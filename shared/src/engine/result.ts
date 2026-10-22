@@ -30,6 +30,7 @@ function pickSurprise(ctx: Ctx): SurpriseDef | undefined {
  * 返回 phase = 'result'（之后 shopAction({type:'continue'}) 进下一回合）或 'over'。
  */
 export function applyBattleResult(state: RunState, result: BattleResult, data: GameData): RunState {
+  if (state.phase !== 'battle') return { ...state, error: '现在不是战斗阶段（先 endShop）' };
   const s = clone(state);
   delete s.error;
   const ctx = makeCtx(s, data);
@@ -44,16 +45,6 @@ export function applyBattleResult(state: RunState, result: BattleResult, data: G
   } else {
     log(ctx, '和局，不加热搜不掉信心');
   }
-  for (const pb of result.permanentBuffs) {
-    const u = s.team.find((x) => x?.uid === pb.uid);
-    if (u) {
-      u.atk = Math.max(0, u.atk + pb.atk);
-      u.hp = Math.max(1, u.hp + pb.hp);
-    }
-  }
-  s.modifiers.nextTurnGold += result.bonus.gold;
-  s.modifiers.nextFreeRerolls += result.bonus.rerolls;
-  s.modifiers.nextUnitPriceMod -= result.bonus.discount;
   const strip = (u: { defId: string; atk: number; hp: number; level: 1 | 2 | 3; tempAtk?: number; tempHp?: number }) => ({
     defId: u.defId, atk: u.atk + (u.tempAtk ?? 0), hp: u.hp + (u.tempHp ?? 0), level: u.level,
   });
@@ -65,6 +56,16 @@ export function applyBattleResult(state: RunState, result: BattleResult, data: G
     trophies: s.trophies,
     lives: s.lives,
   });
+  for (const pb of result.permanentBuffs) {
+    const u = s.team.find((x) => x?.uid === pb.uid);
+    if (u) {
+      u.atk = Math.max(0, u.atk + pb.atk);
+      u.hp = Math.max(1, u.hp + pb.hp);
+    }
+  }
+  s.modifiers.nextTurnGold += result.bonus.gold;
+  s.modifiers.nextFreeRerolls += result.bonus.rerolls;
+  s.modifiers.nextUnitPriceMod -= result.bonus.discount;
   clearBattleTemps(s);
   if (s.tutorial) s.tutorial.battles++;
   s.lastSurprise = undefined;

@@ -7,7 +7,11 @@ import { shopAction } from './shop';
 
 /** 用局面里的修正（enemyDebuff 等）和确定性种子（seed + 回合）跑这回合的战斗 */
 export function battleForState(state: RunState, enemyTeam: readonly (UnitInst | null)[], data: GameData): BattleResult {
-  return simulateBattle(state.team, enemyTeam, data, `${state.seed}:t${state.turn}`, { enemyAtkMod: -state.modifiers.enemyAtkDebuff });
+  return simulateBattle(state.team, enemyTeam, data, `${state.seed}:t${state.turn}`, {
+    enemyAtkMod: -state.modifiers.enemyAtkDebuff,
+    meReverse: (state.modifiers.battleSwapAll ?? 0) % 2 === 1,
+    mePullFront: state.modifiers.battlePullFront ?? [],
+  });
 }
 
 /**

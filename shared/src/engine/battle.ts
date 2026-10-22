@@ -6,7 +6,7 @@ import {
   type Ability, type BattleEvent, type BattleOptions, type BattleResult, type Faction, type GameData, type Level,
   type Side, type Trigger, type UnitDef, type UnitInst, type UnitRef, type UnitSnap,
 } from '../types';
-import { abilityAmount, abilityBuff, abilityMult } from './shop';
+import { abilityAmount, abilityBuff, abilityMult, consumeBonus, destroyThreshold, matchesFilter, resolveChoice } from './shop';
 
 export const MAX_ROUNDS = 50;
 /** 战场每方最多单位数（队伍 5 + 1 个召唤余量） */
@@ -39,6 +39,7 @@ interface BU {
   orig: boolean;
   lastPos: number;
   killer?: BU;
+  consumed?: boolean;
 }
 
 interface Pending {
@@ -166,14 +167,15 @@ class Battle {
         this.emit({
           type: 'faint', unit: { uid: u.uid, defId: u.defId, side: u.side, pos: u.lastPos },
           killer: killer ? this.ref(killer) : undefined,
-          text: `${this.name(u)} 阵亡${killer ? `（被 ${this.name(killer)} 击败）` : ''}`,
+          ...(u.consumed ? { consumed: true } : {}),
+          text: u.consumed && killer ? `${this.name(u)} 被 ${this.name(killer)} 吞并` : `${this.name(u)} 阵亡${killer ? `（被 ${this.name(killer)} 击败）` : ''}`,
         });
         this.say(u);
         this.queueFor(u, 'faint', { killer, pos: u.lastPos });
         for (const f of arr) if (this.isAlive(f)) this.queueFor(f, 'friendFaint', { pos: u.lastPos });
         if (killer && killer.side !== u.side) {
           if (this.isAlive(killer)) this.say(killer, 0.5);
-          this.queueFor(killer, 'kill', { killer: u });
+          this.queueFor(killer, 'kill', {});
         }
       }
     }
@@ -181,9 +183,16 @@ class Battle {
 
   // ── 目标 ──
   targets(p: Pending, ab: Ability): BU[] {
+    const ok = (x: BU) => matchesFilter(x.def, ab.filter);
+    return this.rawTargets(p, ab, ok).filter(ok);
+  }
+
+  rawTargets(p: Pending, ab: Ability, ok: (x: BU) => boolean): BU[] {
     const u = p.u;
-    const friends = this.sides[u.side].filter((x) => this.isAlive(x));
-    const enemies = this.sides[other(u.side)].filter((x) => this.isAlive(x));
+    // copyStats / swapPosition 的对象不会是自己
+    const noSelf = ab.effect === 'copyStats' || ab.effect === 'swapPosition';
+    const friends = this.sides[u.side].filter((x) => this.isAlive(x) && (x === u ? !noSelf : ok(x)));
+    const enemies = this.sides[other(u.side)].filter((x) => this.isAlive(x) && ok(x));
     const others = friends.filter((x) => x !== u);
     const n = ab.n ?? 1;
     const lowest = (l: BU[]) => (l.length ? [l.reduce((m, x) => (x.hp < m.hp ? x : m))] : []);
@@ -195,12 +204,14 @@ class Battle {
       case 'backFriend':
         return others.slice(-1);
       case 'adjacentFriends': {
+        // 按实际站位取左右邻居（筛选条件在外层再过滤）
+        const line = this.sides[u.side].filter((x) => this.isAlive(x));
         if (u.alive) {
-          const i = friends.indexOf(u);
-          return [friends[i - 1], friends[i + 1]].filter(Boolean);
+          const i = line.indexOf(u);
+          return [line[i - 1], line[i + 1]].filter(Boolean);
         }
         const at = p.pos ?? u.lastPos;
-        return [friends[at - 1], friends[at]].filter(Boolean);
+        return [line[at - 1], line[at]].filter(Boolean);
       }
       case 'randomFriend':
         return this.rng.sample(others, n);
@@ -232,7 +243,7 @@ class Battle {
   // ── 技能执行 ──
   runAbility(p: Pending): void {
     const u = p.u;
-    const ab = u.def.ability!;
+    const ab = resolveChoice(u.def.ability!, this.rng);
     const tg = ab.effect === 'summon' ? [] : this.targets(p, ab);
     this.emit({
       type: 'ability', unit: this.ref(u), trigger: p.trigger, effect: ab.effect, targets: tg.map((t) => this.ref(t)),
@@ -243,15 +254,22 @@ class Battle {
       case 'damage':
         for (const t of tg) this.damage(u, t, amt, 'ability');
         break;
-      case 'destroy':
+      case 'destroy': {
+        const limit = destroyThreshold(ab, u.level);
         for (const t of tg) {
           if (!this.isAlive(t)) continue;
+          if (t.hp > limit) {
+            // DESIGN 11.3：血量高于阈值时改为造成阈值点伤害
+            this.damage(u, t, limit, 'ability');
+            continue;
+          }
           const hp = t.hp;
           t.hp = 0;
           t.killer = u;
           this.emit({ type: 'damage', unit: this.ref(t), source: this.ref(u), amount: hp, blocked: 0, hp: 0, shield: t.shield, kind: 'ability', text: `${this.name(u)} 直接击杀了 ${this.name(t)}` });
         }
         break;
+      }
       case 'buff': {
         const b = abilityBuff(ab, u.level);
         for (const t of tg) this.buff(t, b.atk, b.hp, !!ab.permanent, u);
@@ -275,9 +293,15 @@ class Battle {
       case 'copyStats': {
         const t = tg.find((x) => x !== u);
         if (t && this.isAlive(u)) {
-          const da = Math.max(0, t.atk - u.atk);
-          const dh = Math.max(0, t.hp - u.hp);
-          this.buff(u, da, dh, false, u, `${this.name(u)} 复制了 ${this.name(t)} 的属性`);
+          const bonus = ab.consume ? consumeBonus(ab, u.level) : 0;
+          const da = Math.max(0, t.atk - u.atk) + bonus;
+          const dh = Math.max(0, t.hp - u.hp) + bonus;
+          this.buff(u, da, dh, false, u, `${this.name(u)} ${ab.consume ? '吞并' : '复制'}了 ${this.name(t)} 的属性`);
+          if (ab.consume) {
+            t.hp = 0;
+            t.killer = u;
+            t.consumed = true;
+          }
         }
         break;
       }
@@ -427,10 +451,26 @@ class Battle {
     }
   }
 
-  run(): { winner: 'me' | 'enemy' | 'draw'; rounds: number } {
+  /** 商店阶段记下的队形修正（DESIGN 11.5）：先反转，再依次拉到最前 */
+  applyFormation(opts: BattleOptions): void {
+    const me = this.sides.me;
+    if (opts.meReverse && me.length > 1) {
+      me.reverse();
+      for (const u of me) {
+        this.emit({ type: 'move', side: 'me', unit: this.ref(u), from: me.length - 1 - me.indexOf(u), to: me.indexOf(u), order: me.map((x) => x.uid), text: '队伍顺序反转' });
+      }
+    }
+    for (const uid of opts.mePullFront ?? []) {
+      const u = me.find((x) => x.uid === uid);
+      if (u) this.moveTo(u, 0, u);
+    }
+  }
+
+  run(opts: BattleOptions = {}): { winner: 'me' | 'enemy' | 'draw'; rounds: number } {
     const me = this.sides.me;
     const en = this.sides.enemy;
     this.emit({ type: 'start', me: me.map((u) => this.snap(u)), enemy: en.map((u) => this.snap(u)), text: '开战！' });
+    this.applyFormation(opts);
     if (me[0]) this.say(me[0]);
     if (en[0]) this.say(en[0]);
     this.synergies();
@@ -496,7 +536,7 @@ export function simulateBattle(
   // 敌方 uid 可能与我方撞车（快照来自别人的局），加前缀区分
   b.sides.me = mine.map((u) => b.make(u, 'me', true));
   b.sides.enemy = theirs.map((u) => b.make({ ...u, uid: `e_${u.uid}` }, 'enemy', false, opts.enemyAtkMod ?? 0));
-  const { winner, rounds } = b.run();
+  const { winner, rounds } = b.run(opts);
   return {
     winner,
     events: b.events,

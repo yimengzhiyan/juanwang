@@ -1,0 +1,36 @@
+{
+  "_schema": "按 shared/src/types.ts 的 TutorialDef：turns[] = {turn, units: 商店单位 defId[], items: 商店基建 id[], enemy: [{defId, atk?, hp?, level?}] 前排在前}；headlineTurn/headline 指定引导头条；steps 的 key 只能是 buy/buyAgain/fight/merge/item/freezeSell/headline/done，值 {text, target?}，target 是给客户端的高亮提示（shop-unit / shop-item / team / fight / freeze / sell / headline）。流程：回合1 buy→buyAgain→fight；回合2 merge(凑满 3 个进化 Lv2)→item→freezeSell→fight；回合3 headline→fight→done。",
+  "seed": "tutorial-v1",
+  "headlineTurn": 3,
+  "headline": "h_redpack",
+  "turns": [
+    {
+      "turn": 1,
+      "units": ["crawler", "crawler", "labeler"],
+      "items": ["firewall"],
+      "enemy": [{"defId": "botnet", "atk": 1, "hp": 1}]
+    },
+    {
+      "turn": 2,
+      "units": ["crawler", "prompt_eng", "botnet"],
+      "items": ["dataset"],
+      "enemy": [{"defId": "crawler", "atk": 1, "hp": 1}, {"defId": "botnet", "atk": 1, "hp": 1}]
+    },
+    {
+      "turn": 3,
+      "units": ["doubao_chan", "qwen_chan", "wrapper"],
+      "items": ["quantize", "jumpbox"],
+      "enemy": [{"defId": "labeler", "atk": 1, "hp": 2}, {"defId": "botnet", "atk": 1, "hp": 1}]
+    }
+  ],
+  "steps": {
+    "buy": {"text": "点一下「数据爬虫」买下它，花 3 算力，它会进到你的队伍", "target": "shop-unit"},
+    "buyAgain": {"text": "再买一只同名的爬虫，它会叠到第一只身上（2/3），属性 +1/+1", "target": "shop-unit"},
+    "fight": {"text": "点「开战」！最左边的单位打头阵，双方自动互撞", "target": "fight"},
+    "merge": {"text": "商店又来了一只爬虫！买下它凑满 3 只，进化成 Lv2，还会送你一个高阶单位", "target": "shop-unit"},
+    "item": {"text": "基建能强化单位：买下「数据集」，再点你的爬虫，永久 +1/+2", "target": "shop-item"},
+    "freezeSell": {"text": "冻结一个喜欢的商店槽，下回合还在；再把用不上的单位卖掉回点算力", "target": "freeze"},
+    "headline": {"text": "AI 圈出大事了！头条二选一：现在拿算力，还是攒到下回合？", "target": "headline"},
+    "done": {"text": "上手完成！拿满 10 个热搜就能登顶，信心归零就再来一局", "target": "fight"}
+  }
+}

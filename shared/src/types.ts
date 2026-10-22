@@ -39,6 +39,12 @@ export const TARGETS = [
 export type Target = (typeof TARGETS)[number];
 export const ENEMY_TARGETS: readonly Target[] = ['frontEnemy', 'backEnemy', 'randomEnemy', 'allEnemies', 'lowestHpEnemy', 'highestAtkEnemy'];
 
+/** 目标筛选（DESIGN 11.1）：候选单位先按条件过滤再选 */
+export interface TargetFilter { faction?: Faction; minTier?: number; maxTier?: number }
+
+/** 随机形态（DESIGN 11.8）：触发时从 choices 里等概率选一个，覆盖到基础技能上再结算 */
+export type AbilityChoice = Partial<Omit<Ability, 'trigger' | 'choices'>>;
+
 export interface Ability {
   trigger: Trigger;
   effect: Effect;
@@ -58,6 +64,16 @@ export interface Ability {
   unitId?: string;
   /** summon 召唤几个，缺省 1 */
   count?: number;
+  /** 目标筛选：阵营 / 阶级范围 */
+  filter?: TargetFilter;
+  /** copyStats：复制后吞并目标（目标移除），属性 = 两者较高值 + amount（缺省 0，按等级缩放） */
+  consume?: boolean;
+  /** destroy：仅当目标当前血量 ≤ 阈值时直接击杀，否则改为造成"阈值"点伤害 */
+  maxHp?: number;
+  /** destroy 阈值每级增加多少（缺省 0）：阈值 = maxHp + (level-1) × maxHpPerLevel */
+  maxHpPerLevel?: number;
+  /** 随机形态：触发时等概率选一个覆盖到本技能上（例如 GPT 娘回合开始随机 +2 攻 / +2 血 / 降价） */
+  choices?: AbilityChoice[];
   /** 一句话描述，客户端直接显示 */
   desc: string;
 }
@@ -125,7 +141,8 @@ export type EventEffect =
   | { type: 'lifeTrade'; amount: number };
 export type EventEffectType = EventEffect['type'];
 
-export interface HeadlineOption { label: string; effect: EventEffect }
+/** effect = 第一个效果（兼容旧数据）；effects = 全部效果，按顺序结算（validateData 后总是存在） */
+export interface HeadlineOption { label: string; effect: EventEffect; effects?: EventEffect[] }
 export interface HeadlineDef {
   id: string;
   title: string;
@@ -138,6 +155,7 @@ export interface SurpriseDef {
   title: string;
   news: string;
   effect: EventEffect;
+  effects?: EventEffect[];
   good: boolean;
   icon?: string;
 }
@@ -237,6 +255,10 @@ export interface Modifiers {
   nextTurnGold: number;
   nextFreeRerolls: number;
   nextUnitPriceMod: number;
+  /** 商店阶段触发的 swapAll 次数（奇数 = 本场战斗开始时队伍反转，DESIGN 11.5） */
+  battleSwapAll: number;
+  /** 商店阶段触发的 pullFront：本场战斗开始时依次把这些 uid 拉到最前（最后一个最终在最前） */
+  battlePullFront: string[];
 }
 
 export interface BattleRecord {
@@ -329,7 +351,8 @@ export type BattleEvent =
   | { type: 'heal'; unit: UnitRef; source?: UnitRef; amount: number; hp: number; text: string }
   | { type: 'buff'; unit: UnitRef; source?: UnitRef; atk: number; hp: number; newAtk: number; newHp: number; permanent: boolean; text: string }
   | { type: 'shield'; unit: UnitRef; source?: UnitRef; amount: number; total: number; text: string }
-  | { type: 'faint'; unit: UnitRef; killer?: UnitRef; text: string }
+  /** consumed = 被友军 copyStats(consume) 吞并 */
+  | { type: 'faint'; unit: UnitRef; killer?: UnitRef; consumed?: boolean; text: string }
   | { type: 'summon'; unit: UnitSnap; source?: UnitRef; text: string }
   /** 位置变化：order 为该方变化后的完整队列（uid，前排在前） */
   | { type: 'move'; side: Side; unit: UnitRef; from: number; to: number; order: string[]; text: string }
@@ -343,6 +366,10 @@ export type BattleEventType = BattleEvent['type'];
 export interface BattleOptions {
   /** 敌方全队攻击修正（头条 enemyDebuff 传负数，例如 -1） */
   enemyAtkMod?: number;
+  /** 战斗开始时我方队伍反转（商店阶段的 swapAll） */
+  meReverse?: boolean;
+  /** 战斗开始时依次拉到最前的我方 uid（商店阶段的 pullFront） */
+  mePullFront?: string[];
 }
 
 export interface BattleResult {

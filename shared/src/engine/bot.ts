@@ -5,9 +5,9 @@ import {
   BASE_GOLD, TEAM_SIZE, applyAction, beginTurn, clearBattleTemps, emptyModifiers, makeCtx, teamUnits, type Ctx,
 } from './shop';
 
-/** 热搜越高，机器人每回合多拿的算力（上限 4） */
+/** 热搜越高，机器人每回合多拿的算力（每 3 热搜 +1，上限 3） */
 export function botBonusGold(trophies: number): number {
-  return Math.min(4, Math.floor(Math.max(0, trophies) / 2));
+  return Math.min(3, Math.floor(Math.max(0, trophies) / 3));
 }
 
 function unitScore(data: GameData, defId: string, u?: UnitInst): number {

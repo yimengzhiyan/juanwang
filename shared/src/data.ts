@@ -2,7 +2,7 @@
 // 宽松规范化（别名/缺省值）+ 严格报错（未知触发器、缺字段、引用不存在的 id）。
 import {
   EFFECTS, FACTIONS, TARGETS, TRIGGERS, TUTORIAL_STEPS,
-  type Ability, type EventEffect, type Faction, type GameData, type HeadlineDef, type ItemDef, type ItemEffect,
+  type Ability, type AbilityChoice, type EventEffect, type TargetFilter, type Faction, type GameData, type HeadlineDef, type ItemDef, type ItemEffect,
   type SurpriseDef, type Target, type Tier, type TutorialDef, type UnitDef,
 } from './types';
 
@@ -59,6 +59,43 @@ export function parseTarget(v: unknown): { target: Target; n?: number } | null {
   return { target: m[1] as Target, n: m[2] ? Number(m[2]) : undefined };
 }
 
+/** 解析技能的可选字段（基础技能与 choices 共用） */
+function normAbilityExtras(raw: Obj, a: Partial<Ability>, at: string, p: string[]): void {
+  for (const k of ['amount', 'atk', 'hp', 'n', 'count', 'maxHp', 'maxHpPerLevel'] as const) {
+    if (raw[k] !== undefined) {
+      if (!isNum(raw[k])) p.push(`${at}: ${k} 应为数字`);
+      else a[k] = raw[k] as number;
+    }
+  }
+  for (const k of ['permanent', 'perLevel', 'consume'] as const) {
+    if (raw[k] !== undefined) {
+      if (typeof raw[k] !== 'boolean') p.push(`${at}: ${k} 应为布尔`);
+      else a[k] = raw[k] as boolean;
+    }
+  }
+  const unitId = raw.unitId ?? raw.unit ?? raw.summon;
+  if (typeof unitId === 'string') a.unitId = unitId;
+  if (raw.filter !== undefined) {
+    if (!isObj(raw.filter)) p.push(`${at}: filter 应为对象`);
+    else {
+      const f: TargetFilter = {};
+      if (raw.filter.faction !== undefined) {
+        const fa = faction(raw.filter.faction);
+        if (!fa) p.push(`${at}: filter.faction 非法`);
+        else f.faction = fa;
+      }
+      for (const k of ['minTier', 'maxTier'] as const) {
+        const v = raw.filter[k];
+        if (v !== undefined) {
+          if (!isNum(v) || v < 1 || v > 6) p.push(`${at}: filter.${k} 应为 1~6`);
+          else f[k] = v;
+        }
+      }
+      a.filter = f;
+    }
+  }
+}
+
 function normAbility(raw: unknown, at: string, p: string[]): Ability | undefined {
   if (raw === undefined || raw === null) return undefined;
   if (!isObj(raw)) return void p.push(`${at}: ability 应为对象`);
@@ -75,18 +112,37 @@ function normAbility(raw: unknown, at: string, p: string[]): Ability | undefined
     target: t?.target ?? 'self',
     desc: isStr(raw.desc) ? raw.desc : '',
   };
-  for (const k of ['amount', 'atk', 'hp', 'n', 'count'] as const) {
-    if (raw[k] !== undefined) {
-      if (!isNum(raw[k])) p.push(`${at}: ${k} 应为数字`);
-      else a[k] = raw[k] as number;
-    }
-  }
+  normAbilityExtras(raw, a, at, p);
   const n = t?.n ?? a.n;
   if (n !== undefined) a.n = n;
-  if (typeof raw.permanent === 'boolean') a.permanent = raw.permanent;
-  if (typeof raw.perLevel === 'boolean') a.perLevel = raw.perLevel;
-  const unitId = raw.unitId ?? raw.unit ?? raw.summon;
-  if (typeof unitId === 'string') a.unitId = unitId;
+  if (raw.choices !== undefined) {
+    if (!Array.isArray(raw.choices) || raw.choices.length === 0) p.push(`${at}: choices 应为非空数组`);
+    else {
+      a.choices = raw.choices.map((c: unknown, k: number) => {
+        const cat = `${at}.choices[${k}]`;
+        if (!isObj(c)) {
+          p.push(`${cat} 应为对象`);
+          return {};
+        }
+        const out: AbilityChoice = {};
+        if (c.effect !== undefined) {
+          if (!(EFFECTS as readonly string[]).includes(c.effect as string)) p.push(`${cat}: 未知 effect "${String(c.effect)}"`);
+          else out.effect = c.effect as Ability['effect'];
+        }
+        if (c.target !== undefined) {
+          const ct = parseTarget(c.target);
+          if (!ct) p.push(`${cat}: 未知 target "${String(c.target)}"`);
+          else {
+            out.target = ct.target;
+            if (ct.n !== undefined) out.n = ct.n;
+          }
+        }
+        if (isStr(c.desc)) out.desc = c.desc;
+        normAbilityExtras(c, out, cat, p);
+        return out;
+      });
+    }
+  }
   return a;
 }
 
@@ -218,6 +274,12 @@ export function normEventEffect(raw: unknown, at: string, p: string[]): EventEff
   }
 }
 
+/** 头条选项 / 突发：effects 数组优先，兼容单个 effect（DESIGN 11.4） */
+function normEffects(o: Obj, at: string, p: string[]): EventEffect[] {
+  if (Array.isArray(o.effects) && o.effects.length) return o.effects.map((e, i) => normEventEffect(e, `${at}.effects[${i}]`, p));
+  return [normEventEffect(o.effect, at, p)];
+}
+
 function normItem(raw: unknown, i: number, p: string[]): ItemDef | null {
   if (!isObj(raw)) return void p.push(`items[${i}] 不是对象`), null;
   const at = `基建 ${String(raw.id ?? `#${i}`)}`;
@@ -256,7 +318,8 @@ function normHeadline(raw: unknown, i: number, p: string[]): HeadlineDef | null 
   const options = raw.options.map((o: unknown, k: number) => {
     const oo = isObj(o) ? o : {};
     if (!isStr(oo.label)) p.push(`${at}: options[${k}] 缺少 label`);
-    return { label: String(oo.label ?? ''), effect: normEventEffect(oo.effect, `${at}.options[${k}]`, p) };
+    const effects = normEffects(oo, `${at}.options[${k}]`, p);
+    return { label: String(oo.label ?? ''), effect: effects[0], effects };
   }) as HeadlineDef['options'];
   const h: HeadlineDef = { id: String(raw.id), title: String(raw.title ?? ''), news: String(raw.news ?? ''), options };
   if (isStr(raw.icon)) h.icon = raw.icon;
@@ -272,7 +335,10 @@ function normSurprise(raw: unknown, i: number, p: string[]): SurpriseDef | null 
     id: String(raw.id),
     title: String(raw.title ?? ''),
     news: String(raw.news ?? ''),
-    effect: normEventEffect(raw.effect, at, p),
+    ...(() => {
+      const effects = normEffects(raw, at, p);
+      return { effect: effects[0], effects };
+    })(),
     good: raw.good !== false,
   };
   if (isStr(raw.icon)) s.icon = raw.icon;
@@ -369,9 +435,13 @@ export function validateData(raw: RawGameData): GameData {
 
   // 引用检查
   for (const u of units) {
-    if (u.ability?.effect === 'summon') {
-      const id = u.ability.unitId ?? 'token_shuijun';
-      if (!data.unitsById[id]) p.push(`单位 ${u.id}: summon 的 unitId "${id}" 不存在`);
+    const ab = u.ability;
+    if (!ab) continue;
+    for (const v of [ab, ...(ab.choices ?? [])]) {
+      if ((v.effect ?? ab.effect) === 'summon') {
+        const id = v.unitId ?? ab.unitId ?? 'token_shuijun';
+        if (!data.unitsById[id]) p.push(`单位 ${u.id}: summon 的 unitId "${id}" 不存在`);
+      }
     }
   }
   for (const it of items) {
@@ -383,8 +453,8 @@ export function validateData(raw: RawGameData): GameData {
       if (units.length && pool.length === 0) p.push(`${at}: freeUnit 找不到符合条件的单位`);
     }
   };
-  headlines.forEach((h) => h.options.forEach((o, k) => checkEv(o.effect, `头条 ${h.id}.options[${k}]`)));
-  surprises.forEach((s) => checkEv(s.effect, `突发 ${s.id}`));
+  headlines.forEach((h) => h.options.forEach((o, k) => (o.effects ?? [o.effect]).forEach((e) => checkEv(e, `头条 ${h.id}.options[${k}]`))));
+  surprises.forEach((s) => (s.effects ?? [s.effect]).forEach((e) => checkEv(e, `突发 ${s.id}`)));
   if (!units.some((u) => !u.token && u.tier === 1)) p.push('units: 至少需要一个 T1 商店单位');
   if (!data.unitsById.token_shuijun) p.push('units: 缺少民间羁绊召唤物 token_shuijun');
   if (tutorial) {

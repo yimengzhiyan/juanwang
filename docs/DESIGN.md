@@ -182,3 +182,13 @@ generateBotTeam(turn, trophies, data, seed) → UnitInst[]
 3. 单位卡状态：价格标签（商店中）、护盾（头像外一圈蓝环 + 数字）、冻结（槽位浅蓝底 + 雪花角标），细节见 docs/ART.md 第 4 节。
 4. 特效全局约束：粒子同屏上限 120；同一时刻最多一个全屏效果；尊重 `prefers-reduced-motion`（关闭震动与粒子）；失败时的红色边缘闪烁用实心 inset box-shadow，不用模糊。
 5. 旧项目的 7 个赛博风道具 SVG 已删除，不再使用。
+
+## 11. 技能系统扩展决议（2026-10-23，引擎补充实现，内容随后改回原设计）
+1. 目标筛选：`target` 可带 `filter: { faction?: Faction; minTier?: number; maxTier?: number }`，如"随机一个开源友军""最低阶友军"。
+2. `copyStats` 增加 `consume: true`：复制后吞并目标（目标移除，属性取两者较高值再相加 amount），用于马一龙"收购"。
+3. `destroy` 增加 `maxHp?: number`：仅当目标当前血量 ≤ maxHp 时生效，否则改为造成 maxHp 点伤害；用于小扎"一亿签字费"控强度（T2 建议 maxHp 3，每级 +2）。
+4. 头条选项与突发允许多个效果：`effects: EventEffect[]`（保留单个 `effect` 兼容），按顺序结算。
+5. `swapAll` 与 `pullFront` 若在商店阶段触发，则记为"本场战斗开始时生效"的修正器，而不是立即改队形。
+6. 群体基建对全队每个单位各触发一次 `eatItem`，这是有意设计。
+7. 允许召唤物承担触发器覆盖（friendSummoned、pushBack 由水军/幻觉使用）。
+8. 新增触发器 `startTurnRandomForm`（可选）：GPT 娘"日地月"每回合开始随机获得三种形态之一（+2 攻 / +2 血 / 本回合商店价格 -1），若引擎实现成本高可用 `startTurn` + 随机 buff 代替。

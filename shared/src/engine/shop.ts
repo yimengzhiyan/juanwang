@@ -3,7 +3,7 @@ import { Rng } from '../rng';
 import { clone } from '../clone';
 import {
   ENEMY_TARGETS,
-  type Ability, type EventEffect, type GameData, type HeadlineDef, type ItemDef, type Level, type Modifiers,
+  type Ability, type EventEffect, type TargetFilter, type GameData, type HeadlineDef, type ItemDef, type Level, type Modifiers,
   type RunState, type ShopActionInput, type ShopSlot, type Tier, type Trigger, type UnitDef, type UnitInst,
 } from '../types';
 
@@ -59,7 +59,7 @@ export function isHeadlineTurn(turn: number, state?: Pick<RunState, 'tutorial'>,
 export function emptyModifiers(): Modifiers {
   return {
     unitPriceMod: 0, itemPriceMod: 0, extraUnitSlots: 0, rerollFree: false, freeRerolls: 0, enemyAtkDebuff: 0,
-    nextTurnGold: 0, nextFreeRerolls: 0, nextUnitPriceMod: 0,
+    nextTurnGold: 0, nextFreeRerolls: 0, nextUnitPriceMod: 0, battleSwapAll: 0, battlePullFront: [],
   };
 }
 
@@ -314,6 +314,34 @@ export function abilityBuff(ab: Ability, level: number): { atk: number; hp: numb
   return { atk: a, hp: a };
 }
 
+/** 单位定义是否满足目标筛选 */
+export function matchesFilter(def: UnitDef | undefined, f?: TargetFilter): boolean {
+  if (!f) return true;
+  if (!def) return false;
+  if (f.faction && def.faction !== f.faction) return false;
+  if (f.minTier !== undefined && def.tier < f.minTier) return false;
+  if (f.maxTier !== undefined && def.tier > f.maxTier) return false;
+  return true;
+}
+
+/** 随机形态：有 choices 时等概率选一个覆盖到基础技能上 */
+export function resolveChoice(ab: Ability, rng: Rng): Ability {
+  if (!ab.choices?.length) return ab;
+  const c = rng.pick(ab.choices);
+  return { ...ab, ...c, desc: c.desc ?? ab.desc, choices: undefined };
+}
+
+/** copyStats(consume) 的额外加成：amount 缺省 0 */
+export function consumeBonus(ab: Ability, level: number): number {
+  return (ab.amount ?? 0) * abilityMult(ab, level);
+}
+
+/** destroy 的血量阈值（未设 maxHp = 无条件） */
+export function destroyThreshold(ab: Ability, level: number): number {
+  if (ab.maxHp === undefined) return Infinity;
+  return ab.maxHp + (level - 1) * (ab.maxHpPerLevel ?? 0);
+}
+
 /**
  * 触发商店阶段技能。subjects = 拥有该触发的单位 uid（按攻击高→低、位置前→后结算）。
  */
@@ -326,7 +354,7 @@ export function fireShop(ctx: Ctx, trigger: Trigger, subjects: string[], info: S
     .sort((a, b) => b.u.atk + b.u.tempAtk - (a.u.atk + a.u.tempAtk) || a.pos - b.pos);
   for (const { u } of order) {
     if (indexOfUid(ctx.s, u.uid) < 0) continue;
-    runShopAbility(ctx, u, ctx.data.unitsById[u.defId].ability!, info);
+    runShopAbility(ctx, u, resolveChoice(ctx.data.unitsById[u.defId].ability!, ctx.rng), info);
   }
 }
 /** 对全队（可排除某些 uid）触发 */
@@ -335,8 +363,16 @@ function fireTeam(ctx: Ctx, trigger: Trigger, info: ShopInfo, exclude: string[] 
 }
 
 function shopTargets(ctx: Ctx, self: UnitInst, ab: Ability, info: ShopInfo): UnitInst[] {
+  const ok = (u: UnitInst) => matchesFilter(ctx.data.unitsById[u.defId], ab.filter);
+  // copyStats / swapPosition 的对象不会是自己（lowestHpFriend 等也在其他友军里选）
+  const noSelf = ab.effect === 'copyStats' || ab.effect === 'swapPosition';
+  const res = rawShopTargets(ctx, self, ab, info, teamUnits(ctx.s).filter((u) => ok(u) && !(noSelf && u.uid === self.uid)));
+  return res.filter(ok);
+}
+
+function rawShopTargets(ctx: Ctx, self: UnitInst, ab: Ability, info: ShopInfo, all: UnitInst[]): UnitInst[] {
   const s = ctx.s;
-  const all = teamUnits(s);
+  const everyone = teamUnits(s);
   const others = all.filter((u) => u.uid !== self.uid);
   const idx = indexOfUid(s, self.uid);
   if (ENEMY_TARGETS.includes(ab.target)) return [];
@@ -360,11 +396,11 @@ function shopTargets(ctx: Ctx, self: UnitInst, ab: Ability, info: ShopInfo): Uni
     case 'lowestHpFriend':
       return all.length ? [all.reduce((m, u) => (u.hp + u.tempHp < m.hp + m.tempHp ? u : m))] : [];
     case 'boughtUnit': {
-      const u = info.bought ? all.find((x) => x.uid === info.bought) : undefined;
+      const u = info.bought ? everyone.find((x) => x.uid === info.bought) : undefined;
       return u ? [u] : [];
     }
     case 'summoned': {
-      const u = info.summoned ? all.find((x) => x.uid === info.summoned) : undefined;
+      const u = info.summoned ? everyone.find((x) => x.uid === info.summoned) : undefined;
       return u ? [u] : [];
     }
     default:
@@ -411,8 +447,13 @@ function runShopAbility(ctx: Ctx, self: UnitInst, ab: Ability, info: ShopInfo): 
     case 'copyStats': {
       const t = targets.find((x) => x.uid !== self.uid);
       if (t) {
-        self.atk = Math.max(self.atk, t.atk);
-        self.hp = Math.max(self.hp, t.hp);
+        const bonus = ab.consume ? consumeBonus(ab, self.level) : 0;
+        self.atk = Math.max(self.atk, t.atk) + bonus;
+        self.hp = Math.max(self.hp, t.hp) + bonus;
+        if (ab.consume) {
+          s.team[indexOfUid(s, t.uid)] = null;
+          log(ctx, `${name} 吞并了 ${unitName(ctx, t.defId)}`);
+        }
       }
       break;
     }
@@ -431,7 +472,8 @@ function runShopAbility(ctx: Ctx, self: UnitInst, ab: Ability, info: ShopInfo): 
       break;
     }
     case 'pullFront':
-      for (const t of targets) moveUnit(s, indexOfUid(s, t.uid), 0);
+      // DESIGN 11.5：商店阶段触发的 pullFront 记为战斗开始时生效
+      for (const t of targets) s.modifiers.battlePullFront.push(t.uid);
       break;
     case 'pushBack':
       for (const t of targets) moveUnit(s, indexOfUid(s, t.uid), TEAM_SIZE - 1);
@@ -501,7 +543,8 @@ export function applyEventEffect(ctx: Ctx, e: EventEffect): void {
       for (const u of units) u.shield += e.amount;
       break;
     case 'swapAll':
-      s.team.reverse();
+      // DESIGN 11.5：记为战斗开始时队伍反转（两次抵消）
+      m.battleSwapAll += 1;
       break;
     case 'duplicate': {
       const at = firstEmpty(s);
@@ -564,7 +607,7 @@ export function beginTurn(ctx: Ctx, turn: number): void {
   rollShop(ctx, true);
   if (!ctx.sim) log(ctx, `—— 第 ${turn} 回合 ——`);
   if (s.surprisePending && s.lastSurprise) {
-    applyEventEffect(ctx, s.lastSurprise.effect);
+    for (const e of s.lastSurprise.effects ?? [s.lastSurprise.effect]) applyEventEffect(ctx, e);
     log(ctx, `突发生效：${s.lastSurprise.title}`);
     s.surprisePending = false;
   }
@@ -759,7 +802,7 @@ export function applyAction(ctx: Ctx, a: ShopActionInput): string | null {
       const opt = s.pendingHeadline.options[a.option];
       if (!opt) return '没有这个选项';
       log(ctx, `头条「${s.pendingHeadline.title}」：${opt.label}`);
-      applyEventEffect(ctx, opt.effect);
+      for (const e of opt.effects ?? [opt.effect]) applyEventEffect(ctx, e);
       s.pendingHeadline = undefined;
       if (s.tutorial) s.tutorial.headline = true;
       openShop(ctx);
@@ -865,7 +908,7 @@ function useItem(ctx: Ctx, slotIdx: number, target?: number, source?: number): s
       break;
     }
     case 'pullFront':
-      moveUnit(s, indexOfUid(s, tu!.uid), 0);
+      s.modifiers.battlePullFront.push(tu!.uid);
       break;
     case 'transformRandomSameTier': {
       const old = ctx.data.unitsById[tu!.defId];

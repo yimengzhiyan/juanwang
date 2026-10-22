@@ -4,6 +4,7 @@ import {
   maxItemTierForTurn, maxTierForTurn, newRun, shopAction, itemSlotsForTurn, unitSlotsForTurn, rollShop, makeCtx,
 } from '../src/engine/shop';
 import type { GameData, ItemDef, RunState, ShopSlot } from '../src/types';
+import { battleForState } from '../src/engine/helpers';
 
 const unitSlot = (defId: string, price = 3): ShopSlot => ({ kind: 'unit', defId, price, frozen: false });
 const itemSlot = (defId: string, price: number): ShopSlot => ({ kind: 'item', defId, price, frozen: false });
@@ -194,7 +195,7 @@ describe('价格修正', () => {
     s = act(s, { type: 'buy', slot: 0 });
     expect(s.gold).toBe(8);
     const d = custom({ headlines: [{ id: 'cheap', title: 't', news: 'n', options: [{ label: 'a', effect: { type: 'priceMod', target: 'all', amount: -9 } }, { label: 'b', effect: { type: 'gold', amount: 1 } }] }] });
-    let s2 = { ...newRun('pm2', d), phase: 'headline' as const, pendingHeadline: d.headlines[0] };
+    let s2: RunState = { ...newRun('pm2', d), phase: 'headline', pendingHeadline: d.headlines[0] };
     s2 = act(s2, { type: 'chooseHeadline', option: 0 }, d);
     expect(s2.shop.every((x) => x.price === 1)).toBe(true);
   });
@@ -251,10 +252,14 @@ describe('基建', () => {
     const s = act(withItem('i_team'), { type: 'useItem', slot: 0 }, d);
     expect(units(s).every((u) => u!.tempAtk === 1 && u!.tempHp === 2)).toBe(true);
   });
-  it('pullFront', () => {
-    const s = act(withItem('i_front'), { type: 'useItem', slot: 0, target: 1 }, d);
-    expect(s.team[0]?.defId).toBe('kimi');
-    expect(s.team[1]?.defId).toBe('wrapper');
+  it('pullFront：记为本场战斗开始时拉到最前（DESIGN 11.5）', () => {
+    let s = act(withItem('i_front'), { type: 'useItem', slot: 0, target: 1 }, d);
+    expect(s.team[0]?.defId).toBe('wrapper');
+    expect(s.modifiers.battlePullFront).toEqual([s.team[1]!.uid]);
+    s = act(s, { type: 'endShop' }, d);
+    const r = battleForState(s, [mk('gpt_chan', {}, d)], d);
+    const a = r.events.find((e) => e.type === 'attack');
+    expect(a && a.type === 'attack' && a.me.defId).toBe('kimi');
   });
   it('transformRandomSameTier：变成同阶别的单位，保留额外属性', () => {
     const s = act(withItem('i_tf', [mk('wrapper', { atk: 5 }, d)]), { type: 'useItem', slot: 0, target: 0 }, d);

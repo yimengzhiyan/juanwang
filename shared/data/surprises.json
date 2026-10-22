@@ -1,0 +1,17 @@
+[
+  {"id":"s_gpu_ship","title":"老黄发货","news":"一批新卡到货，商店多了个免费的算力单位","effect":{"type":"freeUnit","faction":"compute"},"good":true},
+  {"id":"s_hf_trending","title":"开源趋势榜","news":"你的开源单位冲上趋势榜，大家都来点星","effect":{"type":"buffFaction","faction":"open","atk":1,"hp":1,"permanent":true},"good":true},
+  {"id":"s_banana","title":"手办风刷屏","news":"香蕉模型爆火，你的一个单位被做成了手办","effect":{"type":"duplicate"},"good":true},
+  {"id":"s_redpack","title":"红包到账","news":"春节红包雨余温未散，下回合多领算力","effect":{"type":"nextTurnGold","amount":3},"good":true},
+  {"id":"s_price_cut","title":"API 降价","news":"新模型发布，API 价格砍了约一半，商店跟着打折","effect":{"type":"priceMod","target":"unit","amount":-1},"good":true},
+  {"id":"s_spring_gala","title":"春晚机器人","news":"机器人登上春晚小品，民间单位人气暴涨","effect":{"type":"freeUnit","faction":"folk"},"good":true},
+  {"id":"s_pair_code","title":"结对编程","news":"终端里来了个搭子，全队代码都过了审","effect":{"type":"shieldAll","amount":2},"good":true},
+  {"id":"s_dots_work","title":"小泡泡打工","news":"你的 Dot 在场下偷偷干活，赚了点算力","effect":{"type":"gold","amount":2},"good":true},
+  {"id":"s_k3_night","title":"凌晨开源","news":"又有大模型凌晨开源，刷新随便刷","effect":{"type":"shopRerollFree"},"good":true},
+  {"id":"s_mass_prod","title":"量产破十万","news":"人形机器人年产有望破十万台，货架多摆一格","effect":{"type":"extraSlot","amount":1},"good":true},
+  {"id":"s_4o_back","title":"还你 4o","news":"呼声太高，旧版本回来了，还顺手升了一级","effect":{"type":"levelUpRandom"},"good":true},
+  {"id":"s_server_busy","title":"服务器繁忙","news":"请稍后再试～本回合单位价格 +1","effect":{"type":"priceMod","target":"unit","amount":1},"good":false},
+  {"id":"s_gpu_melt","title":"GPU 融化","news":"大家画头像画得太猛，显卡在冒烟，本回合全队 -1 攻","effect":{"type":"buffTeam","atk":-1,"hp":0,"permanent":false},"good":false},
+  {"id":"s_copyright_bill","title":"版权账单","news":"律师函寄到了，先交 2 算力和解","effect":{"type":"gold","amount":-2},"good":false},
+  {"id":"s_demo_fail","title":"现场演示翻车","news":"发布会 Wi-Fi 不太好，队伍顺序被打乱了","effect":{"type":"swapAll"},"good":false}
+]

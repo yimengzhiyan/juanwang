@@ -1,0 +1,14 @@
+[
+  {"id":"dataset","name":"数据集","tier":1,"price":3,"targetKind":"unit","effect":{"type":"buff","atk":1,"hp":2,"permanent":true},"desc":"喂一份干净数据：永久 +1/+2","icon":"items/dataset.svg"},
+  {"id":"finetune","name":"微调","tier":1,"price":1,"targetKind":"unit","effect":{"type":"transformRandomSameTier"},"desc":"随机变成另一个同阶单位，保留已加属性","icon":"items/finetune.svg"},
+  {"id":"firewall","name":"防火墙","tier":1,"price":2,"targetKind":"unit","effect":{"type":"shield","amount":4},"desc":"本场获得 4 点护盾（挡一次伤害）","icon":"items/firewall.svg"},
+  {"id":"jumpbox","name":"跳板机","tier":1,"price":1,"targetKind":"team","effect":{"type":"summonToken","unitId":"token_gpu"},"desc":"召唤一张 0/3 显卡肉盾到空位","icon":"items/jumpbox.svg"},
+  {"id":"quantize","name":"量化","tier":1,"price":1,"targetKind":"unit","effect":{"type":"buff","atk":2,"hp":-1,"permanent":true},"desc":"精度换速度：永久 +2 攻 -1 血","icon":"items/quantize.svg"},
+  {"id":"gpu_h100","name":"H100","tier":2,"price":3,"targetKind":"unit","effect":{"type":"buff","atk":3,"hp":0,"permanent":true},"desc":"插上一张卡：永久 +3 攻","icon":"items/gpu_h100.svg"},
+  {"id":"funding_round","name":"融资","tier":2,"price":1,"targetKind":"team","effect":{"type":"gold","amount":3},"desc":"花 1 拿 3：立即获得 3 算力","icon":"items/funding_round.svg"},
+  {"id":"alignment","name":"对齐","tier":2,"price":2,"targetKind":"unit","effect":{"type":"buff","atk":-1,"hp":4,"permanent":true},"desc":"交点对齐税：永久 -1 攻 +4 血","icon":"items/alignment.svg"},
+  {"id":"trending","name":"热搜","tier":2,"price":2,"targetKind":"team","effect":{"type":"teamBuff","atk":2,"hp":0,"permanent":false},"desc":"全队冲上热搜：本回合 +2 攻","icon":"items/trending.svg"},
+  {"id":"distill","name":"蒸馏","tier":3,"price":3,"targetKind":"unit","effect":{"type":"copyStatsFrom"},"desc":"选两个单位：攻血追平另一个的较高值","icon":"items/distill.svg"},
+  {"id":"launch_event","name":"发布会","tier":3,"price":3,"targetKind":"unit","effect":{"type":"levelUp"},"desc":"开个发布会：直接进化 +1 级","icon":"items/launch_event.svg"},
+  {"id":"rlhf","name":"RLHF","tier":3,"price":3,"targetKind":"team","effect":{"type":"teamBuff","atk":1,"hp":1,"permanent":true},"desc":"人类反馈：全队永久 +1/+1","icon":"items/rlhf.svg"}
+]
