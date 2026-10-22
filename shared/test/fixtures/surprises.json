@@ -1,0 +1,5 @@
+[
+  { "id": "s_viral", "title": "爆款出圈", "news": "你的 Demo 视频在社交平台刷屏。", "effect": { "type": "gold", "amount": 2 }, "good": true },
+  { "id": "s_free_reroll", "title": "热搜轮换", "news": "热点一天三换，商店免费刷新。", "effect": { "type": "shopRerollFree" }, "good": true },
+  { "id": "s_outage", "title": "服务宕机", "news": "API 大面积 502，用户怨声载道。", "effect": { "type": "priceMod", "target": "all", "amount": 1 }, "good": false }
+]

@@ -1,0 +1,20 @@
+{
+  "seed": "tutorial-v1",
+  "headlineTurn": 3,
+  "headline": "h_price_war",
+  "turns": [
+    { "turn": 1, "units": ["prompt_eng", "prompt_eng", "crawler"], "items": ["coffee"], "enemy": [{ "defId": "token_shuijun" }] },
+    { "turn": 2, "units": ["prompt_eng", "prompt_eng", "labeler"], "items": ["coffee"], "enemy": [{ "defId": "crawler" }] },
+    { "turn": 3, "units": ["doubao_chan", "qwen_chan", "wrapper"], "items": ["coffee", "firewall"], "enemy": [{ "defId": "crawler" }, { "defId": "labeler", "atk": 1, "hp": 2 }] }
+  ],
+  "steps": {
+    "buy": { "text": "点一个单位，花 3 算力把它买进队伍", "target": "shop-unit-0" },
+    "buyAgain": { "text": "再买一个！队伍最多 5 人，最左边先上场", "target": "shop-unit-0" },
+    "fight": { "text": "点「开战」，看它们自动互撞", "target": "btn-fight" },
+    "merge": { "text": "买同名单位叠到它身上，凑满 3 个就能进化 Lv2", "target": "shop-unit-0" },
+    "item": { "text": "基建是道具：买下后点一个单位使用", "target": "shop-item-0" },
+    "freezeSell": { "text": "冻结想留到下回合的商品，再卖掉一个不需要的单位", "target": "btn-freeze" },
+    "headline": { "text": "头条来了！二选一，会影响这回合的商店", "target": "headline-options" },
+    "done": { "text": "引导完成，去卷吧！" }
+  }
+}

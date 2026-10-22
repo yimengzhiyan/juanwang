@@ -1,0 +1,616 @@
+{
+  "cells": [
+    {
+      "id": 0,
+      "type": "start",
+      "name": "融资轮",
+      "desc": "每次路过，投资人都会再信你一次：+200T",
+      "short": "融资"
+    },
+    {
+      "id": 1,
+      "type": "property",
+      "name": "抱抱脸社区",
+      "desc": "模型、数据、表情包，全世界的开源都往这儿堆",
+      "group": "brown",
+      "price": 60,
+      "rents": [
+        2,
+        10,
+        30,
+        90,
+        160,
+        250
+      ],
+      "upgradeCost": 50,
+      "short": "抱抱脸"
+    },
+    {
+      "id": 2,
+      "type": "fate",
+      "name": "突发",
+      "desc": "AI 圈一天，人间一年",
+      "short": "突发"
+    },
+    {
+      "id": 3,
+      "type": "property",
+      "name": "大肥鱼实验室",
+      "desc": "便宜大碗还开源，一条鲸鱼搅动整片海",
+      "group": "brown",
+      "price": 60,
+      "rents": [
+        4,
+        20,
+        60,
+        180,
+        320,
+        450
+      ],
+      "upgradeCost": 50,
+      "short": "大肥鱼"
+    },
+    {
+      "id": 4,
+      "type": "tax",
+      "name": "API 账单",
+      "desc": "月底一看账单，Token 比咖啡还烧钱",
+      "tax": 200,
+      "short": "账单"
+    },
+    {
+      "id": 5,
+      "type": "compute",
+      "name": "皮衣显卡仓",
+      "desc": "买得越多，省得越多——仓管如是说",
+      "price": 200,
+      "short": "显卡仓"
+    },
+    {
+      "id": 6,
+      "type": "property",
+      "name": "套壳大师",
+      "desc": "底层是谁不重要，UI 做得好看最重要",
+      "group": "lightblue",
+      "price": 100,
+      "rents": [
+        6,
+        30,
+        90,
+        270,
+        400,
+        550
+      ],
+      "upgradeCost": 50,
+      "short": "套壳"
+    },
+    {
+      "id": 7,
+      "type": "chance",
+      "name": "热搜",
+      "desc": "又上热搜了，这次是好事还是坏事？",
+      "short": "热搜"
+    },
+    {
+      "id": 8,
+      "type": "property",
+      "name": "光标编辑器",
+      "desc": "Tab 一下代码就写完了，程序员狂喜",
+      "group": "lightblue",
+      "price": 100,
+      "rents": [
+        6,
+        30,
+        90,
+        270,
+        400,
+        550
+      ],
+      "upgradeCost": 50,
+      "short": "光标"
+    },
+    {
+      "id": 9,
+      "type": "property",
+      "name": "困惑搜索",
+      "desc": "有问必答还附引用，就是名字有点困惑",
+      "group": "lightblue",
+      "price": 120,
+      "rents": [
+        8,
+        40,
+        100,
+        300,
+        450,
+        600
+      ],
+      "upgradeCost": 50,
+      "short": "困惑"
+    },
+    {
+      "id": 10,
+      "type": "jail",
+      "name": "监管审查",
+      "desc": "只是路过参观的话，请随意拍照",
+      "short": "监管"
+    },
+    {
+      "id": 11,
+      "type": "property",
+      "name": "豆包工厂",
+      "desc": "国民级 AI 量产基地，日活多到数不过来",
+      "group": "pink",
+      "price": 140,
+      "rents": [
+        10,
+        50,
+        150,
+        450,
+        625,
+        750
+      ],
+      "upgradeCost": 100,
+      "short": "豆包"
+    },
+    {
+      "id": 12,
+      "type": "utility",
+      "name": "核电站",
+      "desc": "一座核电站只够喂一个大模型",
+      "price": 150,
+      "short": "核电"
+    },
+    {
+      "id": 13,
+      "type": "property",
+      "name": "千问书院",
+      "desc": "开源全家桶，从 0.5B 卷到超大杯",
+      "group": "pink",
+      "price": 140,
+      "rents": [
+        10,
+        50,
+        150,
+        450,
+        625,
+        750
+      ],
+      "upgradeCost": 100,
+      "short": "千问"
+    },
+    {
+      "id": 14,
+      "type": "property",
+      "name": "Kimi 长文馆",
+      "desc": "两百万字一口气读完，书虫都自愧不如",
+      "group": "pink",
+      "price": 160,
+      "rents": [
+        12,
+        60,
+        180,
+        500,
+        700,
+        900
+      ],
+      "upgradeCost": 100,
+      "short": "Kimi"
+    },
+    {
+      "id": 15,
+      "type": "compute",
+      "name": "昇腾算力塔",
+      "desc": "国产算力拔地起，卡脖子？不存在",
+      "price": 200,
+      "short": "昇腾"
+    },
+    {
+      "id": 16,
+      "type": "property",
+      "name": "米斯特拉风",
+      "desc": "欧洲之光，法式浪漫写进权重里",
+      "group": "orange",
+      "price": 180,
+      "rents": [
+        14,
+        70,
+        200,
+        550,
+        750,
+        950
+      ],
+      "upgradeCost": 100,
+      "short": "米斯特"
+    },
+    {
+      "id": 17,
+      "type": "fate",
+      "name": "突发",
+      "desc": "AI 圈一天，人间一年",
+      "short": "突发"
+    },
+    {
+      "id": 18,
+      "type": "property",
+      "name": "标注大厂",
+      "desc": "没有人工，哪来智能？数据标到手软",
+      "group": "orange",
+      "price": 180,
+      "rents": [
+        14,
+        70,
+        200,
+        550,
+        750,
+        950
+      ],
+      "upgradeCost": 100,
+      "short": "标注"
+    },
+    {
+      "id": 19,
+      "type": "property",
+      "name": "数据砖块",
+      "desc": "湖仓一体，把数据砌成摩天楼",
+      "group": "orange",
+      "price": 200,
+      "rents": [
+        16,
+        80,
+        220,
+        600,
+        800,
+        1000
+      ],
+      "upgradeCost": 100,
+      "short": "数据砖"
+    },
+    {
+      "id": 20,
+      "type": "free",
+      "name": "开源节",
+      "desc": "大家都开源了，奖池你也拿走吧",
+      "short": "开源节"
+    },
+    {
+      "id": 21,
+      "type": "property",
+      "name": "机器狗乐园",
+      "desc": "会后空翻、会扭秧歌，还会上春晚",
+      "group": "red",
+      "price": 220,
+      "rents": [
+        18,
+        90,
+        250,
+        700,
+        875,
+        1050
+      ],
+      "upgradeCost": 150,
+      "short": "机器狗"
+    },
+    {
+      "id": 22,
+      "type": "chance",
+      "name": "热搜",
+      "desc": "又上热搜了，这次是好事还是坏事？",
+      "short": "热搜"
+    },
+    {
+      "id": 23,
+      "type": "property",
+      "name": "擎天柱工厂",
+      "desc": "人形机器人进厂打工，明年一定量产",
+      "group": "red",
+      "price": 220,
+      "rents": [
+        18,
+        90,
+        250,
+        700,
+        875,
+        1050
+      ],
+      "upgradeCost": 150,
+      "short": "擎天柱"
+    },
+    {
+      "id": 24,
+      "type": "property",
+      "name": "萝卜车站",
+      "desc": "方向盘？那是什么？无人车随叫随到",
+      "group": "red",
+      "price": 240,
+      "rents": [
+        20,
+        100,
+        300,
+        750,
+        925,
+        1100
+      ],
+      "upgradeCost": 150,
+      "short": "萝卜车"
+    },
+    {
+      "id": 25,
+      "type": "compute",
+      "name": "东数西算中心",
+      "desc": "东部的数据，西部的风电，算力跨省漫游",
+      "price": 200,
+      "short": "东数"
+    },
+    {
+      "id": 26,
+      "type": "property",
+      "name": "水果智能",
+      "desc": "发布会说今年上，用户说明年见",
+      "group": "yellow",
+      "price": 260,
+      "rents": [
+        22,
+        110,
+        330,
+        800,
+        975,
+        1150
+      ],
+      "upgradeCost": 150,
+      "short": "水果"
+    },
+    {
+      "id": 27,
+      "type": "property",
+      "name": "巨硬副驾",
+      "desc": "每个软件右上角都住着一位副驾驶",
+      "group": "yellow",
+      "price": 260,
+      "rents": [
+        22,
+        110,
+        330,
+        800,
+        975,
+        1150
+      ],
+      "upgradeCost": 150,
+      "short": "巨硬"
+    },
+    {
+      "id": 28,
+      "type": "utility",
+      "name": "数据爬虫站",
+      "desc": "全网能爬的都爬了，下一步爬自己",
+      "price": 150,
+      "short": "爬虫"
+    },
+    {
+      "id": 29,
+      "type": "property",
+      "name": "雨林云商",
+      "desc": "卖书起家，现在卖的是算力和 GPU 时长",
+      "group": "yellow",
+      "price": 280,
+      "rents": [
+        24,
+        120,
+        360,
+        850,
+        1025,
+        1200
+      ],
+      "upgradeCost": 150,
+      "short": "雨林"
+    },
+    {
+      "id": 30,
+      "type": "gotojail",
+      "name": "被监管",
+      "desc": "刷榜、幻觉、数据来源说不清？请移步审查",
+      "short": "被监管"
+    },
+    {
+      "id": 31,
+      "type": "property",
+      "name": "深度思维",
+      "desc": "下完围棋折蛋白，谷歌亲闺女的老家",
+      "group": "green",
+      "price": 300,
+      "rents": [
+        26,
+        130,
+        390,
+        900,
+        1100,
+        1275
+      ],
+      "upgradeCost": 200,
+      "short": "深思"
+    },
+    {
+      "id": 32,
+      "type": "property",
+      "name": "人类社",
+      "desc": "先把安全做好，再把代码写好",
+      "group": "green",
+      "price": 300,
+      "rents": [
+        26,
+        130,
+        390,
+        900,
+        1100,
+        1275
+      ],
+      "upgradeCost": 200,
+      "short": "人类社"
+    },
+    {
+      "id": 33,
+      "type": "fate",
+      "name": "突发",
+      "desc": "AI 圈一天，人间一年",
+      "short": "突发"
+    },
+    {
+      "id": 34,
+      "type": "property",
+      "name": "开放AI",
+      "desc": "名字叫开放，权重先别问",
+      "group": "green",
+      "price": 320,
+      "rents": [
+        28,
+        150,
+        450,
+        1000,
+        1200,
+        1400
+      ],
+      "upgradeCost": 200,
+      "short": "开放AI"
+    },
+    {
+      "id": 35,
+      "type": "compute",
+      "name": "星际之门",
+      "desc": "五千亿美元的机房，规模大到能看见",
+      "price": 200,
+      "short": "星门"
+    },
+    {
+      "id": 36,
+      "type": "chance",
+      "name": "热搜",
+      "desc": "又上热搜了，这次是好事还是坏事？",
+      "short": "热搜"
+    },
+    {
+      "id": 37,
+      "type": "property",
+      "name": "安全超智能",
+      "desc": "只做一件事：安全的超级智能",
+      "group": "darkblue",
+      "price": 350,
+      "rents": [
+        35,
+        175,
+        500,
+        1100,
+        1300,
+        1500
+      ],
+      "upgradeCost": 200,
+      "short": "超智能"
+    },
+    {
+      "id": 38,
+      "type": "tax",
+      "name": "显卡税",
+      "desc": "显卡越买越多，税也越交越多",
+      "tax": 100,
+      "short": "显卡税"
+    },
+    {
+      "id": 39,
+      "type": "property",
+      "name": "AGI 圣殿",
+      "desc": "据说明年就建成，已经说了好几年",
+      "group": "darkblue",
+      "price": 400,
+      "rents": [
+        50,
+        200,
+        600,
+        1400,
+        1700,
+        2000
+      ],
+      "upgradeCost": 200,
+      "short": "AGI"
+    }
+  ],
+  "groups": [
+    {
+      "id": "brown",
+      "name": "开源小作坊",
+      "color": "#C98A5A",
+      "cells": [
+        1,
+        3
+      ]
+    },
+    {
+      "id": "lightblue",
+      "name": "套壳应用",
+      "color": "#5FD4FF",
+      "cells": [
+        6,
+        8,
+        9
+      ]
+    },
+    {
+      "id": "pink",
+      "name": "国产之光",
+      "color": "#FF7AC6",
+      "cells": [
+        11,
+        13,
+        14
+      ]
+    },
+    {
+      "id": "orange",
+      "name": "海外独角兽",
+      "color": "#FFA94D",
+      "cells": [
+        16,
+        18,
+        19
+      ]
+    },
+    {
+      "id": "red",
+      "name": "具身智能",
+      "color": "#FF5470",
+      "cells": [
+        21,
+        23,
+        24
+      ]
+    },
+    {
+      "id": "yellow",
+      "name": "科技巨头",
+      "color": "#FFD93D",
+      "cells": [
+        26,
+        27,
+        29
+      ]
+    },
+    {
+      "id": "green",
+      "name": "前沿实验室",
+      "color": "#3DDC97",
+      "cells": [
+        31,
+        32,
+        34
+      ]
+    },
+    {
+      "id": "darkblue",
+      "name": "AGI 超级智能",
+      "color": "#5B6CFF",
+      "cells": [
+        37,
+        39
+      ]
+    }
+  ],
+  "startBonus": 200,
+  "jailFine": 50
+}

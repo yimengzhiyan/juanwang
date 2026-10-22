@@ -1,0 +1,9 @@
+[
+  {"id":"roadblock","name":"宕机路障","desc":"放在前方 1~8 格内任一格，任何人走到都会立刻停下。","icon":"items/roadblock.svg","targetKind":"cellAhead","range":8},
+  {"id":"missile","name":"DDoS 导弹","desc":"轰炸前方 1~10 格内一块对手基建，降 1 级（旗舰→v4）。","icon":"items/missile.svg","targetKind":"enemyPropertyAhead","range":10},
+  {"id":"rocket","name":"火箭加速","desc":"本回合掷骰结果 +6，算力全开冲冲冲。","icon":"items/rocket.svg","targetKind":"none"},
+  {"id":"turtle","name":"限流乌龟","desc":"指定一名对手，其下次掷骰固定为 1，请排队等待。","icon":"items/turtle.svg","targetKind":"player"},
+  {"id":"shield","name":"防火墙护盾","desc":"下一次应付的 API 调用费全额免除。","icon":"items/shield.svg","targetKind":"none"},
+  {"id":"teleport","name":"跳板机","desc":"直接传送到自己任意一块基建；没有基建则回融资轮（不发钱）。","icon":"items/teleport.svg","targetKind":"ownProperty"},
+  {"id":"jailfree","name":"合规豁免卡","desc":"监管审查中使用，立刻无条件出来。","icon":"items/jailfree.svg","targetKind":"none"}
+]

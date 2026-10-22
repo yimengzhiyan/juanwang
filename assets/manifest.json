@@ -1,0 +1,83 @@
+{
+  "version": 2,
+  "style": "bright-cartoon",
+  "note": "units/*.svg 为占位图；用户用 GPT 生成同名 PNG 放到 units/<id>.png 后，客户端优先加载 PNG（见 docs/PROMPTS_GPT.md 放置路径表）",
+  "characters": {
+    "altman": "characters/altman.png",
+    "claude_chan": "characters/claude_chan.png",
+    "dario": "characters/dario.png",
+    "deepseek_chan": "characters/deepseek_chan.png",
+    "doubao_chan": "characters/doubao_chan.png",
+    "gemini_chan": "characters/gemini_chan.png",
+    "gpt_chan": "characters/gpt_chan.png",
+    "huang": "characters/huang.png",
+    "ilya": "characters/ilya.png",
+    "lecun": "characters/lecun.png",
+    "liang": "characters/liang.png",
+    "musk": "characters/musk.png",
+    "qwen_chan": "characters/qwen_chan.png",
+    "zuck": "characters/zuck.png"
+  },
+  "units": {
+    "prompt_eng": "units/prompt_eng.svg",
+    "crawler": "units/crawler.svg",
+    "labeler": "units/labeler.svg",
+    "wrapper": "units/wrapper.svg",
+    "botnet": "units/botnet.svg",
+    "vibe_coder": "units/vibe_coder.svg",
+    "ai_gf": "units/ai_gf.svg",
+    "scalper": "units/scalper.svg",
+    "leaderboard": "units/leaderboard.svg",
+    "hf": "units/hf.svg",
+    "kimi": "units/kimi.svg",
+    "mistral": "units/mistral.svg",
+    "hallucination": "units/hallucination.svg",
+    "robodog": "units/robodog.svg",
+    "stargate": "units/stargate.svg",
+    "regulator": "units/regulator.svg",
+    "agi": "units/agi.svg",
+    "funding": "units/funding.svg"
+  },
+  "tokens": {
+    "token_shuijun": "units/token_shuijun.svg",
+    "token_halluc": "units/token_halluc.svg",
+    "token_gpu": "units/token_gpu.svg"
+  },
+  "items": {
+    "gpu_h100": "items/gpu_h100.svg",
+    "dataset": "items/dataset.svg",
+    "finetune": "items/finetune.svg",
+    "distill": "items/distill.svg",
+    "firewall": "items/firewall.svg",
+    "funding_round": "items/funding_round.svg",
+    "launch_event": "items/launch_event.svg",
+    "trending": "items/trending.svg",
+    "jumpbox": "items/jumpbox.svg",
+    "alignment": "items/alignment.svg",
+    "quantize": "items/quantize.svg",
+    "rlhf": "items/rlhf.svg"
+  },
+  "ui": {
+    "atk": "ui/atk.svg",
+    "battle": "ui/battle.svg",
+    "faction_closed": "ui/faction_closed.svg",
+    "faction_compute": "ui/faction_compute.svg",
+    "faction_folk": "ui/faction_folk.svg",
+    "faction_open": "ui/faction_open.svg",
+    "fire": "ui/fire.svg",
+    "freeze": "ui/freeze.svg",
+    "gold": "ui/gold.svg",
+    "hp": "ui/hp.svg",
+    "lives": "ui/lives.svg",
+    "reroll": "ui/reroll.svg",
+    "sell": "ui/sell.svg",
+    "star": "ui/star.svg"
+  },
+  "branding": {
+    "logo": "logo.svg",
+    "bg_home": "bg_home.svg"
+  },
+  "fonts": {
+    "fredoka": "fonts/fredoka-latin.woff2"
+  }
+}

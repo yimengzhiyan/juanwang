@@ -1,0 +1,14 @@
+[
+  { "id": "h_price_war", "title": "大模型价格战", "news": "各家 API 一夜降价九成，开发者狂喜。",
+    "options": [ { "label": "跟着降价", "effect": { "type": "priceMod", "target": "unit", "amount": -1 } },
+                 { "label": "囤点算力", "effect": { "type": "nextTurnGold", "amount": 3 } } ] },
+  { "id": "h_open_weights", "title": "开源权重", "news": "又一家公司开源了旗舰模型权重。",
+    "options": [ { "label": "全员微调", "effect": { "type": "buffFaction", "faction": "open", "atk": 1, "hp": 1, "permanent": true } },
+                 { "label": "白嫖一个", "effect": { "type": "freeUnit", "faction": "open" } } ] },
+  { "id": "h_gpu_short", "title": "显卡断供", "news": "高端显卡出口受限，二手市场价格翻倍。",
+    "options": [ { "label": "加钱抢卡", "effect": { "type": "gold", "amount": 2 } },
+                 { "label": "多开一格", "effect": { "type": "extraSlot", "amount": 1 } } ] },
+  { "id": "h_safety", "title": "安全对齐", "news": "监管要求所有模型上线前做红队测试。",
+    "options": [ { "label": "全员护盾", "effect": { "type": "shieldAll", "amount": 2 } },
+                 { "label": "削弱对手", "effect": { "type": "enemyDebuff", "amount": 1 } } ] }
+]

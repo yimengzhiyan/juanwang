@@ -1,0 +1,346 @@
+# 《卷王自走棋》美术与 UI 规范（ART.md）
+
+> 以 `docs/DESIGN.md` 为准，本文件是第 8 节"美术方向"的展开，也细化第 7 节的特效。
+> 一句话画风：**明亮清新、Q 版卡通厚涂、皇室战争式饱和配色、粗深棕描边、平光高光。**
+> 禁止项：霓虹发光、赛博朋克暗底、`filter: drop-shadow/blur` 发光、`mix-blend-mode: screen` 叠光、渐变描边、玻璃拟态毛玻璃。
+
+---
+
+## 0. 视觉三原则
+
+1. **亮底深线**：背景永远是亮色（天空蓝→奶油白），所有前景物件用 `#3B2A1A` 深棕粗描边勾出轮廓，靠描边而不是发光把物件"立"起来。
+2. **平光两色**：一个形状只用"本色 + 一块偏暗的影色"（右下）+ 一块白色高光（左上，半透明椭圆或弧线）。不做多层渐变，不做外发光。
+3. **克制动效**：同一时刻最多一个全屏效果；粒子总数有上限；每个特效都有明确结束时间。
+
+---
+
+## 1. 配色 Token（CSS 变量）
+
+```css
+:root {
+  /* 背景 */
+  --bg-sky: #4FC3F7;
+  --bg-sky-mid: #A9E3FB;
+  --bg-cream: #FFF8E7;
+  --bg-grad: linear-gradient(180deg, #4FC3F7 0%, #A9E3FB 45%, #FFF8E7 80%);
+  --bg-grass: #58C65C;            /* 首页草坡、底部装饰 */
+  --bg-grass-dark: #46AD4B;
+
+  /* 面板 */
+  --panel: rgba(255, 255, 255, 0.90);
+  --panel-solid: #FFFFFF;
+  --panel-sunk: #EEF3F8;          /* 槽位凹陷底 */
+  --panel-sunk-line: #C9D3DE;     /* 空槽虚线 */
+  --paper: #FFF1C9;               /* 头条报纸、卷轴 */
+
+  /* 主色 */
+  --c-blue: #2F80ED;   --c-blue-dark: #1F5FC0;
+  --c-gold: #FFC53D;   --c-gold-dark: #E0A21E;
+  --c-green: #58C65C;  --c-green-dark: #3E9E44;
+  --c-red: #F25757;    --c-red-dark: #D63E3E;
+  --c-purple: #9B6BFF; --c-purple-dark: #7A4FE0;
+  --c-orange: #FF8C42; --c-pink: #FF7EB6;
+
+  /* 文字 */
+  --text: #1F2A44;
+  --text-sub: #5A6785;
+  --text-on-color: #FFFFFF;       /* 彩色按钮上的白字，配 --outline 2px 描边 */
+
+  /* 描边与阴影 */
+  --outline: #3B2A1A;
+  --outline-w: 3px;               /* 手机卡片/按钮；图标内部 SVG 已自带 */
+  --shadow-soft: 0 6px 0 rgba(59, 42, 26, 0.18), 0 10px 24px rgba(31, 42, 68, 0.12);
+  --shadow-press: 0 2px 0 rgba(59, 42, 26, 0.18);
+
+  /* 4 阵营 */
+  --f-open: #58C65C;      /* 开源 绿 */
+  --f-closed: #2F80ED;    /* 闭源 蓝 */
+  --f-compute: #FF8C42;   /* 算力 橙 */
+  --f-folk: #FF7EB6;      /* 民间 粉 */
+
+  /* 6 阶级（单位卡边框） */
+  --t1: #9BB1C8;  --t2: #58C65C;  --t3: #2F80ED;
+  --t4: #9B6BFF;  --t5: #FF8C42;  --t6: #FFC53D;
+
+  /* 反馈 */
+  --dmg: #F25757;         /* 伤害数字 */
+  --heal: #58C65C;        /* 回血/加血数字 */
+  --buff-atk: #FF8C42;    /* 加攻数字 */
+  --shield: #7FD6FF;      /* 护盾 */
+  --frozen: #BDEBFF;      /* 冻结槽位底 */
+
+  /* 圆角 */
+  --r-card: 20px;  --r-btn: 20px;  --r-chip: 999px;
+}
+```
+
+单位插画底色（每个单位一个明亮圆底，SVG 内已画好，PNG 生图时沿用）：
+
+| id | 底色 | id | 底色 | id | 底色 |
+|---|---|---|---|---|---|
+| prompt_eng | `#8FD3FF` | ai_gf | `#BFE3FF` | hallucination | `#FFD97A` |
+| crawler | `#B8E986` | scalper | `#A8E06A` | robodog | `#7FD6FF` |
+| labeler | `#FFD36B` | leaderboard | `#8EC5FF` | stargate | `#B9A6FF` |
+| wrapper | `#C9B5FF` | hf | `#7CC8FF` | regulator | `#CFE0EE` |
+| botnet | `#FFB38A` | kimi | `#9EE6B8` | agi | `#8E9BFF` |
+| vibe_coder | `#7FE0D0` | mistral | `#A9D4FF` | funding | `#7BD88F` |
+| token_shuijun | `#FFC9A8` | token_halluc | `#E6D2FF` | token_gpu | `#BFD0E0` |
+
+---
+
+## 2. 字体
+
+```css
+@font-face {
+  font-family: 'Fredoka';
+  src: url('/assets/fonts/fredoka-latin.woff2') format('woff2');
+  font-weight: 400 700;
+  font-display: swap;
+}
+:root {
+  --font-ui: 'Fredoka', 'PingFang SC', 'HarmonyOS Sans SC', 'MiSans', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
+  --font-num: 'Fredoka', 'Arial Rounded MT Bold', system-ui, sans-serif;  /* 攻/血、算力、伤害数字 */
+}
+body { font-family: var(--font-ui); color: var(--text); }
+```
+
+| 用途 | 字号（手机） | 字重 | 处理 |
+|---|---|---|---|
+| 页标题 / 结局大字 | 32px | 700 | 白字 + 3px `--outline` 描边（`-webkit-text-stroke` 或 `paint-order: stroke`） + 下方 3px 实色投影 |
+| 按钮 | 20px | 700 | 白字 + 2px 描边 |
+| 卡片名 | 13px | 700 | `--text` |
+| 角标数字（攻/血） | 18px | 700 | `--font-num`，白字 + 2.5px 描边 |
+| 正文 / 技能描述 | 14px | 500 | `--text`，行高 1.45 |
+| 浮字（伤害/算力） | 26px | 700 | 彩色字 + 3px 描边，见第 7 节 |
+
+中文 Logo 已转曲为 `assets/logo.svg`，不依赖字体。
+
+---
+
+## 3. 组件 CSS
+
+### 3.1 卡片 / 面板
+
+```css
+.panel {
+  background: var(--panel);
+  border: var(--outline-w) solid var(--outline);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-soft);
+  padding: 12px;
+}
+.panel--paper { background: var(--paper); }          /* 头条、结算 */
+.slot {                                               /* 队伍/商店空槽 */
+  background: var(--panel-sunk);
+  border: 3px dashed var(--panel-sunk-line);
+  border-radius: 18px;
+}
+.slot.is-frozen { background: var(--frozen); border-color: var(--shield); }
+```
+
+### 3.2 按钮（手机 ≥56px 高；单击完成；按下缩放）
+
+```css
+.btn {
+  --btn-c: var(--c-blue); --btn-d: var(--c-blue-dark);
+  min-height: 56px; padding: 0 22px;
+  font: 700 20px/1 var(--font-ui); color: #fff;
+  -webkit-text-stroke: 2px var(--outline); paint-order: stroke fill;
+  background: var(--btn-c);
+  border: 3px solid var(--outline);
+  border-radius: var(--r-btn);
+  box-shadow: inset 0 -6px 0 var(--btn-d), inset 0 4px 0 rgba(255,255,255,.45), 0 5px 0 rgba(59,42,26,.25);
+  transition: transform .08s ease-out, box-shadow .08s ease-out;
+  touch-action: manipulation; user-select: none;
+}
+.btn:active, .btn.is-pressed {
+  transform: translateY(3px) scale(0.96);
+  box-shadow: inset 0 -3px 0 var(--btn-d), inset 0 3px 0 rgba(255,255,255,.4), 0 2px 0 rgba(59,42,26,.25);
+}
+.btn:disabled { --btn-c: #C9D3DE; --btn-d: #97A6B8; opacity: .85; }
+.btn--go     { --btn-c: var(--c-green);  --btn-d: var(--c-green-dark); }  /* 开战、再来一局 */
+.btn--gold   { --btn-c: var(--c-gold);   --btn-d: var(--c-gold-dark); color: var(--outline); -webkit-text-stroke: 0; } /* 每日挑战 */
+.btn--danger { --btn-c: var(--c-red);    --btn-d: var(--c-red-dark); }    /* 出售 */
+.btn--icon   { width: 56px; padding: 0; }  /* 刷新 / 冻结 / 静音：内放 ui/*.svg 32px */
+```
+
+桌面端按钮可降到 48px 高，`:hover` 只做 `translateY(-2px)`，不加发光。
+
+---
+
+## 4. 单位卡结构
+
+手机基准：商店卡 **84×104**，队伍卡 **72×92**（5 槽一行放得下 390 宽）。以下以 84×104 标注（队伍卡等比缩放 0.857）。
+
+```
+          ┌──────────────── 84 ────────────────┐
+          │ ★★☆                     [阵营]     │  ← 等级星：左上 (4,4)，每颗 14px，Lv1=1 实 2 空
+          │      ╭──────────────────╮  20px圆  │     阵营徽：右上 (60,2)，20×20，ui/faction_*.svg
+          │      │                  │          │
+          │      │   头像 64×64     │          │  ← 头像圆：中心 (42,40)，直径 64，
+          │      │  (圆形裁切)      │          │     外描 4px 阶级色 + 外圈 2px --outline
+          │      ╰──────────────────╯          │
+     104  │    提示词工程师  （名字 12px 单行省略）│ ← 名字：y=76，居中，超长 text-overflow
+          │ ⚔ ┌──┐                    ┌──┐ ❤   │
+          │   │ 3│                    │ 2│     │  ← 攻击角标：左下 (−6,74) 32×32，ui/atk.svg 底 + 白字数字
+          └───┴──┴────────────────────┴──┴─────┘     血量角标：右下 (58,74) 32×32，ui/hp.svg 底 + 白字数字
+                                                       （角标超出卡片 6px，靠描边压住边界，更"厚"）
+```
+
+| 元素 | 尺寸 / 位置（84×104 卡） | 规则 |
+|---|---|---|
+| 卡底 | 84×104，圆角 18px，`--panel-solid`，3px `--outline` | 选中：底改 `#FFF4CC`，上浮 4px |
+| 阶级边框 | 头像外 4px 环，颜色 `--t1..--t6` | T6 环额外加 2px 白色内圈（不发光） |
+| 头像 | 64×64 圆，`object-fit: cover`；角色 PNG 往上偏 8% 取脸 | SVG 单位图本身是圆底，直接放 |
+| 攻击角标 | 32×32 剑图标，数字 18px 叠在图标中心偏下 | 本场临时加成数字变 `--buff-atk` 橙色 |
+| 血量角标 | 32×32 心图标，数字 18px | 受伤后数字变 `--dmg` 红色；护盾时角标外加 3px `--shield` 圆环 |
+| 等级星 | 14×14 ×3，`ui/star.svg`，空星 `opacity:.25; filter: grayscale(1)` | Lv2 两颗、Lv3 三颗；xp 进度用星下 2px 小条 |
+| 阵营小图标 | 20×20 右上，`ui/faction_open|closed|compute|folk.svg` | 羁绊激活时轻微弹跳一次 |
+| 价格（商店） | 卡片上沿外中间 3px 处，金色胶囊 `⚡3` 高 22px | 买不起时灰掉 |
+
+---
+
+## 5. 布局线框
+
+### 5.1 手机竖屏（390×844 基准，左右 12px 安全边距）
+
+**商店阶段**
+
+```
+┌──────────────────────────────────────┐
+│ ❤5   🔥3/10   回合 4      ⚡10   ⚙ │  顶栏 56px：信心/热搜/回合/算力/设置，白面板胶囊
+├──────────────────────────────────────┤
+│ [开源 2/3] [闭源 1/3] [算力 0/3] [民间 3/3✓] │  羁绊徽章行 28px，可横滑
+├──────────────────────────────────────┤
+│              我 的 队 伍              │  标签 14px（前排在左 ←）
+│ ┌────┐┌────┐┌────┐┌────┐┌────┐       │
+│ │ 1  ││ 2  ││ 3  ││ 4  ││ 5  │       │  队伍 5 槽：72×92，间距 6px，草绿地台条
+│ └────┘└────┘└────┘└────┘└────┘       │
+│  ▔▔▔▔▔▔▔▔▔▔▔ 草地台 ▔▔▔▔▔▔▔▔▔▔▔▔       │
+├──────────────────────────────────────┤
+│ ╭──────────── 商 店 ────────────────╮│  商店白面板，圆角 20
+│ │ ⚡3     ⚡3     ⚡3     ⚡3    ⚡3   ││
+│ │┌────┐ ┌────┐ ┌────┐ ┌────┐┌────┐  ││  单位 3~5：84×104（5 个时缩到 66×84）
+│ ││    │ │    │ │    │ │    ││    │  ││
+│ │└────┘ └────┘ └────┘ └────┘└────┘  ││
+│ │ ┌──────┐ ┌──────┐                  ││  基建 1~2：64×64 贴纸 + 价格
+│ │ │ 基建 │ │ 基建 │                  ││
+│ │ └──────┘ └──────┘                  ││
+│ ╰────────────────────────────────────╯│
+├──────────────────────────────────────┤
+│ [🔄刷新⚡1] [❄冻结] [💰出售]  [ ⚔ 开战 ] │  底栏 72px：56px 高按钮；开战 .btn--go 占 40% 宽
+└──────────────────────────────────────┘
+```
+
+**战斗阶段**（商店区收起，敌方队伍从上滑入）
+
+```
+┌──────────────────────────────────────┐
+│ ❤5   🔥3/10   回合 4   [1x][2x][跳过] │
+├──────────────────────────────────────┤
+│              敌 方（镜像）             │
+│        ┌────┐┌────┐┌────┐┌────┐┌────┐│  敌方：前排在右 → 朝向我方，卡片底色淡红 #FFF0F0
+│        │ 1  ││ 2  ││ 3  ││ 4  ││ 5  ││
+│        └────┘└────┘└────┘└────┘└────┘│
+│                                      │
+│              ╭──────╮                │
+│              │  VS  │                │  VS 徽章 96px（开战时撞击一次后缩成 48px 停在中线）
+│              ╰──────╯                │
+│ ┌────┐┌────┐┌────┐┌────┐┌────┐        │  我方：前排在左
+│ │ 1  ││ 2  ││ 3  ││ 4  ││ 5  │        │
+│ └────┘└────┘└────┘└────┘└────┘        │
+│ ───── 技能横幅（出现时占这一条 40px）──── │
+│     [ 战斗日志：可折叠 3 行 ]          │
+└──────────────────────────────────────┘
+```
+
+> 战斗中前排相撞的"擂台"是两队前排之间的竖向中轴：我方前排从左下往中线斜冲，敌方前排从右上往中线斜冲，挤压后回位。
+
+**头条弹窗**：遮罩 `rgba(31,42,68,.45)`；米白纸卡 340×420，旋转 -2°，左上红色"头条"圆章（旋转 -12°）；标题 26px，新闻正文 15px；底部两个 `.btn` 上下排列（各 56px 高，宽 100%）。
+
+### 5.2 桌面端"手机壳居中"
+
+```
+┌──────────────────────────────────── 1440 ────────────────────────────────────┐
+│ 背景：bg_home.svg 横向拉伸 (cover)，天空+云+草坡                                │
+│                                                                              │
+│      ☁        ✦                 ┌──── 520 ────┐                   ☁         │
+│   (左侧装饰：                    │             │          (右侧装饰：         │
+│    漂浮芯片/方块，               │  游戏主区   │           排行榜小卡 /       │
+│    慢速 6s 上下浮动 8px)         │  与手机竖屏 │           今日种子 /         │
+│                                 │  布局一致   │           静音、全屏按钮)    │
+│                                 │  高 100vh   │                              │
+│                                 │  max 920    │                              │
+│                                 └─────────────┘                              │
+│ ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁ 草坡 ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁ │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+```css
+.shell {
+  width: min(520px, 100vw); height: min(100dvh, 920px);
+  margin: 0 auto; position: relative; overflow: hidden;
+  background: var(--bg-grad);
+  border: 4px solid var(--outline); border-radius: 32px;   /* ≤ 520px 宽时去掉边框与圆角 */
+  box-shadow: 0 12px 0 rgba(59,42,26,.18), 0 24px 60px rgba(31,42,68,.18);
+}
+@media (max-width: 540px) { .shell { border: 0; border-radius: 0; box-shadow: none; } }
+```
+
+---
+
+## 6. 素材清单与约定
+
+| 路径 | 尺寸 | 说明 |
+|---|---|---|
+| `assets/characters/<id>.png` | 768 左右，透明底 | 14 个已有角色头像，直接用 |
+| `assets/units/<id>.svg` | 512×512 | 18 单位 + 3 召唤物，自带彩色圆底；GPT 生图后放 `units/<id>.png`，客户端 PNG 优先、SVG 兜底 |
+| `assets/items/<id>.svg` | 128×128 | 12 个基建贴纸图标（白边圆贴纸） |
+| `assets/ui/*.svg` | 64×64 | 阵营 4、star、atk、hp、lives、gold、fire、freeze、reroll、sell、battle |
+| `assets/logo.svg` | 1024×400 | 转曲 Logo，透明底 |
+| `assets/bg_home.svg` | 1080×1920 | 首页背景，`background-size: cover; background-position: center bottom` |
+| `assets/manifest.json` | — | 以上全部分组索引 |
+
+SVG 统一约定：主描边 `#3B2A1A`（512 图 10~12px、128 图 5px、64 图 4px），`stroke-linejoin: round`；影色在右下（本色约 -20% 亮度），高光在左上（白 45~70% 透明度）。
+
+---
+
+## 7. 特效分镜（对应 DESIGN 第 7 节）
+
+全局约定：
+- 粒子画布一层（`<canvas>` 绝对定位全屏，`pointer-events:none`），**全局活跃粒子上限 120**，超出时丢弃最老的。
+- 粒子形状只用：圆点、圆角方块、四角星（`✦`）、彩纸条（矩形旋转）。无 `shadowBlur`、无 `globalCompositeOperation='lighter'`。
+- 粒子配色池 `FX = ['#FFC53D','#2F80ED','#58C65C','#F25757','#9B6BFF','#FF7EB6','#FFFFFF']`，每个粒子带 2px `#3B2A1A` 描边（大于 6px 的）。
+- 曲线用 GSAP 名称；2x 倍速 = `gsap.globalTimeline.timeScale(2)`；跳过 = 直接 `progress(1)` 并清空粒子。
+
+| # | 时刻 | 分镜（时间轴） | 颜色 | 粒子上限 | 曲线 |
+|---|---|---|---|---|---|
+| 1 | **购买** 0.4s | 0–0.25s 卡片从商店位置沿抛物线飞到队伍槽（中点上抬 40px），同时 `scale 1→0.9`；0.25–0.4s 落位 `scaleY .8 → 1.08 → 1` 弹跳；落位瞬间槽下 6 颗白色圆点向两侧溅开；顶栏算力处冒 `-3` 浮字（金色，上浮 24px 渐隐 0.5s） | 浮字 `--c-gold` 白描边 | 6 | 飞行 `power2.inOut`，落位 `back.out(3)` |
+| 2 | **合体进化** 0.9s | 0–0.3s 来源卡缩小并沿弧线吸入目标卡（`scale→0.3, opacity→0`）；0.3–0.45s 目标卡 `scale 1→0.85` 蓄力；0.45s 金色爆星：12 颗四角星 + 8 条彩纸放射（半径 60–110px）；0.45–0.75s 卡片 `scale 0.85→1.25→1` 回弹，阶级环转一圈；0.5s 卡顶冒 "Lv2!" 金色胶囊标签（`back.out` 弹出，停 0.4s 后上浮消失）；0.45s 整个 `.shell` 短震 `x: ±4px` 3 次 0.15s | 星 `#FFC53D`，彩纸取配色池 | 20 | 吸入 `power3.in`，回弹 `elastic.out(1,0.5)` |
+| 3 | **头条** 入 0.5s | 遮罩 0.2s 淡入至 45%；纸卡从屏幕上方 `y:-120%`、`rotate:-14°` 甩入到 `rotate:-2°`；落定瞬间红色"头条"印章从 `scale 2.2, opacity 0` 盖到 `scale 1`（0.15s）并带 2px 抖动；两个选项按钮依次 `y:20→0` 淡入（间隔 0.06s）。退出：选中的按钮压一下，卡片向下 `y:+40, opacity:0` 0.25s | 纸 `#FFF1C9`、章 `#F25757` | 0 | 甩入 `back.out(1.6)`，印章 `power4.out` |
+| 4 | **开战** 0.6s | 0–0.35s 我方队伍从左外、敌方从右外滑入（各卡 0.04s 依次错开）；0.3s 中线 VS 徽章从两侧两半飞入相撞，`scale 1.4→1`；撞击点 8 颗白色圆点 + 4 颗金星炸开；0.45–0.6s VS 缩小到 48px 停在中线 | VS 白字红底 `#F25757` + 蓝底 `#2F80ED` 两半 | 12 | 滑入 `power3.out`，撞击 `back.out(2)` |
+| 5 | **攻击** 0.45s/次 | 0–0.15s 双方前排向中线冲 18px，同时 `scaleX 1.12 scaleY 0.9`（挤压）；0.15s 命中：中点 6 颗火花（金/白四角星，半径 20–40px，0.25s 消失）；0.15–0.3s 伤害数字 `-3` 在受击卡头顶弹出（`scale 0→1.3→1`，上浮 30px，0.5s 渐隐）；受击卡 `x: ±6px` 抖 2 次，头像闪白一次（叠白色 60% 遮罩 0.08s，不用 `filter`）；0.3–0.45s 回位 | 数字 `--dmg` 红、3px 深棕描边；火花 `#FFC53D` `#FFFFFF` | 8/次 | 冲刺 `power2.in`，回位 `power2.out` |
+| 6 | **技能** 0.5s | 0–0.15s 施法单位头顶冒 28px 技能图标气泡（白圆底 + 描边，`back.out` 弹出）；同时屏幕战斗区中线出现一条 40px 高横幅：阵营色底 + 白字"提示词工程师：开战时 给前排 +1/+1"，从左 `x:-100%` 滑入，停 0.3s 后向右滑出；0.2s 目标卡闪光 = 2 次白色描边环 `scale 1→1.25, opacity 1→0`；加成浮字 `+1/+1`（攻橙/血绿） | 横幅 = 施法单位阵营色 | 4 | 横幅 `power2.out`，环 `sine.out` |
+| 7 | **阵亡** 0.5s | 0–0.1s 卡片 `filter: grayscale(1)`（允许：非发光滤镜）+ `scale 0.95`；0.1–0.5s 卡片切 4 片（clip-path 预切四块 DOM）各自向外飞 20–40px、旋转 ±30°、下落 30px 渐隐；同时台词气泡在原位冒出（白底描边气泡，14px，停 1.2s 不阻塞后续动画）；后排卡片 0.2s 补位 | 碎片为卡片本身灰度 | 0（DOM 碎片 4） | 碎片 `power1.in`，补位 `power2.out` |
+| 8 | **胜利** 1.2s | 0–0.3s 中央 "胜利！" 白字描边大字 `scale 0→1.2→1`；0.2s 底部两侧各喷 18 条彩纸（抛物线上抛后飘落，重力 900px/s²）；0.5–1.0s 一个 48px 热搜火焰图标 (`ui/fire.svg`) 从中央沿弧线飞到顶栏热搜计数，到达时计数 `scale 1.4→1` 并 +1 | 彩纸配色池 | 36 | 大字 `back.out(2.5)`，飞行 `power2.inOut` |
+| 9 | **失败** 0.8s | 0–0.2s 顶栏一颗信心心 (`ui/lives.svg`) 放大 1.3 倍；0.2–0.5s 心裂成两半左右分开下落、旋转 ±25° 渐隐；0.2s 屏幕边缘红闪一次：`.shell` 内 `box-shadow: inset 0 0 0 10px rgba(242,87,87,.55)` 0.1s 出现、0.3s 退去（实色内框，不是模糊光）；回合 ≥10 掉 2 颗时第二颗延迟 0.15s 同样处理 | `#F25757` | 0 | 放大 `back.out`，碎裂 `power2.in` |
+| 10 | **结局** 3s | 登顶：0–0.6s 金色奖杯（可用 `assets/fx/crown.svg` 或奖杯 SVG）从下方弹到中央 `scale 0→1.15→1`，身后 12 道白色放射条慢转（`rotate 360` / 12s，透明度 .35，实色不模糊）；0.4–3s 彩纸雨从顶部持续落下（每 0.1s 补 3 条，保持 ≤60 条）。出局：0–0.6s 画面 `grayscale(.8)` 过渡，"信心归零" 大字下落 `bounce.out`；2.0s 后"再来一局"大按钮（`.btn--go`，72px 高）`scale 0→1` 弹出并每 1.6s 轻跳一次 | 奖杯 `#FFC53D`；出局灰 `#97A6B8` | 60 | 奖杯 `elastic.out(1,0.6)`，按钮 `back.out(3)` |
+
+### 7.1 克制原则（必须遵守）
+
+1. **同一时刻最多一个全屏效果**（全屏 = 遮罩、全屏彩纸、边缘红闪、画面灰化、短震）。新的全屏效果到来时，先 `progress(1)` 结束上一个。
+2. **不用发光**：禁止 `filter: drop-shadow()` 做光晕、`box-shadow` 大模糊彩色光、`text-shadow` 彩色光、canvas `shadowBlur`、`lighter/screen` 混合模式。立体感一律用"实色偏移阴影 + 深棕描边"。
+3. **粒子上限**：全局 120，单个特效见表。手机低端机（`navigator.hardwareConcurrency <= 4`）上限减半。
+4. **不遮挡数字**：伤害/加成浮字层级最高，粒子永远在卡片角标之下。
+5. **可关闭**：设置里"减少动效"或系统 `prefers-reduced-motion` 时：去掉短震、彩纸减到 1/4、所有位移改为 0.15s 淡入淡出。
+6. **节奏**：一次攻击最长 0.45s；一整场战斗在 1x 下目标 8–15s，超过 20s 自动切 2x。
+
+---
+
+## 8. 插画风格要点（给 SVG 与生图共用）
+
+- Q 版比例：头身比 1:1.2 左右，大头、圆眼（深棕椭圆 + 左上白点）、腮红（粉色半透明椭圆）。
+- 物件拟人化：非人单位（网页、手机、显卡、卷轴）都给"小眼睛 + 小嘴 + 腮红"，统一可爱感。
+- 每张单位图都在彩色圆底里，圆底左上一道白色弧线高光，右下 10% 暗影；周围 1~3 颗白色四角星点缀。
+- 颜色饱和但不刺眼：大面积用中明度色，最暗只到 `#3B2A1A` 描边，最亮是白色高光。
+- 禁止：暗色背景、霓虹边缘光、电路板发光纹、故障风（glitch）、写实材质。

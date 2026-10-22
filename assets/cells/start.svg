@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+<defs><linearGradient id="g" x1="16" y1="12" x2="112" y2="116" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FFE27A"/><stop offset="1" stop-color="#FF9A3C"/></linearGradient>
+<radialGradient id="bg" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FFE27A" stop-opacity="0.28"/><stop offset="1" stop-color="#FF9A3C" stop-opacity="0"/></radialGradient>
+<filter id="nb" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.5"/></filter></defs>
+<circle cx="64" cy="64" r="60" fill="url(#bg)"/>
+<g fill="none" stroke="url(#g)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" filter="url(#nb)" opacity="0.7"><circle cx="64" cy="76" r="30"/><path d="M50 64h28M64 64v26"/><path d="M104 24H30M42 12L30 24L42 36"/><path d="M104 24v14"/></g>
+<g fill="none" stroke="url(#g)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><circle cx="64" cy="76" r="30"/><path d="M50 64h28M64 64v26"/><path d="M104 24H30M42 12L30 24L42 36"/><path d="M104 24v14"/></g>
+<g fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"><circle cx="64" cy="76" r="30"/><path d="M50 64h28M64 64v26"/><path d="M104 24H30M42 12L30 24L42 36"/><path d="M104 24v14"/></g>
+</svg>

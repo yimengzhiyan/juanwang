@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<defs>
+<radialGradient id="dario-bg" cx="50%" cy="38%" r="65%"><stop offset="0" stop-color="#e7b9aa"/><stop offset="0.55" stop-color="#C96442"/><stop offset="1" stop-color="#6f3724"/></radialGradient>
+<radialGradient id="dario-skin" cx="50%" cy="35%" r="70%"><stop offset="0" stop-color="#FFF1E6"/><stop offset="0.6" stop-color="#FFE3CF"/><stop offset="1" stop-color="#F7C2A2"/></radialGradient>
+<linearGradient id="dario-hair" x1="0" y1="0" x2="0.25" y2="1"><stop offset="0" stop-color="#52443d"/><stop offset="0.55" stop-color="#3A2A22"/><stop offset="1" stop-color="#2c201a"/></linearGradient>
+<linearGradient id="dario-iris" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#21160e"/><stop offset="0.55" stop-color="#4A3020"/><stop offset="1" stop-color="#aea29b"/></linearGradient>
+<linearGradient id="dario-cloth" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ebdecb"/><stop offset="1" stop-color="#beb2a1"/></linearGradient>
+<clipPath id="dario-clip"><circle cx="256" cy="256" r="250"/></clipPath>
+</defs>
+<circle cx="256" cy="256" r="252" fill="url(#dario-bg)"/>
+<circle cx="256" cy="256" r="226" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="3" stroke-dasharray="6 14"/>
+<circle cx="256" cy="256" r="200" fill="#ffffff" fill-opacity="0.06"/>
+<path d="M92 102C94.88 117.12 94.88 117.12 110 120C94.88 122.88 94.88 122.88 92 138C89.12 122.88 89.12 122.88 74 120C89.12 117.12 89.12 117.12 92 102Z" fill="#ffffff" opacity="0.85"/><path d="M430 84C431.92 94.08 431.92 94.08 442 96C431.92 97.92 431.92 97.92 430 108C428.08 97.92 428.08 97.92 418 96C428.08 94.08 428.08 94.08 430 84Z" fill="#ffffff" opacity="0.7"/><path d="M448 321C449.44 328.56 449.44 328.56 457 330C449.44 331.44 449.44 331.44 448 339C446.56 331.44 446.56 331.44 439 330C446.56 328.56 446.56 328.56 448 321Z" fill="#ffffff" opacity="0.6"/><path d="M70 292C71.28 298.72 71.28 298.72 78 300C71.28 301.28 71.28 301.28 70 308C68.72 301.28 68.72 301.28 62 300C68.72 298.72 68.72 298.72 70 292Z" fill="#ffffff" opacity="0.55"/>
+<circle cx="408" cy="160" r="4" fill="#fff" opacity="0.7"/><circle cx="118" cy="400" r="5" fill="#fff" opacity="0.4"/>
+<g clip-path="url(#dario-clip)">
+
+<path d="M222 320 L290 320 L292 404 C270 418 242 418 220 404Z" fill="#F7C2A2" stroke="#2B1D4E" stroke-width="6" stroke-linejoin="round"/><path d="M224 360 Q256 380 288 360 L288 372 Q256 392 224 372Z" fill="#E9A888" opacity="0.6"/><path d="M84 520 C88 440 150 396 256 396 C362 396 424 440 428 520Z" fill="url(#dario-cloth)" stroke="#2B1D4E" stroke-width="6" stroke-linejoin="round"/>
+<path d="M216 398 L256 440 L230 456 L196 410Z" fill="#FFFFFF" stroke="#2B1D4E" stroke-width="6" stroke-linejoin="round"/><path d="M296 398 L256 440 L282 456 L316 410Z" fill="#FFFFFF" stroke="#2B1D4E" stroke-width="6" stroke-linejoin="round"/>
+<path d="M256 440 L256 520" stroke="#aea393" stroke-width="4"/><circle cx="256" cy="472" r="5" fill="#8b8276"/><circle cx="256" cy="502" r="5" fill="#8b8276"/>
+</g>
+<ellipse cx="140" cy="276" rx="20" ry="26" fill="#FFE3CF" stroke="#2B1D4E" stroke-width="6"/><ellipse cx="372" cy="276" rx="20" ry="26" fill="#FFE3CF" stroke="#2B1D4E" stroke-width="6"/>
+<ellipse cx="142" cy="278" rx="8" ry="12" fill="#F7C2A2"/><ellipse cx="370" cy="278" rx="8" ry="12" fill="#F7C2A2"/>
+<path d="M138 250 C138 176 190 140 256 140 C322 140 374 176 374 250 C374 314 330 364 256 368 C182 364 138 314 138 250Z" fill="url(#dario-skin)" stroke="#2B1D4E" stroke-width="6"/>
+<path d="M186 226 Q208 214 232 222" fill="none" stroke="#31241d" stroke-width="9" stroke-linecap="round"/><path d="M280 222 Q304 214 326 226" fill="none" stroke="#31241d" stroke-width="9" stroke-linecap="round"/><ellipse cx="208" cy="272" rx="22" ry="26" fill="#FFFFFF"/>
+<ellipse cx="208" cy="274" rx="19" ry="24" fill="url(#dario-iris)" stroke="#2B1D4E" stroke-width="4"/>
+<ellipse cx="208" cy="276" rx="8.55" ry="11.52" fill="#160e0a"/>
+<ellipse cx="208" cy="285.2" rx="11.4" ry="5.28" fill="#b7aca6" opacity="0.7"/>
+<circle cx="201" cy="264" r="6" fill="#FFFFFF"/>
+<circle cx="215" cy="284" r="3" fill="#FFFFFF" opacity="0.9"/><path d="M189 263.6 Q208 238 230 262.4" fill="none" stroke="#2B1D4E" stroke-width="6" stroke-linecap="round"/><ellipse cx="304" cy="272" rx="22" ry="26" fill="#FFFFFF"/>
+<ellipse cx="304" cy="274" rx="19" ry="24" fill="url(#dario-iris)" stroke="#2B1D4E" stroke-width="4"/>
+<ellipse cx="304" cy="276" rx="8.55" ry="11.52" fill="#160e0a"/>
+<ellipse cx="304" cy="285.2" rx="11.4" ry="5.28" fill="#b7aca6" opacity="0.7"/>
+<circle cx="311" cy="264" r="6" fill="#FFFFFF"/>
+<circle cx="297" cy="284" r="3" fill="#FFFFFF" opacity="0.9"/><path d="M285 263.6 Q304 238 326 262.4" fill="none" stroke="#2B1D4E" stroke-width="6" stroke-linecap="round"/><ellipse cx="184" cy="314" rx="20" ry="10" fill="#FF7E9D" opacity="0.45"/><ellipse cx="328" cy="314" rx="20" ry="10" fill="#FF7E9D" opacity="0.45"/><g stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" opacity="0.7"><path d="M172 312 l6 -6"/><path d="M182 314 l6 -6"/><path d="M318 312 l6 -6"/><path d="M328 314 l6 -6"/></g><path d="M254 300 q4 4 0 7" fill="none" stroke="#F7C2A2" stroke-width="4" stroke-linecap="round"/><path d="M232 320 Q256 352 280 320Z" fill="#8E2C48" stroke="#2B1D4E" stroke-width="5" stroke-linejoin="round"/><path d="M244 334 Q256 344 268 334 Q260 328 256 330 Q252 328 244 334Z" fill="#FF7E95"/>
+
+<g fill="#2B1D4E"><circle cx="125.6" cy="204.8" r="39"/><circle cx="138.8" cy="174.2" r="42"/><circle cx="160.2" cy="147.9" r="45"/><circle cx="188.2" cy="127.7" r="39"/><circle cx="220.9" cy="114.9" r="42"/><circle cx="256.0" cy="110.6" r="45"/><circle cx="291.1" cy="114.9" r="39"/><circle cx="323.8" cy="127.7" r="42"/><circle cx="351.8" cy="147.9" r="45"/><circle cx="373.2" cy="174.2" r="39"/><circle cx="386.4" cy="204.8" r="42"/><circle cx="186.0" cy="176.0" r="31"/><circle cx="221.0" cy="176.0" r="31"/><circle cx="256.0" cy="176.0" r="31"/><circle cx="291.0" cy="176.0" r="31"/><circle cx="326.0" cy="176.0" r="31"/><circle cx="256.0" cy="150.0" r="45"/><circle cx="206.0" cy="140.0" r="39"/><circle cx="306.0" cy="140.0" r="39"/></g><g fill="url(#dario-hair)"><circle cx="125.6" cy="204.8" r="34"/><circle cx="138.8" cy="174.2" r="37"/><circle cx="160.2" cy="147.9" r="40"/><circle cx="188.2" cy="127.7" r="34"/><circle cx="220.9" cy="114.9" r="37"/><circle cx="256.0" cy="110.6" r="40"/><circle cx="291.1" cy="114.9" r="34"/><circle cx="323.8" cy="127.7" r="37"/><circle cx="351.8" cy="147.9" r="40"/><circle cx="373.2" cy="174.2" r="34"/><circle cx="386.4" cy="204.8" r="37"/><circle cx="186.0" cy="176.0" r="26"/><circle cx="221.0" cy="176.0" r="26"/><circle cx="256.0" cy="176.0" r="26"/><circle cx="291.0" cy="176.0" r="26"/><circle cx="326.0" cy="176.0" r="26"/><circle cx="256.0" cy="150.0" r="40"/><circle cx="206.0" cy="140.0" r="34"/><circle cx="306.0" cy="140.0" r="34"/></g>
+<g fill="none" stroke="#261b16" stroke-width="4" stroke-linecap="round" opacity="0.7"><path d="M105.2 216.7 q20.4 15.3 40.8 0"/><path d="M116.6 187.2 q22.2 16.7 44.4 0"/><path d="M136.2 161.9 q24.0 18.0 48.0 0"/><path d="M167.8 139.6 q20.4 15.3 40.8 0"/><path d="M198.7 127.9 q22.2 16.7 44.4 0"/><path d="M232.0 124.6 q24.0 18.0 48.0 0"/><path d="M270.7 126.8 q20.4 15.3 40.8 0"/><path d="M301.6 140.6 q22.2 16.7 44.4 0"/><path d="M327.8 161.9 q24.0 18.0 48.0 0"/><path d="M352.8 186.1 q20.4 15.3 40.8 0"/><path d="M364.2 217.8 q22.2 16.7 44.4 0"/><path d="M170.4 185.1 q15.6 11.7 31.2 0"/><path d="M205.4 185.1 q15.6 11.7 31.2 0"/><path d="M240.4 185.1 q15.6 11.7 31.2 0"/><path d="M275.4 185.1 q15.6 11.7 31.2 0"/><path d="M310.4 185.1 q15.6 11.7 31.2 0"/><path d="M232.0 164.0 q24.0 18.0 48.0 0"/><path d="M185.6 151.9 q20.4 15.3 40.8 0"/><path d="M285.6 151.9 q20.4 15.3 40.8 0"/></g>
+<g fill="none" stroke="#6E5446" stroke-width="5" stroke-linecap="round" opacity="0.8"><path d="M108.6 198.0 q13.6 -17.0 30.6 -6.8"/><path d="M140.2 139.9 q16.0 -20.0 36.0 -8.0"/><path d="M202.4 107.5 q14.8 -18.5 33.3 -7.4"/><path d="M274.1 108.1 q13.6 -17.0 30.6 -6.8"/><path d="M331.8 139.9 q16.0 -20.0 36.0 -8.0"/><path d="M367.9 197.4 q14.8 -18.5 33.3 -7.4"/><path d="M208.0 170.8 q10.4 -13.0 23.4 -5.2"/><path d="M278.0 170.8 q10.4 -13.0 23.4 -5.2"/><path d="M236.0 142.0 q16.0 -20.0 36.0 -8.0"/><path d="M289.0 133.2 q13.6 -17.0 30.6 -6.8"/></g>
+
+<g clip-path="url(#dario-clip)"></g>
+<circle cx="256" cy="256" r="250" fill="none" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="4"/>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+<defs><linearGradient id="g" x1="16" y1="12" x2="112" y2="116" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FFD93D"/><stop offset="1" stop-color="#FF4D6D"/></linearGradient>
+<radialGradient id="bg" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FFD93D" stop-opacity="0.28"/><stop offset="1" stop-color="#FF4D6D" stop-opacity="0"/></radialGradient>
+<filter id="nb" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.5"/></filter></defs>
+<circle cx="64" cy="64" r="60" fill="url(#bg)"/>
+<g fill="none" stroke="url(#g)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" filter="url(#nb)" opacity="0.7"><path d="M64 14L114 102H14Z"/><path d="M70 42L52 72H68L58 94L80 62H64Z"/></g>
+<g fill="none" stroke="url(#g)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M64 14L114 102H14Z"/><path d="M70 42L52 72H68L58 94L80 62H64Z"/></g>
+<g fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"><path d="M64 14L114 102H14Z"/><path d="M70 42L52 72H68L58 94L80 62H64Z"/></g>
+</svg>
