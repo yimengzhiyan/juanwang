@@ -3,13 +3,16 @@ import { clone } from '../clone';
 import type { BattleResult, GameData, RunState, SurpriseDef } from '../types';
 import { MAX_TURNS, WIN_TROPHIES, clearBattleTemps, log, makeCtx, type Ctx } from './shop';
 
-export const SURPRISE_CHANCE = 0.3;
-/** 回合 ≥ 10 输一场掉 2 信心 */
-export const LATE_GAME_TURN = 10;
+import { DIFFICULTY } from './difficulty';
+
+/** 默认值快照（实际以 DIFFICULTY 为准，可运行时修改） */
+export const SURPRISE_CHANCE = DIFFICULTY.surpriseChance;
+/** 回合 ≥ 该值输一场掉 2 信心 */
+export const LATE_GAME_TURN = DIFFICULTY.lateGameTurn;
 
 /** 输一场掉几颗信心 */
 export function livesLostOnDefeat(turn: number): number {
-  return turn >= LATE_GAME_TURN ? 2 : 1;
+  return turn >= DIFFICULTY.lateGameTurn ? DIFFICULTY.lateGameLifeLoss : 1;
 }
 
 function pickSurprise(ctx: Ctx): SurpriseDef | undefined {
@@ -17,7 +20,7 @@ function pickSurprise(ctx: Ctx): SurpriseDef | undefined {
   const list = ctx.data.surprises;
   if (!list.length || s.turn % 2 === 0) return undefined;
   if (s.tutorial && ctx.data.tutorial && s.turn <= Math.max(...ctx.data.tutorial.turns.map((t) => t.turn))) return undefined;
-  if (!ctx.rng.chance(SURPRISE_CHANCE)) return undefined;
+  if (!ctx.rng.chance(DIFFICULTY.surpriseChance)) return undefined;
   let pool = list.filter((x) => !s.seenSurprises.includes(x.id));
   if (!pool.length) pool = list;
   const sp = ctx.rng.pick(pool);

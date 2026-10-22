@@ -15,11 +15,11 @@ describe('applyBattleResult', () => {
     expect(applyBattleResult(at(), res('enemy'), data)).toMatchObject({ trophies: 0, lives: 4 });
     expect(applyBattleResult(at(), res('draw'), data)).toMatchObject({ trophies: 0, lives: 5 });
   });
-  it('回合 ≥ 10 输一场掉 2 信心', () => {
-    expect(livesLostOnDefeat(9)).toBe(1);
-    expect(livesLostOnDefeat(10)).toBe(2);
-    expect(applyBattleResult(at({ turn: 9 }), res('enemy'), data).lives).toBe(4);
-    expect(applyBattleResult(at({ turn: 10 }), res('enemy'), data).lives).toBe(3);
+  it('回合 ≥ 12（DIFFICULTY.lateGameTurn）输一场掉 2 信心', () => {
+    expect(livesLostOnDefeat(11)).toBe(1);
+    expect(livesLostOnDefeat(12)).toBe(2);
+    expect(applyBattleResult(at({ turn: 11 }), res('enemy'), data).lives).toBe(4);
+    expect(applyBattleResult(at({ turn: 12 }), res('enemy'), data).lives).toBe(3);
   });
   it('热搜 = 10 登顶', () => {
     expect(applyBattleResult(at({ trophies: 9 }), res('me'), data)).toMatchObject({ phase: 'over', won: true, endReason: 'trophies', trophies: 10 });

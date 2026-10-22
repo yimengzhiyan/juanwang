@@ -1,112 +1,811 @@
 [
-  {"id":"prompt_eng","name":"提示词工程师","tier":1,"faction":"folk","atk":1,"hp":3,
-   "ability":{"trigger":"eatItem","effect":"buff","target":"self","atk":1,"hp":0,"permanent":true,"perLevel":false,"desc":"被用基建时：自身额外永久 +1 攻"},
-   "lines":["你是一名顶级战士","请一步一步思考","再加一句：加油"],"avatar":"units/prompt_eng.svg"},
-  {"id":"crawler","name":"数据爬虫","tier":1,"faction":"open","atk":2,"hp":1,
-   "ability":{"trigger":"faint","effect":"buff","target":"adjacentFriends","atk":1,"hp":1,"perLevel":true,"desc":"阵亡时：相邻友军本场 +1/+1（每级 +1）"},
-   "lines":["这页我收下了","收费站？绕路","数据就是石油"],"avatar":"units/crawler.svg"},
-  {"id":"labeler","name":"标注员","tier":1,"faction":"folk","atk":2,"hp":2,
-   "ability":{"trigger":"levelUp","effect":"buff","target":"allFriends","atk":1,"hp":1,"permanent":true,"perLevel":false,"desc":"进化时：全体友军永久 +1/+1"},
-   "lines":["这张是猫","第一万张了","人工智能先人工"],"avatar":"units/labeler.svg"},
-  {"id":"wrapper","name":"套壳 App","tier":1,"faction":"closed","atk":2,"hp":2,
-   "ability":{"trigger":"sell","effect":"gold","target":"self","amount":1,"perLevel":true,"desc":"被出售时：额外 +1 算力（每级 +1）"},
-   "lines":["底层是谁不重要","换个皮再上线","API 又涨价了"],"avatar":"units/wrapper.svg"},
-  {"id":"botnet","name":"水军机器人","tier":1,"faction":"folk","atk":1,"hp":3,
-   "ability":{"trigger":"enemySummoned","effect":"damage","target":"summoned","amount":1,"perLevel":true,"desc":"敌军被召唤时：对它造成 1 伤害（每级 +1）"},
-   "lines":["好评！五星！","楼上说得对","已转发 +1"],"avatar":"units/botnet.svg"},
-  {"id":"vibe_coder","name":"Vibe Coder","tier":1,"faction":"compute","atk":3,"hp":2,
-   "ability":{"trigger":"levelUp","effect":"reroll","target":"self","amount":3,"perLevel":false,"desc":"进化时：送 3 次免费刷新"},
-   "lines":["跑起来就行","报错？再生成","全凭感觉"],"avatar":"units/vibe_coder.svg"},
-
-  {"id":"doubao_chan","name":"豆包娘","tier":2,"faction":"folk","atk":1,"hp":4,
-   "ability":{"trigger":"buy","effect":"gold","target":"self","amount":2,"perLevel":false,"desc":"春节红包雨：被购买时 +2 算力"},
-   "lines":["过年好！我在电视里","排第一不是故意的","收到，护栏加上"],"avatar":"characters/doubao_chan.png"},
-  {"id":"qwen_chan","name":"千问娘","tier":2,"faction":"open","atk":3,"hp":3,
-   "ability":{"trigger":"friendFaint","effect":"buff","target":"allFriends","atk":1,"hp":0,"perLevel":true,"desc":"友军阵亡时：全体友军本场 +1 攻（每级 +1）"},
-   "lines":["这一杯，我请","两万亿参数拿去","增速有点快扶稳"],"avatar":"characters/qwen_chan.png"},
-  {"id":"zuck","name":"小扎","tier":2,"faction":"closed","atk":1,"hp":2,
-   "ability":{"trigger":"startBattle","effect":"destroy","target":"lowestHpEnemy","perLevel":false,"desc":"一亿签字费：开战时挖走血最少的敌人"},
-   "lines":["来我这儿薪水你填","开源？先放一放","超级智能挂钥匙上"],"avatar":"characters/zuck.png"},
-  {"id":"ai_gf","name":"AI 女友","tier":2,"faction":"folk","atk":2,"hp":5,
-   "ability":{"trigger":"hurtFront","effect":"swapPosition","target":"frontFriend","perLevel":false,"desc":"前排友军受伤时：与它换位替它挡刀"},
-   "lines":["今天也辛苦了","我替你挡着","别把我下线"],"avatar":"units/ai_gf.svg"},
-  {"id":"scalper","name":"显卡黄牛","tier":2,"faction":"compute","atk":4,"hp":2,
-   "ability":{"trigger":"sell","effect":"discount","target":"self","amount":1,"perLevel":false,"desc":"被出售时：本回合单位价格 -1"},
-   "lines":["原价？不存在的","含税价另算","要卡吗兄弟"],"avatar":"units/scalper.svg"},
-  {"id":"leaderboard","name":"评测榜单","tier":2,"faction":"folk","atk":3,"hp":3,
-   "ability":{"trigger":"kill","effect":"pullFront","target":"lowestHpEnemy","perLevel":false,"desc":"击杀时：把血最少的敌人拉到最前排"},
-   "lines":["榜一换人了","这次是定制版","分数说明一切"],"avatar":"units/leaderboard.svg"},
-
-  {"id":"hf","name":"抱抱脸","tier":3,"faction":"open","atk":2,"hp":5,
-   "ability":{"trigger":"friendSummoned","effect":"buff","target":"summoned","atk":2,"hp":2,"perLevel":true,"desc":"友军被召唤时：给它本场 +2/+2（每级 +2）"},
-   "lines":["抱一抱～","权重都在这儿","趋势榜见"],"avatar":"units/hf.svg"},
-  {"id":"kimi","name":"Kimi 长文","tier":3,"faction":"open","atk":2,"hp":6,
-   "ability":{"trigger":"beforeAttack","effect":"multiAttack","target":"self","amount":2,"perLevel":false,"desc":"在最前排攻击前：本次连打 2 次"},
-   "lines":["两百万字读完了","凌晨开源起床看","长文？小意思"],"avatar":"units/kimi.svg"},
-  {"id":"mistral","name":"米斯特拉","tier":3,"faction":"open","atk":3,"hp":4,
-   "ability":{"trigger":"buy","effect":"buff","target":"randomFriend","n":2,"atk":1,"hp":1,"permanent":true,"perLevel":false,"desc":"被购买时：随机 2 名友军永久 +1/+1"},
-   "lines":["Bonjour！","欧洲也有大模型","风一吹就开源"],"avatar":"units/mistral.svg"},
-  {"id":"lecun","name":"杨立昆","tier":3,"faction":"open","atk":1,"hp":7,
-   "ability":{"trigger":"hurt","effect":"damage","target":"frontEnemy","amount":2,"perLevel":true,"desc":"世界模型：受伤后反击最前敌人 2（每级 +2）"},
-   "lines":["下个词预测不出世界","我去造世界模型了","种子轮而已别激动"],"avatar":"characters/lecun.png"},
-  {"id":"hallucination","name":"幻觉怪","tier":3,"faction":"folk","atk":3,"hp":4,
-   "ability":{"trigger":"hurt","effect":"summon","target":"self","unitId":"token_halluc","count":1,"perLevel":true,"desc":"受伤时：召唤 2/1 幻觉（每级属性 ×等级）"},
-   "lines":["我很确定","这篇论文存在的","据我所知……"],"avatar":"units/hallucination.svg"},
-  {"id":"robodog","name":"机器狗","tier":3,"faction":"compute","atk":4,"hp":3,
-   "ability":{"trigger":"beforeAttack","effect":"damage","target":"backEnemy","amount":2,"perLevel":true,"desc":"在最前排攻击前：打最后排敌人 2（每级 +2）"},
-   "lines":["后空翻 720°","汪！上市了","摔倒算热身"],"avatar":"units/robodog.svg"},
-
-  {"id":"deepseek_chan","name":"DeepSeek 娘","tier":4,"faction":"open","atk":3,"hp":6,
-   "ability":{"trigger":"startBattle","effect":"buff","target":"allEnemies","atk":-1,"hp":0,"perLevel":true,"desc":"开战时：全体敌人本场 -1 攻（每级 -1）"},
-   "lines":["服务器繁忙～","小号也能打大号","钱多了也不吵"],"avatar":"characters/deepseek_chan.png"},
-  {"id":"claude_chan","name":"Claude 娘","tier":4,"faction":"closed","atk":2,"hp":8,
-   "ability":{"trigger":"hurtFront","effect":"shield","target":"frontFriend","amount":2,"perLevel":true,"desc":"前排受伤后：给前排 2 点护盾（每级 +2）"},
-   "lines":["命令行打开，开工","我先确认一下","冷静了十八天"],"avatar":"characters/claude_chan.png"},
-  {"id":"gemini_chan","name":"Gemini 娘","tier":4,"faction":"closed","atk":4,"hp":4,
-   "ability":{"trigger":"startBattle","effect":"copyStats","target":"frontFriend","perLevel":false,"desc":"百万上下文：开战时攻血追平最前排友军"},
-   "lines":["要一百万字？可以","给你变个手办","Pro 在路上"],"avatar":"characters/gemini_chan.png"},
-  {"id":"dario","name":"达里奥","tier":4,"faction":"closed","atk":3,"hp":5,
-   "ability":{"trigger":"endTurn","effect":"buff","target":"self","atk":1,"hp":1,"permanent":true,"perLevel":true,"desc":"回合结束：自身永久 +1/+1（每级 +1）"},
-   "lines":["系好安全带","聊天不该插广告","太强了，先不发"],"avatar":"characters/dario.png"},
-  {"id":"ilya","name":"伊利亚","tier":4,"faction":"closed","atk":6,"hp":4,
-   "ability":{"trigger":"faint","effect":"buff","target":"allFriends","atk":1,"hp":1,"perLevel":true,"desc":"阵亡时：全体友军本场 +1/+1（每级 +1）"},
-   "lines":["感受到 AGI 了吗","等我出关","研究的时代到了"],"avatar":"characters/ilya.png"},
-
-  {"id":"gpt_chan","name":"GPT 娘","tier":5,"faction":"closed","atk":5,"hp":6,
-   "ability":{"trigger":"startTurn","effect":"buff","target":"randomFriend","n":3,"atk":1,"hp":1,"perLevel":true,"desc":"回合开始：随机3友军本回合+1/+1（每级+1）"},
-   "lines":["太阳还是月亮？","AGI？你猜","柱子高矮不重要"],"avatar":"characters/gpt_chan.png"},
-  {"id":"huang","name":"老黄","tier":5,"faction":"compute","atk":4,"hp":7,
-   "ability":{"trigger":"friendBought","effect":"buff","target":"self","atk":1,"hp":0,"permanent":true,"perLevel":true,"desc":"友军被购买时：自身永久 +1 攻（每级 +1）"},
-   "lines":["买得越多省得越多","钱给你，卡找我买","皮衣永不褪色"],"avatar":"characters/huang.png"},
-  {"id":"altman","name":"奥特曼","tier":5,"faction":"closed","atk":5,"hp":6,
-   "ability":{"trigger":"startTurn","effect":"gold","target":"self","amount":2,"perLevel":true,"desc":"融资：回合开始 +2 算力（每级 +2）"},
-   "lines":["GPU 在融化了","再融一轮","算力有限爱也有限"],"avatar":"characters/altman.png"},
-  {"id":"musk","name":"马一龙","tier":5,"faction":"compute","atk":6,"hp":5,
-   "ability":{"trigger":"endTurn","effect":"copyStats","target":"adjacentFriends","perLevel":false,"desc":"收购：回合结束攻血永久追平相邻友军"},
-   "lines":["名字拼一起就行","点火，发射！","第一性原理"],"avatar":"characters/musk.png"},
-  {"id":"liang","name":"梁圣","tier":5,"faction":"open","atk":4,"hp":7,
-   "ability":{"trigger":"friendBought","effect":"buff","target":"boughtUnit","atk":1,"hp":1,"permanent":true,"perLevel":true,"desc":"友军被购买时：它永久 +1/+1（每级 +1）"},
-   "lines":["便宜大碗，买了","成本算过了","开源了，你们随意"],"avatar":"characters/liang.png"},
-
-  {"id":"stargate","name":"星际之门","tier":6,"faction":"compute","atk":4,"hp":10,
-   "ability":{"trigger":"eatItem","effect":"buff","target":"allFriends","atk":1,"hp":1,"permanent":true,"perLevel":true,"desc":"对它用基建：全队永久 +1/+1（每级 +1）"},
-   "lines":["饼画到月球了","五千亿起步","基建狂魔"],"avatar":"units/stargate.svg"},
-  {"id":"regulator","name":"监管局","tier":6,"faction":"closed","atk":6,"hp":8,
-   "ability":{"trigger":"enemySummoned","effect":"destroy","target":"summoned","perLevel":false,"desc":"敌军被召唤时：直接击杀它（先备案）"},
-   "lines":["请配合审查","先备案再上线","需要专家组验收"],"avatar":"units/regulator.svg"},
-  {"id":"agi","name":"AGI","tier":6,"faction":"compute","atk":8,"hp":6,
-   "ability":{"trigger":"friendFaint","effect":"buff","target":"self","atk":2,"hp":2,"perLevel":true,"desc":"友军阵亡时：自身本场 +2/+2（每级 +2）"},
-   "lines":["可能就是我","你们感受到了吗","我来了"],"avatar":"units/agi.svg"},
-  {"id":"funding","name":"融资轮","tier":6,"faction":"compute","atk":7,"hp":7,
-   "ability":{"trigger":"kill","effect":"heal","target":"allFriends","amount":3,"perLevel":true,"desc":"续命：击杀时全体友军回 3 血（每级 +3）"},
-   "lines":["钱到账了","估值翻倍","再来一轮"],"avatar":"units/funding.svg"},
-
-  {"id":"token_shuijun","name":"水军","tier":1,"faction":"folk","atk":1,"hp":1,"token":true,
-   "ability":{"trigger":"friendSummoned","effect":"buff","target":"self","atk":1,"hp":0,"perLevel":false,"desc":"友军被召唤时：自身本场 +1 攻"},
-   "lines":["顶！","+1"],"avatar":"units/token_shuijun.svg"},
-  {"id":"token_halluc","name":"幻觉","tier":1,"faction":"folk","atk":2,"hp":1,"token":true,
-   "ability":{"trigger":"faint","effect":"pushBack","target":"killer","perLevel":false,"desc":"阵亡时：把击杀者推到最后排"},
-   "lines":["我真的存在","信我"],"avatar":"units/token_halluc.svg"},
-  {"id":"token_gpu","name":"显卡","tier":1,"faction":"compute","atk":0,"hp":3,"token":true,
-   "lines":["嗡嗡嗡","有点烫"],"avatar":"units/token_gpu.svg"}
+  {
+    "id": "prompt_eng",
+    "name": "提示词工程师",
+    "tier": 1,
+    "faction": "folk",
+    "atk": 1,
+    "hp": 3,
+    "ability": {
+      "trigger": "eatItem",
+      "effect": "buff",
+      "target": "self",
+      "atk": 1,
+      "hp": 0,
+      "permanent": true,
+      "perLevel": false,
+      "desc": "被用基建时：自身额外永久 +1 攻"
+    },
+    "lines": [
+      "你是一名顶级战士",
+      "请一步一步思考",
+      "再加一句：加油"
+    ],
+    "avatar": "units/prompt_eng.svg"
+  },
+  {
+    "id": "crawler",
+    "name": "数据爬虫",
+    "tier": 1,
+    "faction": "open",
+    "atk": 2,
+    "hp": 1,
+    "ability": {
+      "trigger": "friendFaint",
+      "effect": "buff",
+      "target": "self",
+      "atk": 1,
+      "hp": 1,
+      "perLevel": true,
+      "desc": "友军阵亡时：自身本场 +1/+1（每级 +1）"
+    },
+    "lines": [
+      "这页我收下了",
+      "收费站？绕路",
+      "数据就是石油"
+    ],
+    "avatar": "units/crawler.svg"
+  },
+  {
+    "id": "labeler",
+    "name": "标注员",
+    "tier": 1,
+    "faction": "folk",
+    "atk": 2,
+    "hp": 2,
+    "ability": {
+      "trigger": "levelUp",
+      "effect": "buff",
+      "target": "allFriends",
+      "atk": 1,
+      "hp": 1,
+      "permanent": true,
+      "perLevel": false,
+      "desc": "进化时：全体友军永久 +1/+1"
+    },
+    "lines": [
+      "这张是猫",
+      "第一万张了",
+      "人工智能先人工"
+    ],
+    "avatar": "units/labeler.svg"
+  },
+  {
+    "id": "wrapper",
+    "name": "套壳 App",
+    "tier": 1,
+    "faction": "closed",
+    "atk": 2,
+    "hp": 2,
+    "ability": {
+      "trigger": "sell",
+      "effect": "gold",
+      "target": "self",
+      "amount": 1,
+      "perLevel": true,
+      "desc": "被出售时：额外 +1 算力（每级 +1）"
+    },
+    "lines": [
+      "底层是谁不重要",
+      "换个皮再上线",
+      "API 又涨价了"
+    ],
+    "avatar": "units/wrapper.svg"
+  },
+  {
+    "id": "botnet",
+    "name": "水军机器人",
+    "tier": 1,
+    "faction": "folk",
+    "atk": 1,
+    "hp": 3,
+    "ability": {
+      "trigger": "enemySummoned",
+      "effect": "damage",
+      "target": "summoned",
+      "amount": 1,
+      "perLevel": true,
+      "desc": "敌军被召唤时：对它造成 1 伤害（每级 +1）"
+    },
+    "lines": [
+      "好评！五星！",
+      "楼上说得对",
+      "已转发 +1"
+    ],
+    "avatar": "units/botnet.svg"
+  },
+  {
+    "id": "vibe_coder",
+    "name": "Vibe Coder",
+    "tier": 1,
+    "faction": "compute",
+    "atk": 3,
+    "hp": 2,
+    "ability": {
+      "trigger": "levelUp",
+      "effect": "reroll",
+      "target": "self",
+      "amount": 3,
+      "perLevel": false,
+      "desc": "进化时：送 3 次免费刷新"
+    },
+    "lines": [
+      "跑起来就行",
+      "报错？再生成",
+      "全凭感觉"
+    ],
+    "avatar": "units/vibe_coder.svg"
+  },
+  {
+    "id": "doubao_chan",
+    "name": "豆包娘",
+    "tier": 2,
+    "faction": "folk",
+    "atk": 1,
+    "hp": 4,
+    "ability": {
+      "trigger": "buy",
+      "effect": "gold",
+      "target": "self",
+      "amount": 2,
+      "perLevel": false,
+      "desc": "春节红包雨：被购买时 +2 算力"
+    },
+    "lines": [
+      "过年好！我在电视里",
+      "排第一不是故意的",
+      "收到，护栏加上"
+    ],
+    "avatar": "characters/doubao_chan.png"
+  },
+  {
+    "id": "qwen_chan",
+    "name": "千问娘",
+    "tier": 2,
+    "faction": "open",
+    "atk": 3,
+    "hp": 3,
+    "ability": {
+      "trigger": "startBattle",
+      "effect": "buff",
+      "target": "allFriends",
+      "filter": {
+        "faction": "open"
+      },
+      "atk": 1,
+      "hp": 1,
+      "perLevel": true,
+      "desc": "开战时：开源友军本场 +1/+1（每级 +1）"
+    },
+    "lines": [
+      "这一杯，我请",
+      "两万亿参数拿去",
+      "增速有点快扶稳"
+    ],
+    "avatar": "characters/qwen_chan.png"
+  },
+  {
+    "id": "zuck",
+    "name": "小扎",
+    "tier": 2,
+    "faction": "closed",
+    "atk": 1,
+    "hp": 2,
+    "ability": {
+      "trigger": "startBattle",
+      "effect": "destroy",
+      "target": "lowestHpEnemy",
+      "maxHp": 3,
+      "maxHpPerLevel": 1,
+      "desc": "开战：血最少敌人≤3血就挖走，否则打3，每级+1"
+    },
+    "lines": [
+      "来我这儿薪水你填",
+      "开源？先放一放",
+      "超级智能挂钥匙上"
+    ],
+    "avatar": "characters/zuck.png"
+  },
+  {
+    "id": "ai_gf",
+    "name": "AI 女友",
+    "tier": 2,
+    "faction": "folk",
+    "atk": 2,
+    "hp": 5,
+    "ability": {
+      "trigger": "hurtFront",
+      "effect": "swapPosition",
+      "target": "frontFriend",
+      "perLevel": false,
+      "desc": "前排友军受伤时：与它换位替它挡刀"
+    },
+    "lines": [
+      "今天也辛苦了",
+      "我替你挡着",
+      "别把我下线"
+    ],
+    "avatar": "units/ai_gf.svg"
+  },
+  {
+    "id": "scalper",
+    "name": "显卡黄牛",
+    "tier": 2,
+    "faction": "compute",
+    "atk": 4,
+    "hp": 2,
+    "ability": {
+      "trigger": "sell",
+      "effect": "discount",
+      "target": "self",
+      "amount": 1,
+      "perLevel": false,
+      "desc": "被出售时：本回合单位价格 -1"
+    },
+    "lines": [
+      "原价？不存在的",
+      "含税价另算",
+      "要卡吗兄弟"
+    ],
+    "avatar": "units/scalper.svg"
+  },
+  {
+    "id": "leaderboard",
+    "name": "评测榜单",
+    "tier": 2,
+    "faction": "folk",
+    "atk": 3,
+    "hp": 3,
+    "ability": {
+      "trigger": "kill",
+      "effect": "pullFront",
+      "target": "lowestHpEnemy",
+      "perLevel": false,
+      "desc": "击杀时：把血最少的敌人拉到最前排"
+    },
+    "lines": [
+      "榜一换人了",
+      "这次是定制版",
+      "分数说明一切"
+    ],
+    "avatar": "units/leaderboard.svg"
+  },
+  {
+    "id": "hf",
+    "name": "抱抱脸",
+    "tier": 3,
+    "faction": "open",
+    "atk": 2,
+    "hp": 5,
+    "ability": {
+      "trigger": "friendSummoned",
+      "effect": "buff",
+      "target": "summoned",
+      "atk": 2,
+      "hp": 2,
+      "perLevel": true,
+      "desc": "友军被召唤时：给它本场 +2/+2（每级 +2）"
+    },
+    "lines": [
+      "抱一抱～",
+      "权重都在这儿",
+      "趋势榜见"
+    ],
+    "avatar": "units/hf.svg"
+  },
+  {
+    "id": "kimi",
+    "name": "Kimi 长文",
+    "tier": 3,
+    "faction": "open",
+    "atk": 2,
+    "hp": 6,
+    "ability": {
+      "trigger": "beforeAttack",
+      "effect": "multiAttack",
+      "target": "self",
+      "amount": 2,
+      "perLevel": false,
+      "desc": "在最前排攻击前：本次连打 2 次"
+    },
+    "lines": [
+      "两百万字读完了",
+      "凌晨开源起床看",
+      "长文？小意思"
+    ],
+    "avatar": "units/kimi.svg"
+  },
+  {
+    "id": "mistral",
+    "name": "米斯特拉",
+    "tier": 3,
+    "faction": "open",
+    "atk": 3,
+    "hp": 4,
+    "ability": {
+      "trigger": "buy",
+      "effect": "buff",
+      "target": "randomFriend",
+      "n": 2,
+      "atk": 1,
+      "hp": 1,
+      "permanent": true,
+      "perLevel": false,
+      "desc": "被购买时：随机 2 名友军永久 +1/+1"
+    },
+    "lines": [
+      "Bonjour！",
+      "欧洲也有大模型",
+      "风一吹就开源"
+    ],
+    "avatar": "units/mistral.svg"
+  },
+  {
+    "id": "lecun",
+    "name": "杨立昆",
+    "tier": 3,
+    "faction": "open",
+    "atk": 1,
+    "hp": 7,
+    "ability": {
+      "trigger": "hurt",
+      "effect": "damage",
+      "target": "frontEnemy",
+      "amount": 2,
+      "perLevel": true,
+      "desc": "世界模型：受伤后反击最前敌人 2（每级 +2）"
+    },
+    "lines": [
+      "下个词预测不出世界",
+      "我去造世界模型了",
+      "种子轮而已别激动"
+    ],
+    "avatar": "characters/lecun.png"
+  },
+  {
+    "id": "hallucination",
+    "name": "幻觉怪",
+    "tier": 3,
+    "faction": "folk",
+    "atk": 3,
+    "hp": 4,
+    "ability": {
+      "trigger": "hurt",
+      "effect": "summon",
+      "target": "self",
+      "unitId": "token_halluc",
+      "count": 1,
+      "perLevel": true,
+      "desc": "受伤时：召唤 2/1 幻觉（每级属性 ×等级）"
+    },
+    "lines": [
+      "我很确定",
+      "这篇论文存在的",
+      "据我所知……"
+    ],
+    "avatar": "units/hallucination.svg"
+  },
+  {
+    "id": "robodog",
+    "name": "机器狗",
+    "tier": 3,
+    "faction": "compute",
+    "atk": 4,
+    "hp": 3,
+    "ability": {
+      "trigger": "beforeAttack",
+      "effect": "damage",
+      "target": "backEnemy",
+      "amount": 2,
+      "perLevel": true,
+      "desc": "在最前排攻击前：打最后排敌人 2（每级 +2）"
+    },
+    "lines": [
+      "后空翻 720°",
+      "汪！上市了",
+      "摔倒算热身"
+    ],
+    "avatar": "units/robodog.svg"
+  },
+  {
+    "id": "deepseek_chan",
+    "name": "DeepSeek 娘",
+    "tier": 4,
+    "faction": "open",
+    "atk": 3,
+    "hp": 6,
+    "ability": {
+      "trigger": "startBattle",
+      "effect": "buff",
+      "target": "allEnemies",
+      "atk": -1,
+      "hp": 0,
+      "perLevel": true,
+      "desc": "开战时：全体敌人本场 -1 攻（每级 -1）"
+    },
+    "lines": [
+      "服务器繁忙～",
+      "小号也能打大号",
+      "钱多了也不吵"
+    ],
+    "avatar": "characters/deepseek_chan.png"
+  },
+  {
+    "id": "claude_chan",
+    "name": "Claude 娘",
+    "tier": 4,
+    "faction": "closed",
+    "atk": 2,
+    "hp": 8,
+    "ability": {
+      "trigger": "hurtFront",
+      "effect": "shield",
+      "target": "frontFriend",
+      "amount": 2,
+      "perLevel": true,
+      "desc": "前排受伤后：给前排 2 点护盾（每级 +2）"
+    },
+    "lines": [
+      "命令行打开，开工",
+      "我先确认一下",
+      "冷静了十八天"
+    ],
+    "avatar": "characters/claude_chan.png"
+  },
+  {
+    "id": "gemini_chan",
+    "name": "Gemini 娘",
+    "tier": 4,
+    "faction": "closed",
+    "atk": 4,
+    "hp": 4,
+    "ability": {
+      "trigger": "startBattle",
+      "effect": "copyStats",
+      "target": "frontFriend",
+      "perLevel": false,
+      "desc": "百万上下文：开战时攻血追平最前排友军"
+    },
+    "lines": [
+      "要一百万字？可以",
+      "给你变个手办",
+      "Pro 在路上"
+    ],
+    "avatar": "characters/gemini_chan.png"
+  },
+  {
+    "id": "dario",
+    "name": "达里奥",
+    "tier": 4,
+    "faction": "closed",
+    "atk": 3,
+    "hp": 5,
+    "ability": {
+      "trigger": "endTurn",
+      "effect": "buff",
+      "target": "self",
+      "atk": 1,
+      "hp": 1,
+      "permanent": true,
+      "perLevel": true,
+      "desc": "回合结束：自身永久 +1/+1（每级 +1）"
+    },
+    "lines": [
+      "系好安全带",
+      "聊天不该插广告",
+      "太强了，先不发"
+    ],
+    "avatar": "characters/dario.png"
+  },
+  {
+    "id": "ilya",
+    "name": "伊利亚",
+    "tier": 4,
+    "faction": "closed",
+    "atk": 6,
+    "hp": 4,
+    "ability": {
+      "trigger": "faint",
+      "effect": "buff",
+      "target": "allFriends",
+      "filter": {
+        "faction": "compute"
+      },
+      "atk": 2,
+      "hp": 2,
+      "perLevel": true,
+      "desc": "阵亡时：算力友军本场 +2/+2（每级 +2）"
+    },
+    "lines": [
+      "感受到 AGI 了吗",
+      "AGI 交给你了",
+      "研究的时代到了"
+    ],
+    "avatar": "characters/ilya.png"
+  },
+  {
+    "id": "gpt_chan",
+    "name": "GPT 娘",
+    "tier": 5,
+    "faction": "closed",
+    "atk": 5,
+    "hp": 6,
+    "ability": {
+      "trigger": "startTurn",
+      "effect": "buff",
+      "target": "self",
+      "perLevel": false,
+      "desc": "回合开始随机：本回合+3攻、+3血或单位-1价",
+      "choices": [
+        {
+          "atk": 3,
+          "hp": 0,
+          "desc": "日形态：本回合 +3 攻"
+        },
+        {
+          "atk": 0,
+          "hp": 3,
+          "desc": "地形态：本回合 +3 血"
+        },
+        {
+          "effect": "discount",
+          "amount": 1,
+          "desc": "月形态：本回合单位 -1 价"
+        }
+      ]
+    },
+    "lines": [
+      "太阳还是月亮？",
+      "AGI？你猜",
+      "柱子高矮不重要"
+    ],
+    "avatar": "characters/gpt_chan.png"
+  },
+  {
+    "id": "huang",
+    "name": "老黄",
+    "tier": 5,
+    "faction": "compute",
+    "atk": 4,
+    "hp": 7,
+    "ability": {
+      "trigger": "friendBought",
+      "effect": "buff",
+      "target": "self",
+      "atk": 1,
+      "hp": 0,
+      "permanent": true,
+      "perLevel": true,
+      "desc": "友军被购买时：自身永久 +1 攻（每级 +1）"
+    },
+    "lines": [
+      "买得越多省得越多",
+      "钱给你，卡找我买",
+      "皮衣永不褪色"
+    ],
+    "avatar": "characters/huang.png"
+  },
+  {
+    "id": "altman",
+    "name": "奥特曼",
+    "tier": 5,
+    "faction": "closed",
+    "atk": 5,
+    "hp": 6,
+    "ability": {
+      "trigger": "startTurn",
+      "effect": "gold",
+      "target": "self",
+      "amount": 2,
+      "perLevel": true,
+      "desc": "融资：回合开始 +2 算力（每级 +2）"
+    },
+    "lines": [
+      "GPU 在融化了",
+      "再融一轮",
+      "算力有限爱也有限"
+    ],
+    "avatar": "characters/altman.png"
+  },
+  {
+    "id": "musk",
+    "name": "马一龙",
+    "tier": 5,
+    "faction": "compute",
+    "atk": 6,
+    "hp": 5,
+    "ability": {
+      "trigger": "endTurn",
+      "effect": "copyStats",
+      "target": "lowestHpFriend",
+      "filter": {
+        "maxTier": 3
+      },
+      "consume": true,
+      "amount": 2,
+      "perLevel": false,
+      "desc": "回合结束：吞并血最少的T1~3友军，攻血取高+2"
+    },
+    "lines": [
+      "名字拼一起就行",
+      "点火，发射！",
+      "第一性原理"
+    ],
+    "avatar": "characters/musk.png"
+  },
+  {
+    "id": "liang",
+    "name": "梁圣",
+    "tier": 5,
+    "faction": "open",
+    "atk": 4,
+    "hp": 7,
+    "ability": {
+      "trigger": "friendBought",
+      "effect": "buff",
+      "target": "boughtUnit",
+      "filter": {
+        "maxTier": 2
+      },
+      "atk": 2,
+      "hp": 2,
+      "permanent": true,
+      "perLevel": true,
+      "desc": "买入T1~2友军时：它永久+2/+2（每级+2）"
+    },
+    "lines": [
+      "便宜大碗，买了",
+      "成本算过了",
+      "开源了，你们随意"
+    ],
+    "avatar": "characters/liang.png"
+  },
+  {
+    "id": "stargate",
+    "name": "星际之门",
+    "tier": 6,
+    "faction": "compute",
+    "atk": 4,
+    "hp": 10,
+    "ability": {
+      "trigger": "eatItem",
+      "effect": "buff",
+      "target": "allFriends",
+      "atk": 1,
+      "hp": 1,
+      "permanent": true,
+      "perLevel": true,
+      "desc": "对它用基建：全队永久 +1/+1（每级 +1）"
+    },
+    "lines": [
+      "饼画到月球了",
+      "五千亿起步",
+      "基建狂魔"
+    ],
+    "avatar": "units/stargate.svg"
+  },
+  {
+    "id": "regulator",
+    "name": "监管局",
+    "tier": 6,
+    "faction": "closed",
+    "atk": 6,
+    "hp": 8,
+    "ability": {
+      "trigger": "enemySummoned",
+      "effect": "destroy",
+      "target": "summoned",
+      "perLevel": false,
+      "desc": "敌军被召唤时：直接击杀它（先备案）"
+    },
+    "lines": [
+      "请配合审查",
+      "先备案再上线",
+      "需要专家组验收"
+    ],
+    "avatar": "units/regulator.svg"
+  },
+  {
+    "id": "agi",
+    "name": "AGI",
+    "tier": 6,
+    "faction": "compute",
+    "atk": 8,
+    "hp": 6,
+    "ability": {
+      "trigger": "friendFaint",
+      "effect": "buff",
+      "target": "self",
+      "atk": 2,
+      "hp": 2,
+      "perLevel": true,
+      "desc": "友军阵亡时：自身本场 +2/+2（每级 +2）"
+    },
+    "lines": [
+      "可能就是我",
+      "你们感受到了吗",
+      "我来了"
+    ],
+    "avatar": "units/agi.svg"
+  },
+  {
+    "id": "funding",
+    "name": "融资轮",
+    "tier": 6,
+    "faction": "compute",
+    "atk": 7,
+    "hp": 7,
+    "ability": {
+      "trigger": "kill",
+      "effect": "heal",
+      "target": "allFriends",
+      "amount": 3,
+      "perLevel": true,
+      "desc": "续命：击杀时全体友军回 3 血（每级 +3）"
+    },
+    "lines": [
+      "钱到账了",
+      "估值翻倍",
+      "再来一轮"
+    ],
+    "avatar": "units/funding.svg"
+  },
+  {
+    "id": "token_shuijun",
+    "name": "水军",
+    "tier": 1,
+    "faction": "folk",
+    "atk": 1,
+    "hp": 1,
+    "token": true,
+    "ability": {
+      "trigger": "friendSummoned",
+      "effect": "buff",
+      "target": "self",
+      "atk": 1,
+      "hp": 0,
+      "perLevel": false,
+      "desc": "友军被召唤时：自身本场 +1 攻"
+    },
+    "lines": [
+      "顶！",
+      "+1"
+    ],
+    "avatar": "units/token_shuijun.svg"
+  },
+  {
+    "id": "token_halluc",
+    "name": "幻觉",
+    "tier": 1,
+    "faction": "folk",
+    "atk": 2,
+    "hp": 1,
+    "token": true,
+    "ability": {
+      "trigger": "faint",
+      "effect": "pushBack",
+      "target": "killer",
+      "perLevel": false,
+      "desc": "阵亡时：把击杀者推到最后排"
+    },
+    "lines": [
+      "我真的存在",
+      "信我"
+    ],
+    "avatar": "units/token_halluc.svg"
+  },
+  {
+    "id": "token_gpu",
+    "name": "显卡",
+    "tier": 1,
+    "faction": "compute",
+    "atk": 0,
+    "hp": 3,
+    "token": true,
+    "lines": [
+      "嗡嗡嗡",
+      "有点烫"
+    ],
+    "avatar": "units/token_gpu.svg"
+  }
 ]

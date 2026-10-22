@@ -2,7 +2,7 @@
 // 内容数据自检：node shared/data/check.mjs
 // 错误（exit 1）：id 重复/缺失、阶级与阵营分布、非法 trigger/effect/target、事件效果非法、文案超长、引用不存在。
 // 警告（不影响退出码）：assets/ 下缺少的头像与图标（美术任务补图）。
-// 字段口径以 shared/src/types.ts 为准（Ability.amount/atk/hp/n/unitId/count/permanent/perLevel）。
+// 字段口径以 shared/src/types.ts 与 docs/ENGINE_NOTES.md 为准（含 DESIGN 11 扩展：filter/consume/maxHp/choices/effects[]）。
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,7 +22,8 @@ const TRIGGERS = ['startBattle', 'beforeAttack', 'hurt', 'faint', 'friendFaint',
 const EFFECTS = ['damage', 'buff', 'shield', 'summon', 'copyStats', 'swapPosition', 'gold', 'destroy', 'heal', 'reroll', 'discount', 'pushBack', 'pullFront', 'multiAttack'];
 const TARGETS = ['self', 'frontFriend', 'backFriend', 'adjacentFriends', 'randomFriend', 'allFriends', 'lowestHpFriend', 'frontEnemy', 'backEnemy', 'randomEnemy', 'allEnemies', 'lowestHpEnemy', 'highestAtkEnemy', 'killer', 'summoned', 'boughtUnit'];
 const FACTIONS = ['open', 'closed', 'compute', 'folk'];
-const ABILITY_KEYS = ['trigger', 'effect', 'target', 'amount', 'atk', 'hp', 'permanent', 'perLevel', 'n', 'unitId', 'count', 'desc'];
+const ABILITY_KEYS = ['trigger', 'effect', 'target', 'amount', 'atk', 'hp', 'permanent', 'perLevel', 'n', 'unitId', 'count', 'desc', 'filter', 'consume', 'maxHp', 'maxHpPerLevel', 'choices'];
+const CHOICE_KEYS = ABILITY_KEYS.filter((k) => !['trigger', 'choices'].includes(k));
 const ITEM_EFFECTS = { buff: ['atk', 'hp', 'permanent'], shield: ['amount'], copyStatsFrom: [], levelUp: [], gold: ['amount'], summonToken: ['unitId'], teamBuff: ['atk', 'hp', 'permanent'], pullFront: [], transformRandomSameTier: [] };
 const EVENT_EFFECTS = {
   gold: ['amount'], priceMod: ['target', 'amount'], freeUnit: [], buffTeam: ['atk', 'hp', 'permanent'], buffFaction: ['faction', 'atk', 'hp', 'permanent'],
@@ -99,6 +100,23 @@ for (const u of units) {
   if (!TARGETS.includes(tgt)) err(`${at}: target 非法 ${a.target}`);
   if (!a.desc) err(`${at}: 缺 desc`);
   else if (len(a.desc) > 24) err(`${at}: desc 超 24 字（${len(a.desc)}）「${a.desc}」`);
+  if (a.filter !== undefined) {
+    const f = a.filter;
+    for (const k of Object.keys(f)) if (!['faction', 'minTier', 'maxTier'].includes(k)) err(`${at}: filter 字段 ${k} 非法`);
+    if (f.faction !== undefined && !FACTIONS.includes(f.faction)) err(`${at}: filter.faction 非法`);
+    for (const k of ['minTier', 'maxTier']) if (f[k] !== undefined && !(Number.isInteger(f[k]) && f[k] >= 1 && f[k] <= 6)) err(`${at}: filter.${k} 应为 1~6`);
+  }
+  if (a.consume !== undefined && a.effect !== 'copyStats') err(`${at}: consume 只配 copyStats`);
+  if ((a.maxHp !== undefined || a.maxHpPerLevel !== undefined) && a.effect !== 'destroy') err(`${at}: maxHp 只配 destroy`);
+  if (a.choices !== undefined) {
+    if (!Array.isArray(a.choices) || a.choices.length < 2) err(`${at}: choices 至少 2 个`);
+    for (const [i, c] of (a.choices ?? []).entries()) {
+      for (const k of Object.keys(c)) if (!CHOICE_KEYS.includes(k)) err(`${at}.choices[${i}]: 字段 ${k} 非法`);
+      if (c.effect !== undefined && !EFFECTS.includes(c.effect)) err(`${at}.choices[${i}]: effect 非法`);
+      if (c.effect !== undefined) effUse[c.effect].push(u.id);
+      if (!c.desc || len(c.desc) > 24) err(`${at}.choices[${i}]: desc 缺失或超 24 字`);
+    }
+  }
   if (a.effect === 'summon' && !byId[a.unitId ?? 'token_shuijun']) err(`${at}: 召唤的 ${a.unitId} 不存在`);
   if (tgt === 'boughtUnit' && !['buy', 'friendBought'].includes(a.trigger)) err(`${at}: boughtUnit 只配 buy/friendBought`);
   if (tgt === 'summoned' && !['friendSummoned', 'enemySummoned'].includes(a.trigger)) err(`${at}: summoned 只配 *Summoned 触发`);
@@ -106,7 +124,7 @@ for (const u of units) {
   const shopTrig = ['buy', 'sell', 'levelUp', 'friendBought', 'startTurn', 'endTurn', 'eatItem'];
   if (shopTrig.includes(a.trigger) && ['damage', 'destroy', 'multiAttack'].includes(a.effect)) err(`${at}: ${a.effect} 在商店阶段无效`);
   if (shopTrig.includes(a.trigger) && /Enemy|killer/.test(tgt)) err(`${at}: 商店阶段没有敌人目标`);
-  const perLv = a.effect === 'multiAttack' ? a.perLevel === true : a.perLevel !== false;
+  const perLv = (a.effect === 'multiAttack' ? a.perLevel === true : a.perLevel !== false) && !['swapPosition', 'pushBack', 'pullFront', 'copyStats'].includes(a.effect) && !(a.effect === 'destroy' && !a.maxHpPerLevel);
   if (perLv && !/每级|×等级/.test(a.desc)) err(`${at}: 按等级缩放但 desc 没写「每级」`);
   if (!perLv && /每级/.test(a.desc)) err(`${at}: 不缩放但 desc 写了「每级」`);
 }
@@ -153,6 +171,14 @@ const checkEv = (e, at) => {
   if (e.type === 'freeUnit' && e.tier !== undefined && !shop.some((u) => u.tier === e.tier && (!e.faction || u.faction === e.faction))) err(`${at}: freeUnit 无符合条件的单位`);
   if (e.type === 'enemyDebuff' && e.amount <= 0) err(`${at}: enemyDebuff 用正数`);
 };
+// 选项/突发：effects 数组优先（按顺序结算），兼容单个 effect
+const evList = (o, at) => {
+  if (Array.isArray(o.effects) && o.effects.length) return o.effects;
+  if (o.effect) return [o.effect];
+  if (at) err(`${at}: 缺 effect/effects`);
+  return [];
+};
+let comboHeadlines = 0;
 const headlines = load('headlines.json');
 uniq(headlines, 'headlines');
 if (headlines.length < 26) err(`头条只有 ${headlines.length} 张（≥26）`);
@@ -163,9 +189,10 @@ for (const h of headlines) {
   if (!Array.isArray(h.options) || h.options.length !== 2) { err(`${at}: options 必须 2 个`); continue; }
   h.options.forEach((o, k) => {
     if (!o.label || len(o.label) > 10) err(`${at}.options[${k}]: label 缺失或超 10 字`);
-    checkEv(o.effect, `${at}.options[${k}]`);
+    evList(o, `${at}.options[${k}]`).forEach((e, i) => checkEv(e, `${at}.options[${k}]#${i}`));
   });
-  if (JSON.stringify(h.options[0].effect) === JSON.stringify(h.options[1].effect)) err(`${at}: 两个选项效果相同，不是取舍`);
+  if (JSON.stringify(evList(h.options[0])) === JSON.stringify(evList(h.options[1]))) err(`${at}: 两个选项效果相同，不是取舍`);
+  if (h.options.some((o) => Array.isArray(o.effects) && o.effects.length > 1)) comboHeadlines++;
   if (/死|自杀|枪|深伪|色情|未成年|儿童|五角大楼|国防部/.test(h.title + h.news)) err(`${at}: 含禁用题材`);
 }
 const surprises = load('surprises.json');
@@ -176,8 +203,9 @@ for (const s of surprises) {
   if (!s.title || len(s.title) > 8) err(`${at}: title 缺失或超 8 字`);
   if (!s.news || len(s.news) > 40) err(`${at}: news 缺失或超 40 字`);
   if (typeof s.good !== 'boolean') err(`${at}: good 应为布尔`);
-  checkEv(s.effect, at);
+  evList(s, at).forEach((e, i) => checkEv(e, `${at}#${i}`));
 }
+if (comboHeadlines < 3) err(`组合取舍（effects 多效果）的头条只有 ${comboHeadlines} 张，应 ≥3`);
 const goodRatio = surprises.filter((s) => s.good).length / surprises.length;
 if (goodRatio < 2 / 3) err(`突发好事占比 ${(goodRatio * 100).toFixed(0)}%，应 ≥ 67%`);
 for (const t of Object.keys(EVENT_EFFECTS)) if (!evUse.has(t)) warn(`事件效果 ${t} 没被任何头条/突发使用`);
@@ -217,7 +245,7 @@ console.log('触发器使用（*=召唤物）');
 for (const t of TRIGGERS) console.log(`  ${t.padEnd(15)} ${trigUse[t].join(', ')}`);
 console.log('效果使用');
 for (const e of EFFECTS) console.log(`  ${e.padEnd(13)} ${effUse[e].join(', ')}`);
-console.log(`基建 ${items.length} · 头条 ${headlines.length} · 突发 ${surprises.length}（好事 ${(goodRatio * 100).toFixed(0)}%）`);
+console.log(`基建 ${items.length} · 头条 ${headlines.length}（组合 ${comboHeadlines}）· 突发 ${surprises.length}（好事 ${(goodRatio * 100).toFixed(0)}%）`);
 if (warns.length) {
   console.log(`\n警告 ${warns.length} 条：`);
   for (const w of warns) console.log('  ! ' + w);

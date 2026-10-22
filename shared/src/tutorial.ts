@@ -38,7 +38,7 @@ export function tutorialEnemy(state: RunState, data: GameData): UnitInst[] | nul
     });
 }
 
-/** 离线对手：引导局用固定弱队，否则用机器人（种子 = 局种子 + 回合） */
+/** 离线对手：引导局用固定弱队，否则用机器人（种子 = 局种子 + 回合；带难度系数，见 DIFFICULTY） */
 export function offlineOpponent(state: RunState, data: GameData): UnitInst[] {
-  return tutorialEnemy(state, data) ?? generateBotTeam(state.turn, state.trophies, data, `${state.seed}:opp:${state.turn}`);
+  return tutorialEnemy(state, data) ?? generateBotTeam(state.turn, state.trophies, data, `${state.seed}:opp:${state.turn}`, { lives: state.lives });
 }

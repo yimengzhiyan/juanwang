@@ -9,6 +9,7 @@ export {
 } from './engine/shop';
 export { simulateBattle, MAX_ROUNDS, MAX_FIELD, SYNERGY_THRESHOLD, SYNERGY_DESC } from './engine/battle';
 export { applyBattleResult, livesLostOnDefeat, SURPRISE_CHANCE, LATE_GAME_TURN } from './engine/result';
-export { generateBotTeam, botBonusGold } from './engine/bot';
+export { generateBotTeam, botBonusGold, scaleTeam, type BotOpts } from './engine/bot';
+export { DIFFICULTY, opponentScale, type Difficulty } from './engine/difficulty';
 export { tutorialStep, tutorialEnemy, offlineOpponent } from './tutorial';
 export { battleForState, runTurnOffline } from './engine/helpers';

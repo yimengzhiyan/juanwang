@@ -102,7 +102,7 @@ phase 'over'     → state.won / state.endReason('trophies'|'lives'|'turnLimit')
 11. **DESIGN 11.5**：商店阶段触发的 `swapAll`（头条/突发）与 `pullFront`（技能或基建）不立即改队形，记到 `modifiers.battleSwapAll`（奇数次=反转）与 `modifiers.battlePullFront`（uid 列表，依次拉到最前），在战斗开始（start 事件之后、羁绊之前）以 move 事件生效。商店里玩家看到的队形不变，UI 可在队伍栏提示"开战时反转/某某上前"。pushBack / swapPosition 在商店阶段仍立即生效。
 12. 头条：随机且尽量不重复（`seenHeadlines`）。突发：奇数回合结算后 30%（用局内 rng，固定种子可重放），尽量不重复；**在下一回合开始时生效**（结算页可先展示 `lastSurprise`，`surprisePending` 为真）。
 13. 事件效果细节：gold 立即到账（可为负，最低 0）；freeUnit 进商店免费槽（不直接进队伍，满员也能拿）；tier 指定时池子为空则向低阶回退；duplicate 复制到第一个空位（无空位无效）；sacrifice 牺牲阶最低（同阶等级最低，再同取最左）的单位；lifeTrade 在只剩 1 信心时不生效；enemyDebuff 只作用于本回合战斗（敌方攻击最低 0）；extraSlot 立即追加单位槽且本回合刷新保持；**effects 数组按顺序全部结算**（validateData 后 `effects` 总是存在，`effect` = 第一个）。
-14. 回合 20 结算后直接结束：`won=false, endReason='turnLimit'`，成绩按热搜数。热搜 10 → `won=true, endReason='trophies'`；信心 0 → `endReason='lives'`。
+14. **输一场掉信心：回合 ≥ 12 掉 2，之前掉 1**（DESIGN 写的是 ≥10，按难度调优改为 12，参数 `DIFFICULTY.lateGameTurn`）。回合 20 结算后直接结束：`won=false, endReason='turnLimit'`，成绩按热搜数。热搜 10 → `won=true, endReason='trophies'`；信心 0 → `endReason='lives'`。
 
 ### 战斗
 15. 战场每方最多 **6** 个单位（队伍 5 + 1 召唤余量），满了召唤失败（无事件）。
@@ -134,7 +134,7 @@ phase 'over'     → state.won / state.endReason('trophies'|'lives'|'turnLimit')
 34. 群体基建（targetKind:'team'）对全队每个单位各触发一次 eatItem（DESIGN 11.6）。
 
 ### 机器人
-35. 机器人从回合 1 模拟到目标回合：每回合 10 + `botBonusGold(trophies)`（每 3 热搜 +1，上限 3）算力；优先合并 → 空位买最强（tier×3+攻+血）→ 满员时卖最弱换明显更强 → 用基建（buff 给最强、护盾给前排、levelUp 给最强未满级、copyStatsFrom 弱者抄强者、summonToken/teamBuff/gold）→ 有余钱刷新（次数 1 + 热搜/3）。不吃头条/突发。排阵：血厚、带 faint/hurt/hurtFront 的在前，带 startBattle 的靠后。回合 20 约 4ms。
+35. 机器人从回合 1 模拟到目标回合：每回合 10 + `botBonusGold(trophies)`（每 3 热搜 +1，上限 2）算力；优先合并 → 空位买最强（tier×3+攻+血）→ 满员时卖最弱换明显更强 → 用基建（buff 给最强、护盾给前排、levelUp 给最强未满级、copyStatsFrom 弱者抄强者、summonToken/teamBuff/gold）→ 有余钱刷新（次数 1 + 热搜/3）。不吃头条/突发。作为**离线对手**时（`offlineOpponent` / `generateBotTeam(..., {lives})`）再乘难度系数，见第 6 节；真人快照不缩放。排阵：血厚、带 faint/hurt/hurtFront 的在前，带 startBattle 的靠后。回合 20 约 4ms。
 
 ## 4. tutorial.json schema（`TutorialDef`）
 ```jsonc
@@ -170,3 +170,37 @@ phase 'over'     → state.won / state.endReason('trophies'|'lives'|'turnLimit')
 - 错误：`{error: '中文原因'}`，400/404/413/429/500。限流：同 IP 每秒 ≤10 次 `/api/*`（healthz/静态文件不限）。
 - 排序：登顶 > 热搜多 > 回合少 > 更早。每人最佳按 (房间, 日期, 名字) 记录，全服榜/今日榜/房间榜都在查询时取每人最佳。
 - 存储：内存 + `server/data/store.json` 每 10 秒（有改动时）原子落盘，退出时也落盘；每回合桶最多 2000 条（LRU，被匹配取用也刷新）。
+
+## 6. 难度（`DIFFICULTY`，`shared/src/engine/difficulty.ts`）
+所有难度参数集中在导出的可变对象 `DIFFICULTY` 里（运行时改字段立即生效，例如做"简单/困难"模式）：
+| 参数 | 默认 | 含义 |
+|---|---|---|
+| `earlyTurns` / `earlyScale` | 4 / 0.75 | 前 4 回合离线对手属性 ×0.75 |
+| `maxScale` / `fullScaleAtTrophies` | 0.85 / 10 | 第 5 回合起系数 = 0.75 + (0.85-0.75) × min(1, 玩家热搜/10) |
+| `lowLivesThreshold` / `lowLivesScale` | 3 / 0.85 | 橡皮筋：玩家信心 ≤3 时再 ×0.85 |
+| `botBonusPerTrophies` / `botBonusMax` | 3 / 2 | 机器人每 3 热搜每回合 +1 算力，上限 2 |
+| `botRerollBase` / `botRerollPerTrophies` | 1 / 3 | 机器人每回合刷新次数 = 1 + 热搜/3 |
+| `lateGameTurn` / `lateGameLifeLoss` | 12 / 2 | 回合 ≥12 输一场掉 2 信心 |
+| `surpriseChance` | 0.3 | 突发概率 |
+
+- 系数作用于机器人队伍的攻、血（含临时加成，四舍五入，攻 ≥0、血 ≥1），由 `opponentScale(turn, trophies, lives)` 计算，`scaleTeam(team, k)` 执行。只影响离线机器人对手；服务端返回的真人快照不缩放。
+- 复现：`npx tsx scripts/sim-difficulty.ts [局数]`，可用 `DIFF='{"maxScale":0.9}'` 临时覆盖参数。模拟口径：玩家每回合使用 `generateBotTeam(回合, 0, data, 固定种子)`（即"机器人水平、无热搜加成的玩家"），对手为 `offlineOpponent`，头条固定选一个选项，真实数据 `shared/data`。
+
+### 2000 局模拟结果
+| 方案 | 结束回合中位数（P25/P75，P10/P90） | 平均回合 | 拿满 10 热搜 | 结局 |
+|---|---|---|---|---|
+| 调前（无系数，≥10 回合掉 2，加成上限 3） | 10（8/11，7/12） | 9.7 | **2.4%** | 信心耗尽 1952 |
+| 协调建议原值（0.8 → 1.0，信心 ≤2 ×0.9，≥12 掉 2，上限 2） | 12（11/14，10/15） | 12.3 | 14.4% | 信心耗尽 1711 |
+| **采用（0.75 → 0.85，信心 ≤3 ×0.85，≥12 掉 2，上限 2）** | **13（12/14，11/15）** | 13.0 | **41.4%** | 信心耗尽 1171、登顶 829 |
+
+扫过的其他参数（500~1000 局）：maxScale 0.9 → 22%；0.85 → 27%；0.8 → 35%；early 0.75 + max 0.85 + 信心≤2 ×0.85 → 34%；信心≤3 ×0.8 且加成上限 1 → 66%（过易）。协调建议的"回升到 1.0"在对等水平下单场胜率只有约 50%，凑不够 10 胜，所以上限定为 0.85。
+
+各阶单位出场率（每场上场单位按阶统计）：
+| | T1 | T2 | T3 | T4 | T5 | T6 |
+|---|---|---|---|---|---|---|
+| 调前·玩家 | 46.4% | 12.2% | 21.7% | 9.3% | 7.1% | 3.4% |
+| 调前·对手 | 46.9% | 12.4% | 21.7% | 8.8% | 7.2% | 3.2% |
+| 调后·玩家 | 36.5% | 10.4% | 19.8% | 12.0% | 13.1% | 8.2% |
+| 调后·对手 | 38.3% | 10.9% | 20.5% | 11.1% | 12.1% | 7.0% |
+
+调后对局更长，T4~T6 的出场率约翻倍。T1 占比偏高是因为机器人很爱合并低阶单位（Lv2/Lv3 的 T1 仍然很能打）；T2 偏低（约 10%）可能值得内容侧关注。

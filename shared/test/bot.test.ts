@@ -24,8 +24,9 @@ describe('generateBotTeam', () => {
   });
   it('热搜越高越强', () => {
     expect(botBonusGold(0)).toBe(0);
+    expect(botBonusGold(5)).toBe(1);
     expect(botBonusGold(8)).toBe(2);
-    expect(botBonusGold(10)).toBe(3);
+    expect(botBonusGold(10)).toBe(2); // 上限 DIFFICULTY.botBonusMax = 2
     expect(power(6, 9)).toBeGreaterThan(power(6, 0));
   });
   it('后期会合并进化、出高阶单位', () => {

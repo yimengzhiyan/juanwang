@@ -5,9 +5,21 @@ import {
   BASE_GOLD, TEAM_SIZE, applyAction, beginTurn, clearBattleTemps, emptyModifiers, makeCtx, teamUnits, type Ctx,
 } from './shop';
 
-/** 热搜越高，机器人每回合多拿的算力（每 3 热搜 +1，上限 3） */
+import { DIFFICULTY, opponentScale } from './difficulty';
+
+/** 热搜越高，机器人每回合多拿的算力（DIFFICULTY.botBonusPerTrophies / botBonusMax） */
 export function botBonusGold(trophies: number): number {
-  return Math.min(3, Math.floor(Math.max(0, trophies) / 3));
+  return Math.min(DIFFICULTY.botBonusMax, Math.floor(Math.max(0, trophies) / DIFFICULTY.botBonusPerTrophies));
+}
+
+/** 按系数缩放队伍属性（含临时加成），攻击最低 0、血量最低 1 */
+export function scaleTeam(team: UnitInst[], factor: number): UnitInst[] {
+  if (factor === 1) return team;
+  return team.map((u) => ({
+    ...u,
+    atk: Math.max(0, Math.round((u.atk + u.tempAtk) * factor) - u.tempAtk),
+    hp: Math.max(1, Math.round((u.hp + u.tempHp) * factor) - u.tempHp),
+  }));
 }
 
 function unitScore(data: GameData, defId: string, u?: UnitInst): number {
@@ -104,7 +116,14 @@ function arrange(data: GameData, team: (UnitInst | null)[]): UnitInst[] {
  * 生成一支机器人队伍：从回合 1 模拟贪心购物到 turn。热搜越高，每回合额外算力越多、刷新越积极。
  * 完全确定性（同参数同结果）。
  */
-export function generateBotTeam(turn: number, trophies: number, data: GameData, seed: string): UnitInst[] {
+export interface BotOpts {
+  /** 作为离线对手时传入玩家当前信心：启用难度系数（前期削弱 + 橡皮筋），见 DIFFICULTY */
+  lives?: number;
+  /** 直接指定属性系数（优先于 lives 计算） */
+  scale?: number;
+}
+
+export function generateBotTeam(turn: number, trophies: number, data: GameData, seed: string, opts?: BotOpts): UnitInst[] {
   const rng = new Rng(`${seed}:bot`);
   const s: RunState = {
     seed, turn: 0, gold: BASE_GOLD, lives: 5, trophies, team: Array(TEAM_SIZE).fill(null), shop: [], phase: 'shop',
@@ -116,12 +135,14 @@ export function generateBotTeam(turn: number, trophies: number, data: GameData, 
   for (let t = 1; t <= target; t++) {
     beginTurn(ctx, t);
     s.gold += bonus;
-    shopTurn(ctx, rng, 1 + Math.floor(trophies / 3));
+    shopTurn(ctx, rng, DIFFICULTY.botRerollBase + Math.floor(Math.max(0, trophies) / DIFFICULTY.botRerollPerTrophies));
     applyAction(ctx, { type: 'endShop' });
     if (t < target) {
       clearBattleTemps(s);
       s.phase = 'result';
     }
   }
-  return arrange(data, s.team).map((u) => ({ ...u, uid: `bot${u.uid}` }));
+  const team = arrange(data, s.team).map((u) => ({ ...u, uid: `bot${u.uid}` }));
+  if (!opts) return team;
+  return scaleTeam(team, opts.scale ?? opponentScale(turn, trophies, opts.lives));
 }
