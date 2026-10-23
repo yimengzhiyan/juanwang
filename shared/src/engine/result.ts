@@ -22,9 +22,9 @@ export const ACHIEVEMENTS: Record<string, string> = {
   upgradeMax: '商店满升级',
   streak5: '五连胜',
   steal: '挖角成功',
-  'tier:open:3': '流派·开源 ×6', 'tier:closed:3': '流派·闭源 ×6', 'tier:compute:3': '流派·算力 ×6', 'tier:folk:3': '流派·民间 ×6',
+  'tier:open:3': '流派·开源 ×5', 'tier:closed:3': '流派·闭源 ×5', 'tier:compute:3': '流派·算力 ×5', 'tier:folk:3': '流派·民间 ×5',
   'tier:researcher:2': '流派·研究员 ×4', 'tier:trader:2': '流派·商人 ×4', 'tier:idol:2': '流派·偶像 ×4', 'tier:engineer:2': '流派·工程师 ×4',
-  'tier:open:2': '流派·开源 ×4', 'tier:closed:2': '流派·闭源 ×4', 'tier:compute:2': '流派·算力 ×4', 'tier:folk:2': '流派·民间 ×4',
+  'tier:open:2': '流派·开源 ×3', 'tier:closed:2': '流派·闭源 ×3', 'tier:compute:2': '流派·算力 ×3', 'tier:folk:2': '流派·民间 ×3',
 };
 
 function pickSurprise(ctx: Ctx): SurpriseDef | undefined {

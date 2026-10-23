@@ -1,11 +1,11 @@
-// 流派羁绊（DESIGN 12.1 / 12.2）：阵营 2/4/6 三档、职业 2/4 两档，档位逐级叠加（4 个时 2 个档的效果仍然生效）。
+// 流派羁绊（DESIGN 12.1 / 12.2）：阵营 2/3/5 三档、职业 2/4 两档，档位逐级叠加（3 个时 2 个档的效果仍然生效）。
 // 本文件只做统计与描述；具体效果分散在 battle.ts（战斗）和 shop.ts（商店阶段）里实现，查 tierOf()。
 import {
   FACTIONS, ROLES,
   type Faction, type GameData, type Role, type SynergyKey, type SynergyKind, type SynergyState, type UnitDef, type UnitInst,
 } from '../types';
 
-export const FACTION_THRESHOLDS = [2, 4, 6] as const;
+export const FACTION_THRESHOLDS = [2, 3, 5] as const;
 export const ROLE_THRESHOLDS = [2, 4] as const;
 
 export const SYNERGY_NAME: Record<SynergyKey, string> = {
@@ -25,7 +25,7 @@ export const SYNERGY_DESCS: Record<SynergyKey, string[]> = {
   engineer: ['进化时额外 +1/+1', '每回合首次刷新免费，进化时全队 +1/+1'],
 };
 
-/** 战斗开场横幅的口号（"开源 ×4：共享升级！"） */
+/** 战斗开场横幅的口号（"开源 ×3：共享升级！"） */
 export const SYNERGY_SHOUT: Record<SynergyKey, string[]> = {
   open: ['开源共享！', '共享升级！', '全民开源！'],
   closed: ['护栏上线！', '铜墙铁壁！', '绝对闭源！'],

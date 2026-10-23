@@ -13,7 +13,7 @@ export function itemSlotsForTurn(_turn: number): number {
 }
 /** @deprecated 2.0 没有热搜，改为 8 人房名次 */
 export const WIN_TROPHIES = 10;
-/** @deprecated 2.0 羁绊是 2/4/6 三档（FACTION_THRESHOLDS） */
+/** @deprecated 2.0 阵营羁绊是 2/3/5 三档（FACTION_THRESHOLDS） */
 export const SYNERGY_THRESHOLD = 2;
 /** @deprecated 用 SYNERGY_DESCS */
 export const SYNERGY_DESC: Record<Faction, string> = Object.fromEntries(FACTIONS.map((f) => [f, SYNERGY_DESCS[f][0]])) as Record<Faction, string>;

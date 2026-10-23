@@ -13,7 +13,7 @@ export function equipEffectOf(inst: EquipInst, data: GameData): EquipEffect {
   return inst.gold ? def.goldEffect : def.effect;
 }
 
-/** 这个单位的装备效果是否 ×2（算力 ×4：算力单位的装备效果翻倍） */
+/** 这个单位的装备效果是否 ×2（算力 ×3：算力单位的装备效果翻倍） */
 export function equipMultFor(def: UnitDef | undefined, tiers: TierMap | undefined): number {
   return def?.faction === 'compute' && (tiers?.compute ?? 0) >= 2 ? 2 : 1;
 }
@@ -54,7 +54,7 @@ export function equipRefund(u: Pick<UnitInst, 'equips'>): number {
 }
 
 /**
- * 显示用有效属性：基础 + 临时 + 装备静态加成（含算力 ×4 翻倍）。team 传入时按队伍羁绊计算倍率。
+ * 显示用有效属性：基础 + 临时 + 装备静态加成（含算力 ×3 翻倍）。team 传入时按队伍羁绊计算倍率。
  * 战斗开场的属性与它一致（再叠加赛场/羁绊开战效果）。
  */
 export function effectiveStats(u: UnitInst, data: GameData, team?: readonly (UnitInst | null)[], bonus?: SynergyBonus): { atk: number; hp: number } {

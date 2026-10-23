@@ -373,7 +373,7 @@ export function destroyThreshold(ab: Ability, level: number): number {
   return ab.maxHp + (level - 1) * (ab.maxHpPerLevel ?? 0);
 }
 
-/** 技能触发次数：1 + 研究员 ×4（研究员单位）+ 微调（含算力 ×4 翻倍） */
+/** 技能触发次数：1 + 研究员 ×4（研究员单位）+ 微调（含算力 ×3 翻倍） */
 export function abilityRepeats(def: UnitDef | undefined, u: Pick<UnitInst, 'equips'>, tiers: TierMap, data: GameData): number {
   let n = 1;
   if (def?.role === 'researcher' && (tiers.researcher ?? 0) >= 2) n += 1;
@@ -449,7 +449,7 @@ function rawShopTargets(ctx: Ctx, self: UnitInst, ab: Ability, info: ShopInfo, a
   }
 }
 
-/** 商店阶段召唤一个单位到 near 附近空位（赛场 summonBuff、民间 ×4 继承 50%） */
+/** 商店阶段召唤一个单位到 near 附近空位（赛场 summonBuff、民间 ×3 继承 50%） */
 export function shopSummon(ctx: Ctx, unitId: string, near: number, mult = 1, summoner?: UnitInst): UnitInst | null {
   const s = ctx.s;
   const at = firstEmpty(s, near);
@@ -773,13 +773,13 @@ function pickHeadline(ctx: Ctx): HeadlineDef | undefined {
   return h;
 }
 
-/** 进入商店：startTurn 技能 + 开源 ×6（开源单位永久 +1/+1） */
+/** 进入商店：startTurn 技能 + 开源 ×5（开源单位永久 +1/+1） */
 export function openShop(ctx: Ctx): void {
   ctx.s.phase = 'shop';
   fireTeam(ctx, 'startTurn', {});
   if (tiersOf(ctx).open >= 3) {
     for (const u of teamUnits(ctx.s)) if (defOf(ctx, u)?.faction === 'open') permBuff(u, 1, 1);
-    log(ctx, '开源 ×6：开源单位永久 +1/+1');
+    log(ctx, '开源 ×5：开源单位永久 +1/+1');
   }
   repriceShop(ctx);
 }
@@ -861,10 +861,10 @@ function applyActionInner(ctx: Ctx, a: ShopActionInput): string | null {
       }
       fireShop(ctx, 'buy', [uid], { bought: uid });
       fireTeam(ctx, 'friendBought', { bought: uid }, [uid]);
-      // 开源 ×4：任一开源单位被购买时，全体开源单位永久 +1/+1
+      // 开源 ×3：任一开源单位被购买时，全体开源单位永久 +1/+1
       if (def?.faction === 'open' && tiersOf(ctx).open >= 2) {
         for (const u of teamUnits(s)) if (defOf(ctx, u)?.faction === 'open') permBuff(u, 1, 1);
-        log(ctx, '开源 ×4：全体开源单位永久 +1/+1');
+        log(ctx, '开源 ×3：全体开源单位永久 +1/+1');
       }
       return null;
     }

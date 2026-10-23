@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createServer, type Server } from 'node:http';
+import { createServer, request, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,24 +10,50 @@ import { Store } from '../src/store';
 const validIds = new Set(['crawler', 'wrapper', 'gpt_chan', 'token_shuijun']);
 const unit = (defId = 'crawler', over: Record<string, unknown> = {}) => ({ uid: 'x', defId, atk: 2, hp: 3, level: 1, xp: 0, shield: 0, tempAtk: 0, tempHp: 0, equips: {}, ...over });
 
+// 确定性说明：不用全局 fetch（undici 的 keep-alive 连接池会把旧连接复用到"同端口的新服务器"上，整套并行跑时偶发 ECONNRESET）。
+// 每个请求用 node:http + agent:false（一次性连接、Connection: close），afterEach 等服务器完全关闭（含所有连接）。
 let servers: Server[] = [];
-afterEach(() => {
-  for (const s of servers) s.close();
+afterEach(async () => {
+  await Promise.all(
+    servers.map((s) => new Promise<void>((ok) => {
+      s.close(() => ok());
+      s.closeAllConnections();
+    })),
+  );
   servers = [];
 });
 
+interface Resp { status: number; headers: Record<string, string | string[] | undefined>; text: () => Promise<string>; json: () => Promise<unknown> }
+/** 一次性 HTTP 请求（不走连接池） */
+function http(url: string, init: { method?: string; headers?: Record<string, string>; body?: string } = {}): Promise<Resp> {
+  return new Promise((ok, fail) => {
+    const req = request(url, { method: init.method ?? 'GET', headers: { connection: 'close', ...init.headers }, agent: false }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (c: Buffer) => chunks.push(c));
+      res.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf8');
+        ok({ status: res.statusCode ?? 0, headers: res.headers, text: async () => body, json: async () => JSON.parse(body) as unknown });
+      });
+      res.on('error', fail);
+    });
+    req.on('error', fail);
+    if (init.body !== undefined) req.write(init.body);
+    req.end();
+  });
+}
+
 async function start(opts: Partial<AppOptions> = {}) {
-  const app = createApp({ validIds, validEquipIds: new Set(['gpu_h100', 'firewall']), rateLimit: { max: 1000, windowMs: 1000 }, random: () => 0, ...opts });
+  const app = createApp({ validIds, validEquipIds: new Set(['gpu_h100', 'firewall']), rateLimit: { max: 1000, windowMs: 1000 }, random: () => 0, now: () => Date.UTC(2026, 9, 23, 4), ...opts });
   const server = createServer((req, res) => void app.handle(req, res));
   servers.push(server);
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const get = async (p: string) => {
-    const r = await fetch(base + p);
+    const r = await http(base + p);
     return { status: r.status, body: (await r.json()) as any };
   };
   const post = async (p: string, body: unknown) => {
-    const r = await fetch(base + p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await http(base + p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     return { status: r.status, body: (await r.json()) as any };
   };
   return { app, base, get, post };
@@ -85,7 +111,7 @@ describe('/api/snapshot 校验', () => {
   it('12 个汉字可以；坏 JSON → 400；未知接口 → 404', async () => {
     const { post, base, get } = await start();
     expect((await post('/api/snapshot', snap({ name: '一二三四五六七八九十一二' }))).status).toBe(200);
-    const r = await fetch(`${base}/api/snapshot`, { method: 'POST', body: '{bad' });
+    const r = await http(`${base}/api/snapshot`, { method: 'POST', body: '{bad' });
     expect(r.status).toBe(400);
     expect((await get('/api/nope')).status).toBe(404);
   });
@@ -205,12 +231,12 @@ describe('落盘与静态托管', () => {
     writeFileSync(join(dir, 'index.html'), '<h1>hi</h1>');
     writeFileSync(join(dir, 'characters', 'a.png'), 'png');
     const { base } = await start({ distDir: dir });
-    const r1 = await fetch(`${base}/`);
+    const r1 = await http(`${base}/`);
     expect(await r1.text()).toBe('<h1>hi</h1>');
-    const r2 = await fetch(`${base}/characters/a.png`);
-    expect(r2.headers.get('content-type')).toBe('image/png');
-    expect(await (await fetch(`${base}/some/route`)).text()).toBe('<h1>hi</h1>');
-    expect((await fetch(`${base}/missing.png`)).status).toBe(404);
-    expect((await fetch(`${base}/..%2f..%2fetc%2fpasswd`)).status).toBe(404);
+    const r2 = await http(`${base}/characters/a.png`);
+    expect(r2.headers['content-type']).toBe('image/png');
+    expect(await (await http(`${base}/some/route`)).text()).toBe('<h1>hi</h1>');
+    expect((await http(`${base}/missing.png`)).status).toBe(404);
+    expect((await http(`${base}/..%2f..%2fetc%2fpasswd`)).status).toBe(404);
   });
 });

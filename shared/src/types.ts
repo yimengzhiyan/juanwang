@@ -117,7 +117,7 @@ export type EquipSlot = 'weapon' | 'armor' | 'trinket';
 export const EQUIP_SLOTS: readonly EquipSlot[] = ['weapon', 'armor', 'trinket'];
 
 /**
- * 装备效果（数据驱动，所有字段可选、可组合）。数值类字段在算力 ×4 羁绊下翻倍（概率封顶 1）。
+ * 装备效果（数据驱动，所有字段可选、可组合）。数值类字段在算力 ×3 羁绊下翻倍（概率封顶 1）。
  * 内容侧可以直接写这个结构；也可以只写 id，引擎用内置的 12 件默认效果（见 defaults.ts）。
  */
 export interface EquipEffect {
@@ -433,9 +433,9 @@ export interface SynergyState {
   name: string;
   /** 按单位个数统计（同名的不同单位各算 1，等级不计） */
   count: number;
-  /** 0 = 未激活；阵营 1~3（2/4/6 个），职业 1~2（2/4 个） */
+  /** 0 = 未激活；阵营 1~3（2/3/5 个），职业 1~2（2/4 个） */
   tier: number;
-  /** 各档门槛：阵营 [2,4,6]，职业 [2,4] */
+  /** 各档门槛：阵营 [2,3,5]，职业 [2,4] */
   thresholds: number[];
   /** 下一档还差的个数（满档为 undefined） */
   next?: number;
