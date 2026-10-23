@@ -1,67 +1,96 @@
-// 真实内容数据（shared/data/*.json）的冒烟测试；数据缺失时跳过。
+// 真实内容数据（shared/data/*.json）：缺文件或不兼容时直接失败并给出清晰原因（不跳过）。
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
-import { validateData } from '../src/data';
-import { newRun, shopAction } from '../src/engine/shop';
-import { generateBotTeam } from '../src/engine/bot';
-import { battleForState } from '../src/engine/helpers';
-import { applyBattleResult } from '../src/engine/result';
-import { offlineOpponent, tutorialStep } from '../src/tutorial';
-import type { RunState } from '../src/types';
+import { DataError, validateData, type RawGameData } from '../src/data';
+import { newRun, shopAction } from '../src/engine/run';
+import { botPlayTurn, generateArchetypeTeam } from '../src/engine/bot';
+import { runTurnOffline } from '../src/engine/helpers';
+import { tutorialStep } from '../src/tutorial';
+import { FACTIONS, ROLES, type Archetype, type GameData, type RunState } from '../src/types';
 
 const dir = fileURLToPath(new URL('../data/', import.meta.url));
-const names = ['units', 'items', 'headlines', 'surprises', 'tutorial'] as const;
-const present = names.slice(0, 4).every((n) => existsSync(join(dir, `${n}.json`)));
+const FILES = ['units', 'headlines', 'surprises', 'tutorial', 'equips', 'consumables', 'arenas', 'opponents', 'pve'] as const;
+const missing = FILES.filter((n) => !existsSync(join(dir, `${n}.json`)));
 const read = (n: string) => (existsSync(join(dir, `${n}.json`)) ? JSON.parse(readFileSync(join(dir, `${n}.json`), 'utf8')) : undefined);
 
-describe.skipIf(!present)('真实内容数据', () => {
-  const data = present ? validateData({ units: read('units'), items: read('items'), headlines: read('headlines'), surprises: read('surprises'), tutorial: read('tutorial') }) : null!;
+function load(): GameData {
+  if (missing.length) throw new Error(`shared/data 缺少 ${missing.map((m) => `${m}.json`).join('、')}（2.0 需要全部 ${FILES.length} 个内容文件）`);
+  try {
+    return validateData(Object.fromEntries(FILES.map((n) => [n, read(n)])) as unknown as RawGameData);
+  } catch (e) {
+    if (e instanceof DataError) throw new Error(`shared/data 与引擎不兼容：\n${e.problems.join('\n')}`);
+    throw e;
+  }
+}
 
-  it('通过校验：32 个商店单位、每阶都有', () => {
-    expect(data.units.filter((u) => !u.token)).toHaveLength(32);
+const ARCHES: Archetype[] = [...FACTIONS.map((f) => ({ faction: f })), ...ROLES.map((r) => ({ role: r }))];
+
+describe('真实内容数据', () => {
+  it('9 个内容文件齐全且通过校验：32 个商店单位、每阶都有、每个单位有职业', () => {
+    const data = load();
+    if (data.warnings.length) console.info(`[realdata] 校验提醒：\n- ${data.warnings.join('\n- ')}`);
+    const shop = data.units.filter((u) => !u.token);
+    expect(shop).toHaveLength(32);
     for (let t = 1; t <= 6; t++) expect(data.shopUnitsByTier[t].length).toBeGreaterThan(0);
+    expect(shop.filter((u) => !u.role).map((u) => u.id)).toEqual([]);
+    expect(data.equips.map((e) => e.id).sort()).toEqual(['alignment', 'dataset', 'distill', 'finetune', 'firewall', 'funding_round', 'gpu_h100', 'jumpbox', 'launch_event', 'quantize', 'rlhf', 'trending']);
+    expect(data.arenas.length).toBeGreaterThanOrEqual(8);
+    expect(data.opponents.length).toBeGreaterThanOrEqual(7);
   });
 
-  it('50 局完整对局（机器人式玩家 vs 机器人）无异常、≤ 20 回合', () => {
-    for (let g = 0; g < 50; g++) {
-      let s: RunState = newRun(`real-${g}`, data);
+  it('机器人按流派偏好：阵营流派在回合 10 的该阵营占比 ≥ 50%', () => {
+    const data = load();
+    for (const f of FACTIONS) {
+      let hit = 0;
+      let tot = 0;
+      for (let i = 0; i < 15; i++) {
+        const t = generateArchetypeTeam({ faction: f }, 10, `real-${f}-${i}`, data);
+        tot += t.length;
+        hit += t.filter((u) => data.unitsById[u.defId].faction === f).length;
+      }
+      expect(hit / tot, f).toBeGreaterThanOrEqual(0.5);
+    }
+  });
+
+  it('引导局可以开局', () => {
+    const data = load();
+    const s = newRun('x', data, { tutorial: true });
+    expect(tutorialStep(s, data)).toBe('buy');
+    expect(s.shop.map((x) => x.defId)).toEqual([...data.tutorial!.turns[0].units, ...(data.tutorial!.turns[0].items ?? [])]);
+  });
+
+  it('完整模拟 200 局（机器人水平玩家，8 条流派轮流）：无异常；中位回合 10~14；平均名次约 4；吃鸡率 10%~20%', () => {
+    const data = load();
+    const turns: number[] = [];
+    const ranks: number[] = [];
+    for (let g = 0; g < 200; g++) {
+      let s: RunState = shopAction(newRun(`D${g}`, data), { type: 'chooseArena', index: g % 3 }, data);
+      expect(s.error).toBeUndefined();
       for (let k = 0; k < 25 && s.phase !== 'over'; k++) {
-        if (s.phase === 'headline') s = shopAction(s, { type: 'chooseHeadline', option: (g % 2) as 0 | 1 }, data);
-        for (let b = 0; b < 8; b++) {
-          const i = s.shop.findIndex((x) => x.kind === 'unit' && x.price <= s.gold);
-          if (i < 0) break;
-          const n = shopAction(s, { type: 'buy', slot: i }, data);
-          if (n.error) break;
-          s = n;
-        }
-        s = shopAction(s, { type: 'endShop' }, data);
-        expect(s.phase).toBe('battle');
-        s = applyBattleResult(s, battleForState(s, offlineOpponent(s, data), data), data);
-        if (s.phase === 'result') s = shopAction(s, { type: 'continue' }, data);
+        s = botPlayTurn(s, data, { archetype: ARCHES[g % ARCHES.length] });
+        expect(s.error).toBeUndefined();
+        s = runTurnOffline(s, data, { pick: g % 3 }).state;
         expect(s.error).toBeUndefined();
       }
       expect(s.phase).toBe('over');
       expect(s.turn).toBeLessThanOrEqual(20);
+      expect(s.end!.rank).toBeGreaterThanOrEqual(1);
+      expect(s.end!.rank).toBeLessThanOrEqual(8);
+      turns.push(s.turn);
+      ranks.push(s.end!.rank);
     }
-  });
-
-  it('机器人在真实数据下也够快、随回合变强', () => {
-    const t0 = performance.now();
-    let p3 = 0;
-    let p10 = 0;
-    for (let i = 0; i < 20; i++) {
-      p3 += generateBotTeam(3, 0, data, `r${i}`).reduce((a, u) => a + u.atk + u.hp, 0);
-      p10 += generateBotTeam(10, 0, data, `r${i}`).reduce((a, u) => a + u.atk + u.hp, 0);
-    }
-    expect((performance.now() - t0) / 40).toBeLessThan(20);
-    expect(p10).toBeGreaterThan(p3);
-  });
-
-  it.skipIf(!existsSync(join(dir, 'tutorial.json')))('引导局可以开局', () => {
-    const s = newRun('x', data, { tutorial: true });
-    expect(tutorialStep(s)).toBe('buy');
-    expect(s.shop.map((x) => x.defId)).toEqual([...data.tutorial!.turns[0].units, ...(data.tutorial!.turns[0].items ?? [])]);
-  });
+    turns.sort((a, b) => a - b);
+    const median = turns[100];
+    const avgRank = ranks.reduce((a, b) => a + b, 0) / ranks.length;
+    const chicken = ranks.filter((r) => r === 1).length / ranks.length;
+    console.info(`[realdata] 200 局：中位回合 ${median}，平均名次 ${avgRank.toFixed(2)}，吃鸡率 ${(chicken * 100).toFixed(1)}%`);
+    expect(median).toBeGreaterThanOrEqual(10);
+    expect(median).toBeLessThanOrEqual(14);
+    expect(avgRank).toBeGreaterThan(3.4);
+    expect(avgRank).toBeLessThan(4.6);
+    expect(chicken).toBeGreaterThanOrEqual(0.1);
+    expect(chicken).toBeLessThanOrEqual(0.2);
+  }, 180_000);
 });

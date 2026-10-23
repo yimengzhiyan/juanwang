@@ -1,5 +1,0 @@
-[
-  { "id": "coffee", "name": "冰美式", "desc": "一个单位永久 +1/+1", "price": 3, "targetKind": "unit", "effect": { "type": "buff", "atk": 1, "hp": 1, "permanent": true }, "icon": "items/coffee.svg", "tier": 1 },
-  { "id": "firewall", "name": "防火墙", "desc": "一个单位本回合获得 3 点护盾", "price": 2, "targetKind": "unit", "effect": { "type": "shield", "amount": 3 }, "icon": "items/firewall.svg", "tier": 1 },
-  { "id": "grant", "name": "政府补贴", "desc": "立即 +2 算力", "price": 1, "targetKind": "team", "effect": { "type": "gold", "amount": 2 }, "icon": "items/grant.svg", "tier": 2 }
-]

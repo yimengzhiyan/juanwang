@@ -1,43 +1,79 @@
 import { describe, expect, it } from 'vitest';
 import { data } from './helpers';
-import { generateBotTeam, botBonusGold } from '../src/engine/bot';
+import { botPlayTurn, generateArchetypeTeam, generateBotTeam, scaleTeam } from '../src/engine/bot';
+import { newRun } from '../src/engine/run';
+import { effectiveStats, equipCount } from '../src/engine/equip';
+import { FACTIONS, ROLES, type Archetype } from '../src/types';
 
-const power = (turn: number, trophies = 0, n = 40) => {
-  let sum = 0;
-  for (let i = 0; i < n; i++) for (const u of generateBotTeam(turn, trophies, data, `p${i}`)) sum += u.atk + u.hp;
-  return sum / n;
-};
+const power = (t: ReturnType<typeof generateBotTeam>) => t.reduce((a, u) => a + effectiveStats(u, data, t).atk + effectiveStats(u, data, t).hp, 0);
 
-describe('generateBotTeam', () => {
-  it('合法：≤5 个单位，defId 都存在，确定性', () => {
-    for (let t = 1; t <= 20; t++) {
-      const team = generateBotTeam(t, t % 10, data, `b${t}`);
-      expect(team.length).toBeGreaterThan(0);
-      expect(team.length).toBeLessThanOrEqual(5);
-      for (const u of team) expect(data.unitsById[u.defId]).toBeDefined();
-      expect(generateBotTeam(t, t % 10, data, `b${t}`)).toEqual(team);
+describe('generateArchetypeTeam', () => {
+  it('合法：≤5 个单位，defId 存在，确定性', () => {
+    const a = generateArchetypeTeam({ faction: 'open' }, 8, 'x', data);
+    expect(a.length).toBeGreaterThan(0);
+    expect(a.length).toBeLessThanOrEqual(5);
+    for (const u of a) expect(data.unitsById[u.defId]).toBeDefined();
+    expect(generateArchetypeTeam({ faction: 'open' }, 8, 'x', data)).toEqual(a);
+  });
+  it('按流派偏好购买：回合 10 时阵营流派的该阵营单位占比 ≥ 50%（每阵营 20 局平均）', () => {
+    for (const f of FACTIONS) {
+      let hit = 0;
+      let tot = 0;
+      for (let i = 0; i < 20; i++) {
+        const t = generateArchetypeTeam({ faction: f }, 10, `${f}${i}`, data);
+        tot += t.length;
+        hit += t.filter((u) => data.unitsById[u.defId].faction === f).length;
+      }
+      expect(hit / tot, f).toBeGreaterThanOrEqual(0.5);
     }
   });
-  it('随回合变强：turn 10 平均属性 > turn 3', () => {
-    expect(power(10)).toBeGreaterThan(power(3));
-    expect(power(3)).toBeGreaterThan(power(1));
+  it('职业流派也偏向该职业（占比明显高于随机）', () => {
+    for (const r of ROLES) {
+      let hit = 0;
+      let tot = 0;
+      for (let i = 0; i < 20; i++) {
+        const t = generateArchetypeTeam({ role: r }, 10, `${r}${i}`, data);
+        tot += t.length;
+        hit += t.filter((u) => data.unitsById[u.defId].role === r).length;
+      }
+      expect(hit / tot, r).toBeGreaterThanOrEqual(0.4);
+    }
   });
-  it('热搜越高越强', () => {
-    expect(botBonusGold(0)).toBe(0);
-    expect(botBonusGold(5)).toBe(1);
-    expect(botBonusGold(8)).toBe(2);
-    expect(botBonusGold(10)).toBe(2); // 上限 DIFFICULTY.botBonusMax = 2
-    expect(power(6, 9)).toBeGreaterThan(power(6, 0));
+  it('装备往主力上堆、会合体进化、随回合变强', () => {
+    let equipped = 0;
+    let stacked = 0;
+    let lv2 = 0;
+    let p4 = 0;
+    let p12 = 0;
+    for (let i = 0; i < 20; i++) {
+      const t = generateArchetypeTeam({ faction: 'compute' } as Archetype, 12, `c${i}`, data);
+      equipped += t.reduce((a, u) => a + equipCount(u), 0);
+      if (t.some((u) => equipCount(u) >= 2)) stacked++;
+      lv2 += t.filter((u) => u.level >= 2).length;
+      p12 += power(t);
+      p4 += power(generateArchetypeTeam({ faction: 'compute' }, 4, `c${i}`, data));
+    }
+    expect(equipped / 20).toBeGreaterThan(2);
+    expect(stacked).toBeGreaterThan(10);
+    expect(lv2).toBeGreaterThan(10);
+    expect(p12).toBeGreaterThan(p4 * 1.5);
   });
-  it('后期会合并进化、出高阶单位', () => {
-    const teams = Array.from({ length: 20 }, (_, i) => generateBotTeam(14, 4, data, `hi${i}`)).flat();
-    expect(teams.some((u) => u.level >= 2)).toBe(true);
-    expect(Math.max(...teams.map((u) => data.unitsById[u.defId].tier))).toBeGreaterThanOrEqual(5);
+  it('scaleTeam 按系数缩放（含临时加成），攻 ≥ 0、血 ≥ 1；opts.scale 生效', () => {
+    const t = generateBotTeam(6, data, 'k');
+    const s = scaleTeam(t, 0.5);
+    s.forEach((u, i) => expect(u.atk + u.tempAtk).toBe(Math.max(0, Math.round((t[i].atk + t[i].tempAtk) * 0.5))));
+    expect(generateBotTeam(6, data, 'k', { scale: 0.5 })).toEqual(s.map((u) => ({ ...u })));
   });
-  it('足够快：回合 20 的机器人 < 20ms', () => {
-    generateBotTeam(20, 9, data, 'warm');
+  it('足够快：回合 20 的机器人 < 60ms', () => {
     const t0 = performance.now();
-    for (let i = 0; i < 20; i++) generateBotTeam(20, 9, data, `fast${i}`);
-    expect((performance.now() - t0) / 20).toBeLessThan(20);
+    for (let i = 0; i < 5; i++) generateArchetypeTeam({ role: 'trader' }, 20, `f${i}`, data);
+    expect((performance.now() - t0) / 5).toBeLessThan(60);
+  });
+  it('botPlayTurn：替玩家按流派购物（纯函数）', () => {
+    const s = newRun('bp', data, { arena: null });
+    const n = botPlayTurn(s, data, { archetype: { faction: 'folk' } });
+    expect(n.team.filter(Boolean).length).toBeGreaterThan(0);
+    expect(s.team.every((u) => u === null)).toBe(true);
+    expect(n.phase).toBe('shop');
   });
 });

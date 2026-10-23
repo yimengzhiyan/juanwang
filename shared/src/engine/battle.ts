@@ -1,26 +1,26 @@
-// 战斗引擎：simulateBattle 完全确定性（同样输入 + 种子 → 同样事件序列）。
+// 战斗引擎 2.0（DESIGN 12.6）：交替开火。simulateBattle 完全确定性（同样输入 + 种子 → 同样事件序列）。
+// 开战顺序：start → 战前队形/头条战场修正 → 赛场规则 → 羁绊横幅（按档位）→ 装备开战效果 → 开战时技能 → 交替开火。
 import { Rng } from '../rng';
 import { clone } from '../clone';
 import {
-  ENEMY_TARGETS, FACTIONS,
-  type Ability, type BattleEvent, type BattleOptions, type BattleResult, type Faction, type GameData, type Level,
-  type Side, type Trigger, type UnitDef, type UnitInst, type UnitRef, type UnitSnap,
+  ENEMY_TARGETS,
+  type Ability, type ArenaRules, type AttackTarget, type BattleEvent, type BattleMods, type BattleOptions, type BattleResult, type DamageKind,
+  type EquipEffect, type GameData, type Level, type Side, type SynergyKey, type SynergyState, type Target, type Trigger, type UnitDef,
+  type UnitEquips, type UnitInst, type UnitRef, type UnitSnap,
 } from '../types';
 import { abilityAmount, abilityBuff, abilityMult, consumeBonus, destroyThreshold, matchesFilter, resolveChoice } from './shop';
+import { SYNERGY_NAME, SYNERGY_SHOUT, mergeBonus, synergiesFromDefs, tierMap, type SynergyBonus, type TierMap } from './synergy';
+import { equipCount, equipEntries, equipMultFor, equipTotals, type EquipEntry } from './equip';
+import { buildSummary } from './summary';
 
-export const MAX_ROUNDS = 50;
-/** 战场每方最多单位数（队伍 5 + 1 个召唤余量） */
-export const MAX_FIELD = 6;
+/** 行动上限：超过后按剩余血量总和判定 */
+export const MAX_ACTIONS = 60;
+/** 战场每方最多单位数（队伍 5 + 召唤余量） */
+export const MAX_FIELD = 7;
 /** 单次结算的连锁上限（防止技能互相触发死循环） */
 const MAX_CHAIN = 400;
-
-export const SYNERGY_THRESHOLD = 3;
-export const SYNERGY_DESC: Record<Faction, string> = {
-  open: '开源共享：全队 +1/+1',
-  closed: '护栏：最前排获得 3 点护盾',
-  compute: '堆卡暴力：全队攻击 +2，血量 -1',
-  folk: '人海：召唤一个 1/1 水军到最后排',
-};
+/** 单次行动最多追击（chain）次数 */
+const MAX_CHAIN_ATTACKS = 5;
 
 interface BU {
   uid: string;
@@ -32,7 +32,10 @@ interface BU {
   maxHp: number;
   level: Level;
   shield: number;
-  /** 下一次攻击的次数（multiAttack），0 = 正常 1 次 */
+  equips: UnitEquips;
+  eq: EquipEffect;
+  eqList: EquipEntry[];
+  /** 下一次行动的攻击段数（multiAttack），0 = 正常 */
   hits: number;
   alive: boolean;
   /** 我方原队伍单位（永久 buff 写回用） */
@@ -40,6 +43,22 @@ interface BU {
   lastPos: number;
   killer?: BU;
   consumed?: boolean;
+  summon: boolean;
+  /** 技能授予的复活血量（>0 = 还有一次） */
+  reviveGrant: number;
+  /** 已经被技能复活过（每场一次） */
+  abilityRevived: boolean;
+  /** 装备复活已用 */
+  equipRevived: boolean;
+  doubled: boolean;
+  /** 待执行的追击次数 */
+  chain: number;
+  /** 算力 ×6：每次攻击额外 1 次 */
+  bonusHit: boolean;
+  /** 闭源 ×4/×6 */
+  closedReflect: number;
+  reflectAtk: boolean;
+  unpierceable: boolean;
 }
 
 interface Pending {
@@ -47,11 +66,11 @@ interface Pending {
   trigger: Trigger;
   killer?: BU;
   summoned?: BU;
-  /** 阵亡时的位置 */
   pos?: number;
 }
 
 const other = (s: Side): Side => (s === 'me' ? 'enemy' : 'me');
+const SIDES: Side[] = ['me', 'enemy'];
 
 class Battle {
   sides: Record<Side, BU[]> = { me: [], enemy: [] };
@@ -61,9 +80,30 @@ class Battle {
   perm = new Map<string, { atk: number; hp: number }>();
   bonus = { gold: 0, rerolls: 0, discount: 0 };
   summonCount = 0;
+  actions = 0;
+  tiers: Record<Side, TierMap>;
+  synergyStates: Record<Side, SynergyState[]>;
+  arena: ArenaRules;
+  arenaId?: string;
+  mods: BattleMods;
+  // 统计
+  damageBy: Record<string, number> = {};
+  hitsTaken: Record<string, number> = {};
+  reflect: Record<Side, number> = { me: 0, enemy: 0 };
+  summons: Record<Side, number> = { me: 0, enemy: 0 };
+  mine = new Map<string, { defId: string; level: Level }>();
 
-  constructor(public data: GameData, seed: string) {
+  constructor(public data: GameData, seed: string, opts: BattleOptions, meInsts: UnitInst[], enInsts: UnitInst[]) {
     this.rng = new Rng(seed);
+    this.arenaId = opts.arena;
+    this.arena = (opts.arena && data.arenasById[opts.arena]?.rules) || {};
+    this.mods = opts.mods ?? {};
+    const arenaBonus: SynergyBonus = {};
+    for (const b of this.arena.synergyBonus ?? []) arenaBonus[b.key] = (arenaBonus[b.key] ?? 0) + b.amount;
+    const defs = (l: UnitInst[]) => l.map((u) => data.unitsById[u.defId] ?? fallbackDef(u.defId));
+    const bonusMe = mergeBonus(arenaBonus, this.mods.synergyBonus);
+    this.tiers = { me: tierMap(defs(meInsts), bonusMe), enemy: tierMap(defs(enInsts), arenaBonus) };
+    this.synergyStates = { me: synergiesFromDefs(defs(meInsts), bonusMe), enemy: synergiesFromDefs(defs(enInsts), arenaBonus) };
   }
 
   // ── 工具 ──
@@ -78,13 +118,13 @@ class Battle {
     return { uid: u.uid, defId: u.defId, side: u.side, pos: this.pos(u) };
   }
   snap(u: BU): UnitSnap {
-    return { ...this.ref(u), atk: u.atk, hp: u.hp, level: u.level, shield: u.shield };
+    return { ...this.ref(u), atk: u.atk, hp: u.hp, level: u.level, shield: u.shield, equips: clone(u.equips) };
   }
   emit(e: BattleEvent): void {
     this.events.push(e);
   }
   say(u: BU, chance = 1): void {
-    const lines = u.def.lines;
+    const lines = u.def.lines?.general;
     if (!lines?.length) return;
     if (chance < 1 && !this.rng.chance(chance)) return;
     const line = this.rng.pick(lines);
@@ -93,40 +133,81 @@ class Battle {
   isAlive(u: BU): boolean {
     return u.alive && u.hp > 0;
   }
+  living(side: Side): BU[] {
+    return this.sides[side].filter((x) => this.isAlive(x));
+  }
 
-  make(inst: UnitInst, side: Side, orig: boolean, atkMod = 0): BU {
+  make(inst: UnitInst, side: Side, orig: boolean, summon = false): BU {
     const def = this.data.unitsById[inst.defId] ?? fallbackDef(inst.defId);
-    const atk = Math.max(0, inst.atk + (inst.tempAtk ?? 0) + atkMod);
-    const hp = Math.max(1, inst.hp + (inst.tempHp ?? 0));
+    const allGold = side === 'me' && !!this.mods.goldenEquips;
+    const mult = equipMultFor(def, this.tiers[side]);
+    const eqList = equipEntries(inst, this.data, mult, allGold);
+    const eq = equipTotals(inst, this.data, mult, allGold);
+    const atk = Math.max(0, inst.atk + (inst.tempAtk ?? 0) + (eq.atk ?? 0));
+    const hp = Math.max(1, inst.hp + (inst.tempHp ?? 0) + (eq.hp ?? 0));
     return {
       uid: inst.uid, defId: inst.defId, def, side, atk, hp, maxHp: hp, level: inst.level ?? 1,
-      shield: Math.max(0, inst.shield ?? 0), hits: 0, alive: true, orig, lastPos: 0,
+      shield: Math.max(0, inst.shield ?? 0), equips: clone(inst.equips ?? {}), eq, eqList, hits: 0, alive: true, orig, lastPos: 0, summon,
+      reviveGrant: 0, abilityRevived: false, equipRevived: false, doubled: false, chain: 0, bonusHit: false,
+      closedReflect: 0, reflectAtk: false, unpierceable: false,
     };
   }
 
+  equipProc(u: BU, pred: (e: EquipEffect) => unknown, text: string): void {
+    const e = u.eqList.find((x) => pred(x.eff));
+    if (!e) return;
+    this.emit({ type: 'equipProc', unit: this.ref(u), equipId: e.def.id, slot: e.slot, gold: e.inst.gold, text: `${this.name(u)} 的${e.inst.gold ? '金色' : ''}${e.def.name}：${text}` });
+  }
+
   // ── 伤害与死亡 ──
-  damage(src: BU | undefined, t: BU, amount: number, kind: 'attack' | 'ability'): void {
-    if (!this.isAlive(t) || amount <= 0) return;
-    const wasFront = this.sides[t.side][0] === t;
-    const blocked = Math.min(t.shield, amount);
-    if (t.shield > 0) t.shield = 0; // 护盾吸收一次伤害后消失
-    const dealt = amount - blocked;
-    t.hp -= dealt;
+  /** 造成伤害，返回实际扣血 */
+  damage(src: BU | undefined, t: BU, amount: number, kind: DamageKind, opts: { ignoreShield?: boolean } = {}): number {
+    if (!this.isAlive(t) || amount <= 0) return 0;
+    if (kind === 'attack') this.hitsTaken[t.uid] = (this.hitsTaken[t.uid] ?? 0) + 1;
     const srcName = src ? this.name(src) : '';
+    if (t.eq.immuneBelow && amount <= t.eq.immuneBelow) {
+      this.emit({
+        type: 'damage', unit: this.ref(t), source: src ? this.ref(src) : undefined, amount: 0, blocked: amount, hp: t.hp, shield: t.shield, kind, immune: true,
+        text: `${this.name(t)} 免疫了 ${amount} 点伤害`,
+      });
+      this.equipProc(t, (e) => e.immuneBelow, '小伤害免疫');
+      return 0;
+    }
+    const wasFront = this.living(t.side)[0] === t;
+    const pierce = !!opts.ignoreShield && !t.unpierceable;
+    let blocked = 0;
+    let broken = false;
+    if (t.shield > 0 && !pierce) {
+      blocked = Math.min(t.shield, amount);
+      t.shield -= blocked;
+      broken = t.shield === 0;
+    }
+    const dealt = amount - blocked;
+    const before = t.hp;
+    t.hp -= dealt;
+    if (src) this.damageBy[src.uid] = (this.damageBy[src.uid] ?? 0) + Math.min(dealt, Math.max(0, before));
+    if (kind === 'reflect' && src) this.reflect[src.side] += Math.min(dealt, Math.max(0, before));
     this.emit({
       type: 'damage', unit: this.ref(t), source: src ? this.ref(src) : undefined, amount: dealt, blocked,
-      hp: Math.max(0, t.hp), shield: t.shield, kind,
-      text: `${srcName ? `${srcName} 对 ` : ''}${this.name(t)} 造成 ${dealt} 点伤害${blocked ? `（护盾挡下 ${blocked}）` : ''}`,
+      hp: Math.max(0, t.hp), shield: t.shield, kind, ...(broken ? { shieldBroken: true } : {}),
+      text: `${srcName ? `${srcName} 对 ` : ''}${this.name(t)} 造成 ${dealt} 点伤害${blocked ? `（护盾挡下 ${blocked}${broken ? '，护盾碎了' : ''}）` : ''}${pierce && t.shield > 0 ? '（无视护盾）' : ''}`,
     });
-    if (dealt <= 0) return;
+    // 碎盾反弹（闭源 ×4 / ×6、金色防火墙）
+    if (broken && src && src.side !== t.side && kind !== 'reflect' && this.isAlive(src)) {
+      const r = Math.max(t.reflectAtk ? src.atk : t.closedReflect, t.eq.shieldReflect ?? 0);
+      if (r > 0) {
+        if (t.eq.shieldReflect && t.eq.shieldReflect >= (t.reflectAtk ? src.atk : t.closedReflect)) this.equipProc(t, (e) => e.shieldReflect, `碎盾反弹 ${r}`);
+        this.damage(t, src, r, 'reflect');
+      }
+    }
+    if (dealt <= 0) return 0;
     if (t.hp <= 0) {
       if (!t.killer && src) t.killer = src;
     } else {
       this.queueFor(t, 'hurt', {});
     }
-    if (wasFront) {
-      for (const f of this.sides[t.side]) if (f !== t && this.isAlive(f)) this.queueFor(f, 'hurtFront', {});
-    }
+    if (wasFront) for (const f of this.sides[t.side]) if (f !== t && this.isAlive(f)) this.queueFor(f, 'hurtFront', {});
+    return dealt;
   }
 
   queueFor(u: BU, trigger: Trigger, extra: Omit<Pending, 'u' | 'trigger'>): void {
@@ -140,7 +221,6 @@ class Battle {
       this.processDeaths();
       if (!this.queue.length) return;
       const batch = this.queue.splice(0);
-      // 攻击高→低；我方先于敌方；位置前→后
       batch.sort((a, b) => b.u.atk - a.u.atk || (a.u.side === b.u.side ? 0 : a.u.side === 'me' ? -1 : 1) || this.pos(a.u) - this.pos(b.u));
       for (const p of batch) {
         const deadOk = p.trigger === 'faint' || p.trigger === 'kill';
@@ -154,7 +234,7 @@ class Battle {
   }
 
   processDeaths(): void {
-    for (const side of ['me', 'enemy'] as Side[]) {
+    for (const side of SIDES) {
       const arr = this.sides[side];
       for (let i = 0; i < arr.length; i++) {
         const u = arr[i];
@@ -177,7 +257,54 @@ class Battle {
           if (this.isAlive(killer)) this.say(killer, 0.5);
           this.queueFor(killer, 'kill', {});
         }
+        this.onDeathSynergies(u);
+        // 复活：技能授予的优先（原位），其次装备（跳板机，最后排）
+        if (!u.consumed) {
+          if (u.reviveGrant > 0) {
+            const hp = u.reviveGrant;
+            u.reviveGrant = 0;
+            this.reviveUnit(u, hp, u.lastPos, 'ability');
+            i = Math.max(-1, i);
+          } else if (u.eq.revive && !u.equipRevived) {
+            u.equipRevived = true;
+            const r = u.eq.revive;
+            const hp = Math.max(1, r.hp ?? 0, Math.floor(u.maxHp * (r.ratio ?? 0)));
+            this.equipProc(u, (e) => e.revive, '复活！');
+            this.reviveUnit(u, hp, r.to === 'same' ? u.lastPos : arr.length, 'equip');
+          }
+        }
       }
+    }
+  }
+
+  reviveUnit(u: BU, hp: number, at: number, via: 'equip' | 'ability', src?: BU): void {
+    const arr = this.sides[u.side];
+    if (arr.length >= MAX_FIELD) return;
+    u.alive = true;
+    u.hp = Math.max(1, hp);
+    u.killer = undefined;
+    u.shield = 0;
+    arr.splice(Math.max(0, Math.min(at, arr.length)), 0, u);
+    this.emit({ type: 'revive', unit: this.snap(u), via, source: src ? this.ref(src) : undefined, text: `${this.name(u)} 以 ${u.hp} 血复活了！` });
+  }
+
+  /** 阵亡时的羁绊：偶像 ×2、民间 ×4（友军阵亡召唤水军）、民间 ×6（召唤物阵亡爆炸） */
+  onDeathSynergies(u: BU): void {
+    const t = this.tiers[u.side];
+    if (u.consumed) return;
+    if (t.idol >= 1 && u.def.role === 'idol') {
+      for (const f of this.living(u.side)) this.buff(f, 1, 0, false, undefined, `${this.name(f)} +1 攻（偶像陨落）`);
+    }
+    if (t.folk >= 3 && u.summon) {
+      const targets = this.living(other(u.side));
+      if (targets.length) {
+        this.emit({ type: 'explode', unit: { uid: u.uid, defId: u.defId, side: u.side, pos: u.lastPos }, amount: 1, targets: targets.map((x) => this.ref(x)), text: `${this.name(u)} 阵亡爆炸：敌方全体 1 伤害` });
+        for (const x of targets) this.damage(u, x, 1, 'explode');
+      }
+    }
+    if (t.folk >= 2 && !u.summon) {
+      const def = this.data.unitsById.token_shuijun;
+      if (def) this.summonUnit(u.side, def.id, u.lastPos, u, 1);
     }
   }
 
@@ -189,14 +316,16 @@ class Battle {
 
   rawTargets(p: Pending, ab: Ability, ok: (x: BU) => boolean): BU[] {
     const u = p.u;
-    // copyStats / swapPosition 的对象不会是自己
     const noSelf = ab.effect === 'copyStats' || ab.effect === 'swapPosition';
     const friends = this.sides[u.side].filter((x) => this.isAlive(x) && (x === u ? !noSelf : ok(x)));
     const enemies = this.sides[other(u.side)].filter((x) => this.isAlive(x) && ok(x));
+    return this.pick(ab.target, ab.n ?? 1, u, friends, enemies, p);
+  }
+
+  pick(target: Target, n: number, u: BU, friends: BU[], enemies: BU[], p?: Pending): BU[] {
     const others = friends.filter((x) => x !== u);
-    const n = ab.n ?? 1;
     const lowest = (l: BU[]) => (l.length ? [l.reduce((m, x) => (x.hp < m.hp ? x : m))] : []);
-    switch (ab.target) {
+    switch (target) {
       case 'self':
         return [u];
       case 'frontFriend':
@@ -204,13 +333,12 @@ class Battle {
       case 'backFriend':
         return others.slice(-1);
       case 'adjacentFriends': {
-        // 按实际站位取左右邻居（筛选条件在外层再过滤）
-        const line = this.sides[u.side].filter((x) => this.isAlive(x));
+        const line = this.living(u.side);
         if (u.alive) {
           const i = line.indexOf(u);
           return [line[i - 1], line[i + 1]].filter(Boolean);
         }
-        const at = p.pos ?? u.lastPos;
+        const at = p?.pos ?? u.lastPos;
         return [line[at - 1], line[at]].filter(Boolean);
       }
       case 'randomFriend':
@@ -232,9 +360,9 @@ class Battle {
       case 'highestAtkEnemy':
         return enemies.length ? [enemies.reduce((m, x) => (x.atk > m.atk ? x : m))] : [];
       case 'killer':
-        return p.killer && this.isAlive(p.killer) ? [p.killer] : [];
+        return p?.killer && this.isAlive(p.killer) ? [p.killer] : [];
       case 'summoned':
-        return p.summoned && this.isAlive(p.summoned) ? [p.summoned] : [];
+        return p?.summoned && this.isAlive(p.summoned) ? [p.summoned] : [];
       default:
         return [];
     }
@@ -243,96 +371,121 @@ class Battle {
   // ── 技能执行 ──
   runAbility(p: Pending): void {
     const u = p.u;
+    const t = this.tiers[u.side];
+    let reps = 1;
+    if (u.def.role === 'researcher' && t.researcher >= 2) reps++;
+    reps += u.eq.abilityRepeat ?? 0;
+    reps = Math.max(1, Math.min(5, Math.round(reps)));
+    for (let r = 1; r <= reps; r++) {
+      if (r > 1) {
+        if (!this.isAlive(u) && p.trigger !== 'faint' && p.trigger !== 'kill') break;
+        if (u.eq.abilityRepeat) this.equipProc(u, (e) => e.abilityRepeat, '技能再触发');
+      }
+      this.runAbilityOnce(p, r);
+      if (r < reps) this.processDeaths();
+    }
+  }
+
+  runAbilityOnce(p: Pending, repeat: number): void {
+    const u = p.u;
     const ab = resolveChoice(u.def.ability!, this.rng);
     const tg = ab.effect === 'summon' ? [] : this.targets(p, ab);
     this.emit({
-      type: 'ability', unit: this.ref(u), trigger: p.trigger, effect: ab.effect, targets: tg.map((t) => this.ref(t)),
-      text: `${this.name(u)}：${ab.desc}`,
+      type: 'ability', unit: this.ref(u), trigger: p.trigger, effect: ab.effect, targets: tg.map((x) => this.ref(x)), repeat,
+      text: `${this.name(u)}：${ab.desc}${repeat > 1 ? `（×${repeat}）` : ''}`,
     });
     const amt = abilityAmount(ab, u.level);
     switch (ab.effect) {
       case 'damage':
-        for (const t of tg) this.damage(u, t, amt, 'ability');
+        for (const x of tg) this.damage(u, x, amt, 'ability');
         break;
       case 'destroy': {
         const limit = destroyThreshold(ab, u.level);
-        for (const t of tg) {
-          if (!this.isAlive(t)) continue;
-          if (t.hp > limit) {
-            // DESIGN 11.3：血量高于阈值时改为造成阈值点伤害
-            this.damage(u, t, limit, 'ability');
+        for (const x of tg) {
+          if (!this.isAlive(x)) continue;
+          if (x.hp > limit || x.unpierceable) {
+            this.damage(u, x, Number.isFinite(limit) ? limit : x.hp, 'ability');
             continue;
           }
-          const hp = t.hp;
-          t.hp = 0;
-          t.killer = u;
-          this.emit({ type: 'damage', unit: this.ref(t), source: this.ref(u), amount: hp, blocked: 0, hp: 0, shield: t.shield, kind: 'ability', text: `${this.name(u)} 直接击杀了 ${this.name(t)}` });
+          const hp = x.hp;
+          x.hp = 0;
+          x.killer = u;
+          this.damageBy[u.uid] = (this.damageBy[u.uid] ?? 0) + hp;
+          this.emit({ type: 'damage', unit: this.ref(x), source: this.ref(u), amount: hp, blocked: 0, hp: 0, shield: x.shield, kind: 'ability', text: `${this.name(u)} 直接击杀了 ${this.name(x)}` });
         }
         break;
       }
       case 'buff': {
         const b = abilityBuff(ab, u.level);
-        for (const t of tg) this.buff(t, b.atk, b.hp, !!ab.permanent, u);
+        for (const x of tg) this.buff(x, b.atk, b.hp, !!ab.permanent, u);
         break;
       }
       case 'heal':
-        for (const t of tg) {
-          if (!this.isAlive(t)) continue;
-          const before = t.hp;
-          t.hp = Math.min(Math.max(t.maxHp, t.hp), t.hp + amt);
-          this.emit({ type: 'heal', unit: this.ref(t), source: this.ref(u), amount: t.hp - before, hp: t.hp, text: `${this.name(t)} 回复 ${t.hp - before} 血` });
+        for (const x of tg) {
+          if (!this.isAlive(x)) continue;
+          const before = x.hp;
+          x.hp = Math.min(Math.max(x.maxHp, x.hp), x.hp + amt);
+          this.emit({ type: 'heal', unit: this.ref(x), source: this.ref(u), amount: x.hp - before, hp: x.hp, text: `${this.name(x)} 回复 ${x.hp - before} 血` });
         }
         break;
       case 'shield':
-        for (const t of tg) {
-          if (!this.isAlive(t)) continue;
-          t.shield += amt;
-          this.emit({ type: 'shield', unit: this.ref(t), source: this.ref(u), amount: amt, total: t.shield, text: `${this.name(t)} 获得 ${amt} 点护盾` });
-        }
+        for (const x of tg) this.addShield(x, amt, u);
         break;
       case 'copyStats': {
-        const t = tg.find((x) => x !== u);
-        if (t && this.isAlive(u)) {
+        const x = tg.find((y) => y !== u);
+        if (x && this.isAlive(u)) {
           const bonus = ab.consume ? consumeBonus(ab, u.level) : 0;
-          const da = Math.max(0, t.atk - u.atk) + bonus;
-          const dh = Math.max(0, t.hp - u.hp) + bonus;
-          this.buff(u, da, dh, false, u, `${this.name(u)} ${ab.consume ? '吞并' : '复制'}了 ${this.name(t)} 的属性`);
+          const da = Math.max(0, x.atk - u.atk) + bonus;
+          const dh = Math.max(0, x.hp - u.hp) + bonus;
+          this.buff(u, da, dh, false, u, `${this.name(u)} ${ab.consume ? '吞并' : '复制'}了 ${this.name(x)} 的属性`);
           if (ab.consume) {
-            t.hp = 0;
-            t.killer = u;
-            t.consumed = true;
+            x.hp = 0;
+            x.killer = u;
+            x.consumed = true;
           }
         }
         break;
       }
-      case 'summon':
-        this.summonFor(p, ab);
+      case 'summon': {
+        const enemySide = ENEMY_TARGETS.includes(ab.target);
+        const side: Side = enemySide ? other(u.side) : u.side;
+        const count = ab.count ?? 1;
+        const mult = abilityMult(ab, u.level);
+        for (let i = 0; i < count; i++) {
+          const arr = this.sides[side];
+          let at: number;
+          if (enemySide || ab.target === 'backFriend') at = arr.length;
+          else if (ab.target === 'frontFriend') at = 0;
+          else if (!u.alive) at = Math.min(p.pos ?? u.lastPos, arr.length);
+          else at = arr.indexOf(u) + 1;
+          this.summonUnit(side, ab.unitId ?? 'token_shuijun', at, u, mult);
+        }
         break;
+      }
       case 'swapPosition': {
-        const t = tg.find((x) => x !== u);
-        if (!t) break;
-        if (t.side === u.side) {
-          if (this.isAlive(u)) this.swap(u, t);
+        const x = tg.find((y) => y !== u);
+        if (!x) break;
+        if (x.side === u.side) {
+          if (this.isAlive(u)) this.swap(u, x);
         } else {
-          const front = this.sides[t.side][0];
-          if (front && front !== t) this.swap(front, t);
+          const front = this.sides[x.side][0];
+          if (front && front !== x) this.swap(front, x);
         }
         break;
       }
       case 'pushBack':
-        for (const t of tg) this.moveTo(t, this.sides[t.side].length - 1, u);
+        for (const x of tg) this.moveTo(x, this.sides[x.side].length - 1);
         break;
       case 'pullFront':
-        for (const t of tg) this.moveTo(t, 0, u);
+        for (const x of tg) this.moveTo(x, 0);
         break;
-      case 'multiAttack': {
-        for (const t of tg) {
-          if (!this.isAlive(t)) continue;
-          t.hits = Math.max(t.hits, amt);
-          this.emit({ type: 'multiAttack', unit: this.ref(t), source: this.ref(u), hits: t.hits, text: `${this.name(t)} 下次攻击 ${t.hits} 次` });
+      case 'multiAttack':
+        for (const x of tg) {
+          if (!this.isAlive(x)) continue;
+          x.hits = Math.max(x.hits, amt);
+          this.emit({ type: 'multiAttack', unit: this.ref(x), source: this.ref(u), hits: x.hits, text: `${this.name(x)} 下次攻击 ${x.hits} 次` });
         }
         break;
-      }
       case 'gold':
       case 'reroll':
       case 'discount': {
@@ -345,11 +498,56 @@ class Battle {
         this.emit({ type: 'bonus', side: u.side, unit: this.ref(u), kind: ab.effect, amount: amt, text: `${this.name(u)}：${label}` });
         break;
       }
+      case 'steal': {
+        const limit = destroyThreshold(ab, u.level);
+        for (const x of tg) {
+          if (!this.isAlive(x) || x.side === u.side) continue;
+          if (x.hp <= limit && this.sides[u.side].length < MAX_FIELD) this.stealUnit(x, u.side, u);
+          else this.damage(u, x, Number.isFinite(limit) ? limit : x.hp, 'ability');
+        }
+        break;
+      }
+      case 'explode': {
+        const dmg = Math.max(0, Math.round(u.atk * (ab.amount ?? 1)));
+        const targets = tg.filter((x) => this.isAlive(x));
+        if (!targets.length || dmg <= 0) break;
+        this.emit({ type: 'explode', unit: this.ref(u), amount: dmg, targets: targets.map((x) => this.ref(x)), text: `${this.name(u)} 自爆！对 ${targets.length} 个目标造成 ${dmg} 伤害` });
+        for (const x of targets) this.damage(u, x, dmg, 'explode');
+        break;
+      }
+      case 'doubleStats':
+        for (const x of tg) {
+          if (!this.isAlive(x) || x.doubled) continue;
+          x.doubled = true;
+          this.buff(x, x.atk, x.hp, false, u, `${this.name(x)} 属性翻倍！`);
+        }
+        break;
+      case 'revive': {
+        const hp = Math.max(1, ab.amount ?? 1);
+        for (const x of tg) {
+          if (x.abilityRevived || x.consumed) continue;
+          x.abilityRevived = true;
+          if (x.alive && x.hp > 0) x.reviveGrant = Math.max(x.reviveGrant, hp);
+          else this.reviveUnit(x, hp, x.lastPos, 'ability', u);
+        }
+        break;
+      }
+      case 'chain':
+        for (const x of tg) if (this.isAlive(x)) x.chain += Math.max(1, ab.amount ?? 1);
+        break;
     }
+  }
+
+  addShield(x: BU, amt: number, src?: BU, text?: string): void {
+    if (!this.isAlive(x) || amt <= 0) return;
+    x.shield += amt;
+    this.emit({ type: 'shield', unit: this.ref(x), source: src ? this.ref(src) : undefined, amount: amt, total: x.shield, text: text ?? `${this.name(x)} 获得 ${amt} 点护盾` });
   }
 
   buff(t: BU, atk: number, hp: number, permanent: boolean, src?: BU, text?: string): void {
     if (!this.isAlive(t) || (atk === 0 && hp === 0)) return;
+    const a0 = t.atk;
+    const h0 = t.hp;
     t.atk = Math.max(0, t.atk + atk);
     t.hp = Math.max(1, t.hp + hp);
     t.maxHp = Math.max(1, t.maxHp + hp);
@@ -359,7 +557,7 @@ class Battle {
     }
     const sign = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
     this.emit({
-      type: 'buff', unit: this.ref(t), source: src ? this.ref(src) : undefined, atk, hp, newAtk: t.atk, newHp: t.hp, permanent,
+      type: 'buff', unit: this.ref(t), source: src ? this.ref(src) : undefined, atk: t.atk - a0, hp: t.hp - h0, newAtk: t.atk, newHp: t.hp, permanent,
       text: text ?? `${this.name(t)} ${sign(atk)}/${sign(hp)}${permanent ? '（永久）' : ''}`,
     });
   }
@@ -373,145 +571,367 @@ class Battle {
     this.emit({ type: 'move', side: a.side, unit: this.ref(a), from: i, to: j, order: arr.map((x) => x.uid), text: `${this.name(a)} 与 ${this.name(b)} 交换位置` });
   }
 
-  moveTo(t: BU, to: number, _src: BU): void {
+  moveTo(t: BU, to: number): void {
     if (!this.isAlive(t)) return;
     const arr = this.sides[t.side];
     const from = arr.indexOf(t);
     if (from < 0 || from === to) return;
     arr.splice(from, 1);
     arr.splice(to, 0, t);
+    this.emit({ type: 'move', side: t.side, unit: this.ref(t), from, to, order: arr.map((x) => x.uid), text: `${this.name(t)} 被${to === 0 ? '拉到最前' : '推到最后'}` });
+  }
+
+  /** 把 x 偷到 toSide 的末尾 */
+  stealUnit(x: BU, toSide: Side, src?: BU): void {
+    const from = this.ref(x);
+    const arr = this.sides[x.side];
+    arr.splice(arr.indexOf(x), 1);
+    x.side = toSide;
+    x.orig = false;
+    x.chain = 0;
+    this.sides[toSide].push(x);
+    if (toSide === 'me') this.mine.set(x.uid, { defId: x.defId, level: x.level });
+    else this.mine.delete(x.uid);
     this.emit({
-      type: 'move', side: t.side, unit: this.ref(t), from, to, order: arr.map((x) => x.uid),
-      text: `${this.name(t)} 被${to === 0 ? '拉到最前' : '推到最后'}`,
+      type: 'steal', unit: from, source: src ? this.ref(src) : from, to: this.ref(x),
+      text: src ? `${this.name(src)} 把 ${this.name(x)} 挖了过来！` : `${this.name(x)} 跳槽了！`,
     });
   }
 
-  summonFor(p: Pending, ab: Ability): void {
-    const u = p.u;
-    const enemySide = ENEMY_TARGETS.includes(ab.target);
-    const side: Side = enemySide ? other(u.side) : u.side;
-    const id = ab.unitId ?? 'token_shuijun';
-    const count = ab.count ?? 1;
-    const mult = abilityMult(ab, u.level);
-    for (let i = 0; i < count; i++) {
-      let at: number;
-      const arr = this.sides[side];
-      if (enemySide || ab.target === 'backFriend') at = arr.length;
-      else if (ab.target === 'frontFriend') at = 0;
-      else if (!u.alive) at = Math.min(p.pos ?? u.lastPos, arr.length);
-      else at = arr.indexOf(u) + 1;
-      const def = this.data.unitsById[id];
-      if (!def) return;
-      const inst: UnitInst = {
-        uid: `s${++this.summonCount}_${u.uid}`, defId: id, atk: def.atk * mult, hp: def.hp * mult, level: 1, xp: 0, shield: 0, tempAtk: 0, tempHp: 0,
-      };
-      this.spawn(inst, side, at, u);
+  /**
+   * 召唤：赛场 summonBuff（双方）、头条 summonBuff（我方）、民间 ×4 继承召唤者 50% 属性。
+   */
+  summonUnit(side: Side, id: string, at: number, src: BU | undefined, mult: number): BU | null {
+    const def = this.data.unitsById[id];
+    if (!def) return null;
+    let atk = def.atk * mult;
+    let hp = def.hp * mult;
+    const ab = this.arena.summonBuff;
+    if (ab) {
+      atk += ab.atk;
+      hp += ab.hp;
     }
+    if (side === 'me' && this.mods.summonBuff) {
+      atk += this.mods.summonBuff.atk;
+      hp += this.mods.summonBuff.hp;
+    }
+    if (src && this.tiers[side].folk >= 2) {
+      atk += Math.floor(src.atk / 2);
+      hp += Math.floor(src.maxHp / 2);
+    }
+    const inst: UnitInst = {
+      uid: `s${++this.summonCount}_${src?.uid ?? side}`, defId: id, atk: Math.max(0, atk), hp: Math.max(1, hp), level: 1, xp: 0, shield: 0, tempAtk: 0, tempHp: 0, equips: {},
+    };
+    return this.spawn(inst, side, at, src);
   }
 
-  /** 放置一个召唤物并发出 summon + friendSummoned/enemySummoned 触发 */
   spawn(inst: UnitInst, side: Side, at: number, src?: BU): BU | null {
     const arr = this.sides[side];
     if (arr.length >= MAX_FIELD) return null;
-    const b = this.make(inst, side, false);
+    const b = this.make(inst, side, false, true);
     arr.splice(Math.max(0, Math.min(at, arr.length)), 0, b);
+    this.summons[side]++;
+    if (side === 'me') this.mine.set(b.uid, { defId: b.defId, level: b.level });
     this.emit({ type: 'summon', unit: this.snap(b), source: src ? this.ref(src) : undefined, text: `召唤了 ${this.name(b)}` });
     for (const f of arr) if (f !== b && this.isAlive(f)) this.queueFor(f, 'friendSummoned', { summoned: b });
     for (const e of this.sides[other(side)]) if (this.isAlive(e)) this.queueFor(e, 'enemySummoned', { summoned: b });
     return b;
   }
 
-  // ── 流程 ──
-  synergies(): void {
-    for (const side of ['me', 'enemy'] as Side[]) {
-      const arr = this.sides[side];
-      const counts: Record<Faction, number> = { open: 0, closed: 0, compute: 0, folk: 0 };
-      for (const u of arr) counts[u.def.faction]++;
-      for (const f of FACTIONS) {
-        if (counts[f] < SYNERGY_THRESHOLD) continue;
-        this.emit({ type: 'synergy', side, faction: f, count: counts[f], text: SYNERGY_DESC[f] });
-        if (f === 'open') for (const u of [...arr]) this.buff(u, 1, 1, false);
-        if (f === 'closed' && arr[0]) {
-          arr[0].shield += 3;
-          this.emit({ type: 'shield', unit: this.ref(arr[0]), amount: 3, total: arr[0].shield, text: `${this.name(arr[0])} 获得 3 点护盾（护栏）` });
-        }
-        if (f === 'compute') {
-          for (const u of [...arr]) {
-            const dh = u.hp > 1 ? -1 : 0;
-            this.buff(u, 2, dh, false);
-          }
-        }
-        if (f === 'folk') {
-          const def = this.data.unitsById.token_shuijun;
-          if (def) {
-            this.spawn({ uid: `s${++this.summonCount}_${side}_folk`, defId: def.id, atk: def.atk, hp: def.hp, level: 1, xp: 0, shield: 0, tempAtk: 0, tempHp: 0 }, side, arr.length);
-          }
-        }
-      }
-    }
-  }
+  // ── 开战流程 ──
 
-  /** 商店阶段记下的队形修正（DESIGN 11.5）：先反转，再依次拉到最前 */
+  /** 商店阶段记下的队形修正 + 头条战场修正 */
   applyFormation(opts: BattleOptions): void {
-    const me = this.sides.me;
-    if (opts.meReverse && me.length > 1) {
-      me.reverse();
-      for (const u of me) {
-        this.emit({ type: 'move', side: 'me', unit: this.ref(u), from: me.length - 1 - me.indexOf(u), to: me.indexOf(u), order: me.map((x) => x.uid), text: '队伍顺序反转' });
-      }
-    }
+    const rev = (side: Side) => {
+      const arr = this.sides[side];
+      if (arr.length < 2) return;
+      arr.reverse();
+      this.emit({ type: 'move', side, unit: this.ref(arr[0]), from: arr.length - 1, to: 0, order: arr.map((x) => x.uid), text: `${side === 'me' ? '我方' : '敌方'}队伍顺序反转` });
+    };
+    if (opts.meReverse) rev('me');
+    if (this.mods.enemyReverse) rev('enemy');
     for (const uid of opts.mePullFront ?? []) {
-      const u = me.find((x) => x.uid === uid);
-      if (u) this.moveTo(u, 0, u);
+      const u = this.sides.me.find((x) => x.uid === uid);
+      if (u) this.moveTo(u, 0);
     }
   }
 
-  run(opts: BattleOptions = {}): { winner: 'me' | 'enemy' | 'draw'; rounds: number } {
+  applyMods(): void {
+    const m = this.mods;
+    const pickEnemy = (t: Target): BU | undefined => this.pick(t, 1, this.sides.me[0] ?? this.sides.enemy[0], this.living('me'), this.living('enemy'))[0];
+    for (const t of m.benchEnemy ?? []) {
+      const x = pickEnemy(t);
+      if (!x) continue;
+      const pos = this.pos(x);
+      this.sides.enemy.splice(pos, 1);
+      x.alive = false;
+      x.lastPos = pos;
+      this.emit({ type: 'faint', unit: { uid: x.uid, defId: x.defId, side: 'enemy', pos }, benched: true, text: `${this.name(x)} 被请下场了（本场不参战）` });
+    }
+    if (m.swapFronts) {
+      const a = this.sides.me[0];
+      const b = this.sides.enemy[0];
+      if (a && b) {
+        this.stealUnit(b, 'me');
+        this.moveTo(b, 0);
+        this.stealUnit(a, 'enemy');
+        this.moveTo(a, 0);
+      }
+    }
+    for (const t of m.stealEnemy ?? []) {
+      const x = pickEnemy(t);
+      if (x && this.sides.me.length < MAX_FIELD) this.stealUnit(x, 'me');
+    }
+    for (const b of m.enemyBoss ?? []) {
+      const def = this.data.unitsById[b.unitId];
+      if (!def) continue;
+      this.spawn({ uid: `boss${++this.summonCount}`, defId: b.unitId, atk: b.atk, hp: b.hp, level: 1, xp: 0, shield: 0, tempAtk: 0, tempHp: 0, equips: {} }, 'enemy', this.sides.enemy.length);
+    }
+    for (const s of m.battleSummon ?? []) for (let i = 0; i < s.count; i++) this.summonUnit(s.side, s.unitId, this.sides[s.side].length, undefined, 1);
+    for (const side of SIDES) {
+      const mul = m.statMul?.[side];
+      if (!mul) continue;
+      for (const u of this.living(side)) {
+        const da = Math.round(u.atk * (mul.atk - 1));
+        const dh = Math.round(u.hp * (mul.hp - 1));
+        this.buff(u, da, dh, false, undefined, `${this.name(u)} 属性 ×${mul.hp !== 1 ? `${mul.hp}（血）` : `${mul.atk}（攻）`}`);
+      }
+    }
+    if (m.enemyBuff) for (const u of this.living('enemy')) this.buff(u, m.enemyBuff.atk, m.enemyBuff.hp, false);
+  }
+
+  applyArena(): void {
+    const a = this.arena;
+    if (!this.arenaId || (!a.battleBuff && !a.startShield)) return;
+    const name = this.data.arenasById[this.arenaId]?.name ?? this.arenaId;
+    this.emit({ type: 'arena', arena: this.arenaId, name, text: `赛场「${name}」：${this.data.arenasById[this.arenaId]?.desc ?? ''}` });
+    for (const side of SIDES) {
+      for (const u of this.living(side)) {
+        if (a.battleBuff) this.buff(u, a.battleBuff.atk, a.battleBuff.hp, false);
+        if (a.startShield && matchesFilter(u.def, a.startShield.filter)) this.addShield(u, a.startShield.amount);
+      }
+    }
+  }
+
+  /** 装备最多的单位（并列取攻击高、再取靠前） */
+  mostEquipped(side: Side): BU | undefined {
+    const l = this.living(side);
+    if (!l.length) return undefined;
+    return l.reduce((m, x) => (equipCount(x) > equipCount(m) || (equipCount(x) === equipCount(m) && x.atk > m.atk) ? x : m));
+  }
+
+  synergies(): void {
+    for (const side of SIDES) {
+      const t = this.tiers[side];
+      for (const st of this.synergyStates[side]) {
+        if (st.tier <= 0) continue;
+        const key = st.key as SynergyKey;
+        const members = this.living(side).filter((u) => u.def.faction === key || u.def.role === key);
+        const speaker = members.filter((u) => u.def.lines?.onSynergy?.length);
+        const sp = speaker.length ? this.rng.pick(speaker) : undefined;
+        const ev: BattleEvent = {
+          type: 'synergyTier', side, kind: st.kind, key, name: SYNERGY_NAME[key], count: st.count, tier: st.tier,
+          text: `${SYNERGY_NAME[key]} ×${st.count}：${SYNERGY_SHOUT[key][st.tier - 1]}`,
+        };
+        if (sp) ev.line = { unit: this.ref(sp), line: this.rng.pick(sp.def.lines!.onSynergy!) };
+        this.emit(ev);
+        this.synergyStart(side, key, t[key]);
+      }
+    }
+  }
+
+  synergyStart(side: Side, key: SynergyKey, tier: number): void {
+    const l = this.living(side);
+    switch (key) {
+      case 'open':
+        for (const u of l) if (u.def.faction === 'open') this.buff(u, 1, 1, false, undefined, `${this.name(u)} +1/+1（开源）`);
+        break;
+      case 'closed':
+        if (l[0]) this.addShield(l[0], 3, undefined, `${this.name(l[0])} 获得 3 点护盾（护栏）`);
+        if (tier >= 2) {
+          for (const u of l) {
+            if (u.def.faction !== 'closed') continue;
+            u.closedReflect = 2;
+            if (tier >= 3) {
+              u.reflectAtk = true;
+              u.unpierceable = true;
+            }
+            this.addShield(u, Math.max(1, Math.floor(u.maxHp / 3)), undefined, `${this.name(u)} 获得 ${Math.max(1, Math.floor(u.maxHp / 3))} 点护盾（闭源）`);
+          }
+        }
+        break;
+      case 'compute': {
+        const m = this.mostEquipped(side);
+        if (m) {
+          this.buff(m, 2, 0, false, undefined, `${this.name(m)} +2 攻（算力：装备最多）`);
+          if (tier >= 3) m.bonusHit = true;
+        }
+        break;
+      }
+      case 'folk': {
+        const def = this.data.unitsById.token_shuijun;
+        if (!def) break;
+        const src = l.filter((u) => u.def.faction === 'folk').sort((a, b) => b.atk + b.hp - (a.atk + a.hp))[0];
+        this.summonUnit(side, def.id, this.sides[side].length, tier >= 2 ? src : undefined, 1);
+        break;
+      }
+      case 'idol':
+        if (tier >= 2) {
+          const idols = l.filter((u) => u.def.role === 'idol');
+          if (!idols.length) break;
+          const star = this.rng.pick(idols);
+          const rest = l.filter((u) => u !== star);
+          if (!rest.length) break;
+          const weak = rest.reduce((m, x) => (x.atk + x.hp < m.atk + m.hp ? x : m));
+          const da = Math.max(0, star.atk - weak.atk);
+          const dh = Math.max(0, star.hp - weak.hp);
+          this.buff(weak, da, dh, false, star, `${this.name(weak)} 复制了偶像 ${this.name(star)} 的属性`);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  /** 装备开战效果：防火墙护盾、蒸馏复制 */
+  equipStart(): void {
+    for (const side of SIDES) {
+      for (const u of this.living(side)) {
+        if (u.eq.startShield) {
+          this.equipProc(u, (e) => e.startShield, `开战护盾 ${u.eq.startShield}`);
+          this.addShield(u, u.eq.startShield);
+        }
+      }
+      for (const u of this.living(side)) {
+        const cn = u.eq.copyNeighbor;
+        if (!cn?.length) continue;
+        const line = this.living(side);
+        const i = line.indexOf(u);
+        const nb = [line[i - 1], line[i + 1]].filter(Boolean);
+        if (!nb.length) continue;
+        const da = cn.includes('atk') ? Math.max(0, Math.max(...nb.map((x) => x.atk)) - u.atk) : 0;
+        const dh = cn.includes('hp') ? Math.max(0, Math.max(...nb.map((x) => x.hp)) - u.hp) : 0;
+        if (da || dh) {
+          this.equipProc(u, (e) => e.copyNeighbor, '追平相邻友军');
+          this.buff(u, da, dh, false, u);
+        }
+      }
+    }
+  }
+
+  // ── 交替开火 ──
+  attackTarget(u: BU): BU | undefined {
+    const enemies = this.living(other(u.side));
+    if (!enemies.length) return undefined;
+    const t: AttackTarget = u.eq.retarget ?? u.def.attackTarget ?? 'frontEnemy';
+    return this.pick(t, 1, u, [], enemies)[0] ?? enemies[0];
+  }
+
+  attackOnce(u: BU, hit: number, hits: number): void {
+    const t = this.attackTarget(u);
+    if (!t) return;
+    const front = this.living(t.side)[0];
+    if (t !== front && u.eq.retarget) this.equipProc(u, (e) => e.retarget, `改打 ${this.name(t)}`);
+    this.emit({
+      type: 'attack', action: this.actions, unit: { ...this.ref(u), atk: u.atk }, target: this.ref(t), hit, hits,
+      text: `${this.name(u)} → ${this.name(t)}${hits > 1 ? `（${hit}/${hits}）` : ''}`,
+    });
+    this.damage(u, t, u.atk, 'attack', { ignoreShield: u.eq.ignoreShield });
+    if (u.eq.splash) {
+      const line = this.sides[t.side];
+      const i = line.indexOf(t);
+      const behind = i >= 0 ? line[i + 1] : line[t.lastPos];
+      if (behind && this.isAlive(behind)) this.damage(u, behind, u.eq.splash, 'splash');
+    }
+  }
+
+  /** 一次行动：beforeAttack → n 段攻击 → 追击 */
+  act(u: BU): void {
+    this.actions++;
+    this.queueFor(u, 'beforeAttack', {});
+    this.resolve();
+    if (!this.isAlive(u) || !this.living(other(u.side)).length) return;
+    let hits = Math.max(1, u.hits);
+    u.hits = 0;
+    if (u.bonusHit) hits++;
+    if (u.eq.extraAttackChance && this.rng.chance(u.eq.extraAttackChance)) {
+      hits++;
+      this.equipProc(u, (e) => e.extraAttackChance, '额外攻击 1 次');
+    }
+    for (let h = 1; h <= hits; h++) {
+      if (!this.isAlive(u) || !this.living(other(u.side)).length) break;
+      this.attackOnce(u, h, hits);
+      this.resolve();
+    }
+    this.flushChains();
+  }
+
+  /** 追击：击杀后立刻再攻击一次（每个单位每次行动最多 MAX_CHAIN_ATTACKS 次） */
+  flushChains(): void {
+    const done = new Map<BU, number>();
+    for (let guard = 0; guard < 20; guard++) {
+      const u = [...this.living('me'), ...this.living('enemy')].find((x) => x.chain > 0);
+      if (!u) return;
+      u.chain--;
+      const n = (done.get(u) ?? 0) + 1;
+      done.set(u, n);
+      if (n > MAX_CHAIN_ATTACKS || !this.living(other(u.side)).length) {
+        u.chain = 0;
+        continue;
+      }
+      this.emit({ type: 'chain', unit: this.ref(u), count: n, text: `${this.name(u)} 连击 ×${n}！` });
+      this.attackOnce(u, 1, 1);
+      this.resolve();
+    }
+  }
+
+  run(opts: BattleOptions): { winner: 'me' | 'enemy' | 'draw'; reason: 'wipe' | 'timeout'; hpLeft: { me: number; enemy: number } } {
     const me = this.sides.me;
     const en = this.sides.enemy;
-    this.emit({ type: 'start', me: me.map((u) => this.snap(u)), enemy: en.map((u) => this.snap(u)), text: '开战！' });
+    const first: Side = this.mods.first ?? opts.first ?? 'me';
+    this.emit({ type: 'start', me: me.map((u) => this.snap(u)), enemy: en.map((u) => this.snap(u)), first, ...(this.arenaId ? { arena: this.arenaId } : {}), text: '开战！' });
     this.applyFormation(opts);
+    this.applyMods();
+    this.resolve();
     if (me[0]) this.say(me[0]);
     if (en[0]) this.say(en[0]);
+    this.applyArena();
     this.synergies();
     this.resolve();
-    // 开战时技能：攻击高→低，同攻击我方先
-    for (const side of ['me', 'enemy'] as Side[]) for (const u of this.sides[side]) this.queueFor(u, 'startBattle', {});
+    this.equipStart();
+    this.resolve();
+    for (const side of SIDES) for (const u of this.sides[side]) this.queueFor(u, 'startBattle', {});
     this.resolve();
 
-    let rounds = 0;
-    while (me.length && en.length && rounds < MAX_ROUNDS) {
-      rounds++;
-      this.queueFor(me[0], 'beforeAttack', {});
-      this.queueFor(en[0], 'beforeAttack', {});
-      this.resolve();
-      if (!me.length || !en.length) break;
-      const a = me[0];
-      const b = en[0];
-      const ha = Math.max(1, a.hits);
-      const hb = Math.max(1, b.hits);
-      a.hits = 0;
-      b.hits = 0;
-      this.emit({
-        type: 'attack', round: rounds,
-        me: { ...this.ref(a), atk: a.atk, hits: ha }, enemy: { ...this.ref(b), atk: b.atk, hits: hb },
-        text: `第 ${rounds} 回合：${this.name(a)} ⚔ ${this.name(b)}`,
-      });
-      for (let i = 0; i < Math.max(ha, hb); i++) {
-        // 同时互击：先确定双方本次是否出手，再一起结算伤害
-        const aHit = i < ha && a.hp > 0 && b.hp > 0 ? a.atk : 0;
-        const bHit = i < hb && b.hp > 0 && a.hp > 0 ? b.atk : 0;
-        if (aHit) this.damage(a, b, aHit, 'attack');
-        if (bHit) this.damage(b, a, bHit, 'attack');
-      }
-      this.resolve();
+    let turn: Side = first;
+    const cursor: Record<Side, number> = { me: 0, enemy: 0 };
+    while (me.length && en.length && this.actions < MAX_ACTIONS) {
+      const arr = this.sides[turn];
+      if (cursor[turn] >= arr.length) cursor[turn] = 0;
+      const actor = arr[cursor[turn]];
+      this.act(actor);
+      const p = arr.indexOf(actor);
+      cursor[turn] = p >= 0 ? p + 1 : Math.min(actor.lastPos, arr.length);
+      if (cursor[turn] >= arr.length) cursor[turn] = 0;
+      turn = other(turn);
     }
-    const winner = me.length && !en.length ? 'me' : en.length && !me.length ? 'enemy' : 'draw';
-    this.emit({
-      type: 'end', winner, rounds, me: me.map((u) => u.uid), enemy: en.map((u) => u.uid),
-      text: winner === 'me' ? '胜利！' : winner === 'enemy' ? '失败…' : rounds >= MAX_ROUNDS && me.length ? `${MAX_ROUNDS} 回合未分胜负，和局` : '同归于尽，和局',
-    });
-    return { winner, rounds };
+    const sum = (l: BU[]) => l.reduce((a, u) => a + Math.max(0, u.hp), 0);
+    const hpLeft = { me: sum(me), enemy: sum(en) };
+    let winner: 'me' | 'enemy' | 'draw';
+    let reason: 'wipe' | 'timeout' = 'wipe';
+    if (me.length && !en.length) winner = 'me';
+    else if (en.length && !me.length) winner = 'enemy';
+    else if (!me.length && !en.length) winner = 'draw';
+    else {
+      reason = 'timeout';
+      winner = hpLeft.me > hpLeft.enemy ? 'me' : hpLeft.enemy > hpLeft.me ? 'enemy' : 'draw';
+    }
+    const text =
+      reason === 'timeout'
+        ? `${MAX_ACTIONS} 次行动未分胜负，按剩余血量 ${hpLeft.me} : ${hpLeft.enemy} ${winner === 'me' ? '判我方胜' : winner === 'enemy' ? '判敌方胜' : '判和局'}`
+        : winner === 'me' ? '胜利！' : winner === 'enemy' ? '失败…' : '同归于尽，和局';
+    this.emit({ type: 'end', winner, actions: this.actions, reason, hpLeft, me: me.map((u) => u.uid), enemy: en.map((u) => u.uid), text });
+    return { winner, reason, hpLeft };
   }
 }
 
@@ -521,7 +941,7 @@ function fallbackDef(id: string): UnitDef {
 
 /**
  * 模拟一场战斗。myTeam / enemyTeam 可以含 null（会被压缩，前排在前）。
- * 单位的 tempAtk/tempHp/shield 会计入本场。
+ * 单位的 tempAtk/tempHp/shield 与装备会计入本场；敌方 uid 加前缀 'e_'。
  */
 export function simulateBattle(
   myTeam: readonly (UnitInst | null)[],
@@ -530,19 +950,31 @@ export function simulateBattle(
   seed: string,
   opts: BattleOptions = {},
 ): BattleResult {
-  const b = new Battle(data, `${seed}:battle`);
-  const mine = myTeam.filter((u): u is UnitInst => !!u);
-  const theirs = enemyTeam.filter((u): u is UnitInst => !!u);
-  // 敌方 uid 可能与我方撞车（快照来自别人的局），加前缀区分
+  const mine = myTeam.filter((u): u is UnitInst => !!u).map((u) => ({ ...u, equips: u.equips ?? {} }));
+  const theirs = enemyTeam.filter((u): u is UnitInst => !!u).map((u) => ({ ...u, equips: u.equips ?? {} }));
+  const b = new Battle(data, `${seed}:battle`, opts, mine, theirs);
   b.sides.me = mine.map((u) => b.make(u, 'me', true));
-  b.sides.enemy = theirs.map((u) => b.make({ ...u, uid: `e_${u.uid}` }, 'enemy', false, opts.enemyAtkMod ?? 0));
-  const { winner, rounds } = b.run(opts);
+  b.sides.enemy = theirs.map((u) => {
+    const x = b.make({ ...u, uid: `e_${u.uid}` }, 'enemy', false);
+    if (opts.enemyAtkMod) x.atk = Math.max(0, x.atk + opts.enemyAtkMod);
+    return x;
+  });
+  for (const u of b.sides.me) b.mine.set(u.uid, { defId: u.defId, level: u.level });
+  const myOrder = b.sides.me.map((u) => u.uid);
+  const { winner } = b.run(opts);
+  const survivors = winner === 'draw' ? 0 : b.sides[winner === 'me' ? 'me' : 'enemy'].length;
+  const summary = buildSummary(
+    { mine: b.mine, myOrder, damageByUid: b.damageBy, hitsTaken: b.hitsTaken, myReflect: b.reflect.me, mySummons: b.summons.me, synergies: b.synergyStates.me },
+    data,
+  );
   return {
     winner,
     events: b.events,
     enemyTeam: theirs.map((u) => clone(u)),
-    rounds,
+    actions: b.actions,
+    survivors,
     permanentBuffs: [...b.perm.entries()].map(([uid, v]) => ({ uid, ...v })),
     bonus: b.bonus,
+    summary,
   };
 }

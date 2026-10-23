@@ -1,0 +1,10 @@
+[
+  {"id":"opp_huang","name":"老黄的显卡军团","avatar":"characters/huang.png","archetype":"compute","core":["huang","scalper","robodog","funding"],"taunt":{"defeated":"这批卡先寄存在你那","victory":"买得越多，赢得越多"}},
+  {"id":"opp_zuck","name":"小扎的羊驼农场","avatar":"characters/zuck.png","archetype":"open","core":["crawler","qwen_chan","mistral","kimi"],"taunt":{"defeated":"羊驼先回圈里歇会","victory":"开源的羊驼，跑得快"}},
+  {"id":"opp_botnet","name":"水军总部","avatar":"units/botnet.svg","archetype":"folk","core":["botnet","doubao_chan","hallucination","hf"],"taunt":{"defeated":"楼塌了……下一楼见","victory":"好评如潮，已转发"}},
+  {"id":"opp_regulator","name":"监管局合规处","avatar":"units/regulator.svg","archetype":"closed","core":["claude_chan","dario","regulator","wrapper"],"taunt":{"defeated":"材料不全，下次补齐","victory":"您的阵容未通过审核"}},
+  {"id":"opp_deepseek","name":"深度求索研究所","avatar":"characters/deepseek_chan.png","archetype":"researcher","core":["deepseek_chan","lecun","liang","dario"],"taunt":{"defeated":"服务器繁忙，稍后再战","victory":"小号也能打大号哦"}},
+  {"id":"opp_altman","name":"奥特曼融资路演","avatar":"characters/altman.png","archetype":"trader","core":["altman","wrapper","scalper","zuck"],"taunt":{"defeated":"没关系，再融一轮","victory":"估值又涨了，谢谢你"}},
+  {"id":"opp_gpt","name":"GPT 娘后援会","avatar":"characters/gpt_chan.png","archetype":"idol","core":["gpt_chan","ai_gf","leaderboard","gemini_chan"],"taunt":{"defeated":"还会回来的，记得我","victory":"今天选太阳，晒到你了"}},
+  {"id":"opp_musk","name":"马一龙火箭工坊","avatar":"characters/musk.png","archetype":"engineer","core":["vibe_coder","labeler","prompt_eng","stargate"],"taunt":{"defeated":"炸了也是数据，再发射","victory":"第一性原理，懂了吗"}}
+]

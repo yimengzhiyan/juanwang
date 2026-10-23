@@ -1,0 +1,26 @@
+[
+  {
+    "id":"pve_halluc","turn":4,"name":"幻觉大军来袭","avatar":"units/hallucination.svg",
+    "desc":"6 个 2/2 幻觉压境，打死一个分裂出一个 1/1 小幻觉。PVE 回合不扣热度，打赢三选一奖励",
+    "team":[{"defId":"mob_halluc"},{"defId":"mob_halluc"},{"defId":"mob_halluc"},{"defId":"mob_halluc"},{"defId":"mob_halluc"},{"defId":"mob_halluc"}],
+    "boss":null,
+    "tip":"溅射、热搜装备和爆炸流专治人海",
+    "rewards":{"pick":3,"pool":[
+      {"type":"unit","tierBonus":1,"desc":"高一阶的随机单位"},
+      {"type":"goldEquip","desc":"随机一件金色装备"},
+      {"type":"gold","amount":6,"desc":"立即 +6 算力"}
+    ]}
+  },
+  {
+    "id":"pve_huang","turn":9,"name":"老黄的显卡军团","avatar":"characters/huang.png",
+    "desc":"4 张 0/6 显卡在前面挡枪，皮衣 Boss 老黄 8/20 坐镇后排，每次攻击都会烫到你全队",
+    "team":[{"defId":"token_gpu","atk":0,"hp":6},{"defId":"token_gpu","atk":0,"hp":6},{"defId":"token_gpu","atk":0,"hp":6},{"defId":"token_gpu","atk":0,"hp":6},{"defId":"boss_huang","atk":8,"hp":20}],
+    "boss":{"defId":"boss_huang","skillName":"买得越多","skillDesc":"老黄每次攻击前，对你全体单位造成 1 点伤害；他站在 4 张显卡后面，先拆卡再打 Boss"},
+    "tip":"热搜装备能越过显卡直击老黄；闭源护盾能扛住烫伤",
+    "rewards":{"pick":3,"pool":[
+      {"type":"unit","tierBonus":1,"desc":"高一阶的随机单位"},
+      {"type":"goldEquip","desc":"随机一件金色装备"},
+      {"type":"gold","amount":6,"desc":"立即 +6 算力"}
+    ]}
+  }
+]

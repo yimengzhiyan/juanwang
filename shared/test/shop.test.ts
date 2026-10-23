@@ -1,330 +1,165 @@
 import { describe, expect, it } from 'vitest';
-import { custom, data, mk, setTeam } from './helpers';
-import {
-  maxItemTierForTurn, maxTierForTurn, newRun, shopAction, itemSlotsForTurn, unitSlotsForTurn, rollShop, makeCtx,
-} from '../src/engine/shop';
-import type { GameData, ItemDef, RunState, ShopSlot } from '../src/types';
-import { battleForState } from '../src/engine/helpers';
+import { data, mk, of, setTeam, start } from './helpers';
+import { newRun, shopAction } from '../src/engine/run';
+import { simulateBattle } from '../src/engine/battle';
+import { MAX_SHOP_LEVEL, UPGRADE_PRICE, makeCtx, maxTierForTurn, rollUnitDef, shopMaxTier, tierWeights, turnIncome } from '../src/engine/shop';
+import type { RunState, ShopSlot } from '../src/types';
 
-const unitSlot = (defId: string, price = 3): ShopSlot => ({ kind: 'unit', defId, price, frozen: false });
-const itemSlot = (defId: string, price: number): ShopSlot => ({ kind: 'item', defId, price, frozen: false });
-const act = (s: RunState, a: Parameters<typeof shopAction>[1], d: GameData = data) => {
-  const n = shopAction(s, a, d);
-  expect(n.error, `动作 ${a.type} 失败`).toBeUndefined();
+const ok = (s: RunState, a: Parameters<typeof shopAction>[1]) => {
+  const n = shopAction(s, a, data);
+  expect(n.error, a.type).toBeUndefined();
   return n;
 };
-const units = (s: RunState) => s.team.filter(Boolean);
+const kinds = (s: RunState) => s.shop.map((x) => x.kind);
+const unitShop = (s: RunState, ids: string[]): RunState => ({ ...s, shop: ids.map((defId) => ({ kind: 'unit', defId, price: 3, frozen: false }) as ShopSlot) });
 
-describe('newRun', () => {
-  it('开局 5 信心 0 热搜 回合 1 10 算力，商店 3 单位 + 1 基建', () => {
-    const s = newRun('seed-a', data);
-    expect(s).toMatchObject({ turn: 1, gold: 10, lives: 5, trophies: 0, phase: 'shop' });
-    expect(s.team).toHaveLength(5);
-    expect(s.shop.filter((x) => x.kind === 'unit')).toHaveLength(3);
-    expect(s.shop.filter((x) => x.kind === 'item')).toHaveLength(1);
-    expect(s.shop.every((x) => x.kind === 'item' || data.unitsById[x.defId].tier === 1)).toBe(true);
+describe('newRun / 赛场三选一', () => {
+  it('开局展示 3 个赛场；选完进入回合 1：20 热度、10 算力、7 名对手，商店 4 单位 + 2 装备 + 1 消耗品', () => {
+    let s = newRun('a', data);
+    expect(s.phase).toBe('arena');
+    expect(s.arenaOptions).toHaveLength(3);
+    expect(new Set(s.arenaOptions).size).toBe(3);
+    expect(shopAction(s, { type: 'buy', slot: 0 }, data).error).toBeTruthy();
+    s = ok(s, { type: 'chooseArena', index: 1 });
+    expect(s.arena).toBe(newRun('a', data).arenaOptions![1]);
+    expect(s).toMatchObject({ phase: 'shop', turn: 1, hp: 20, shopLevel: 0 });
+    expect(s.opponents).toHaveLength(7);
+    expect(s.opponents.every((o) => o.hp === 20 && o.alive && !o.isHuman)).toBe(true);
+    const arenaRules = data.arenasById[s.arena!].rules;
+    const nUnits = 4 + (arenaRules.unitSlotsMod ?? 0);
+    const nEquips = 2 + (arenaRules.equipSlotsMod ?? 0);
+    expect(kinds(s)).toEqual([...Array(nUnits).fill('unit'), ...Array(nEquips).fill('equip'), 'consumable']);
   });
-  it('同种子完全一致，不同种子不同', () => {
-    expect(newRun('x', data)).toEqual(newRun('x', data));
-    const shops = new Set(Array.from({ length: 10 }, (_, i) => JSON.stringify(newRun(`s${i}`, data).shop)));
-    expect(shops.size).toBeGreaterThan(1);
+  it('newRun(seed, data, {arena}) 直接指定赛场（null = 无赛场）；同种子一致', () => {
+    const s = start('x');
+    expect(s).toMatchObject({ phase: 'shop', turn: 1, gold: 10 });
+    expect(s.arena).toBeUndefined();
+    expect(kinds(s)).toEqual(['unit', 'unit', 'unit', 'unit', 'equip', 'equip', 'consumable']);
+    expect(start('x')).toEqual(s);
+    expect(start('y').shop).not.toEqual(s.shop);
+    expect(newRun('x', data, { arena: 'equip_expo' }).arena).toBe('equip_expo');
   });
 });
 
 describe('购买 / 出售 / 刷新 / 冻结 / 交换', () => {
-  const base = () => ({ ...newRun('b', data), shop: [unitSlot('wrapper'), unitSlot('crawler'), unitSlot('wrapper'), itemSlot('coffee', 3)] });
-
   it('购买扣 3 算力，放进第一个空位；算力不够报错', () => {
-    let s = act(base(), { type: 'buy', slot: 0 });
+    let s = ok(start('b'), { type: 'buy', slot: 0 });
     expect(s.gold).toBe(7);
-    expect(s.team[0]?.defId).toBe('wrapper');
-    expect(s.shop).toHaveLength(3);
+    expect(s.team[0]).not.toBeNull();
     s = { ...s, gold: 2 };
-    const f = shopAction(s, { type: 'buy', slot: 0 }, data);
-    expect(f.error).toMatch(/算力不够/);
-    expect(f.gold).toBe(2);
-  });
-  it('可以买到指定空位；指定位置有异名单位时报错', () => {
-    let s = act(base(), { type: 'buy', slot: 0, to: 3 });
-    expect(s.team[3]?.defId).toBe('wrapper');
-    expect(shopAction(s, { type: 'buy', slot: 0, to: 3 }, data).error).toBeTruthy();
-  });
-  it('队伍满了不能买到空位', () => {
-    const s = setTeam(base(), ['kimi', 'kimi', 'kimi', 'kimi', 'kimi'].map((d) => mk(d)));
-    expect(shopAction(s, { type: 'buy', slot: 1 }, data).error).toMatch(/队伍满/);
+    expect(shopAction(s, { type: 'buy', slot: 0 }, data).error).toMatch(/算力不够/);
   });
   it('出售得到 = 等级 的算力，并触发 sell 技能', () => {
-    let s = setTeam(base(), [mk('wrapper', { level: 2, xp: 2 }), mk('labeler')]);
-    s = act(s, { type: 'sell', index: 0 });
-    expect(s.gold).toBe(12);
-    s = act(s, { type: 'sell', index: 1 }); // 标注员：+1 等级价 +1 技能
-    expect(s.gold).toBe(14);
-    expect(units(s)).toHaveLength(0);
+    const s = setTeam(start('s'), [mk('labeler', { level: 2, xp: 2 })]);
+    expect(ok(s, { type: 'sell', index: 0 }).gold).toBe(10 + 2 + 2);
   });
-  it('刷新花 1 算力并换掉未冻结槽，冻结槽保留', () => {
-    let s = newRun('r', data);
-    s = act(s, { type: 'freeze', slot: 0 });
+  it('刷新花 1 算力，冻结槽保留；冻结的槽下回合保留', () => {
+    let s = ok(start('r'), { type: 'freeze', slot: 0 });
     const frozen = s.shop[0];
-    expect(frozen.frozen).toBe(true);
-    s = act(s, { type: 'reroll' });
+    s = ok(s, { type: 'reroll' });
     expect(s.gold).toBe(9);
     expect(s.shop[0]).toEqual(frozen);
-    expect(s.shop.filter((x) => x.kind === 'unit')).toHaveLength(3);
-    const f = shopAction({ ...s, gold: 0 }, { type: 'reroll' }, data);
-    expect(f.error).toBeTruthy();
+    expect(s.modifiers.rerollsThisTurn).toBe(1);
   });
-  it('冻结的槽位下回合保留，再点一次解冻', () => {
-    let s = newRun('f', data);
-    s = act(s, { type: 'freeze', slot: 1 });
-    const kept = s.shop[1];
-    s = act(s, { type: 'endShop' });
-    s = { ...s, phase: 'result' };
-    s = act(s, { type: 'continue' });
-    if (s.phase === 'headline') s = act(s, { type: 'chooseHeadline', option: 0 });
-    expect(s.shop.some((x) => x.defId === kept.defId && x.frozen)).toBe(true);
-    const i = s.shop.findIndex((x) => x.frozen);
-    s = act(s, { type: 'freeze', slot: i });
-    expect(s.shop[i].frozen).toBe(false);
-  });
-  it('交换位置（含空位）', () => {
-    let s = setTeam(base(), [mk('wrapper'), mk('crawler')]);
-    s = act(s, { type: 'swap', a: 0, b: 4 });
-    expect(s.team[0]).toBeNull();
-    expect(s.team[4]?.defId).toBe('wrapper');
-    s = act(s, { type: 'swap', a: 1, b: 4 });
-    expect(s.team[1]?.defId).toBe('wrapper');
-    expect(s.team[4]?.defId).toBe('crawler');
-  });
-  it('非商店阶段不能操作', () => {
-    const s = { ...newRun('p', data), phase: 'battle' as const };
-    expect(shopAction(s, { type: 'reroll' }, data).error).toBeTruthy();
-  });
-  it('shopAction 不修改入参（纯函数）', () => {
-    const s = base();
+  it('交换位置；非商店阶段不能操作；shopAction 不修改入参', () => {
+    const s = setTeam(start('w'), [mk('crawler'), null, mk('wrapper')]);
     const snap = JSON.stringify(s);
-    shopAction(s, { type: 'buy', slot: 0 }, data);
+    const n = ok(s, { type: 'swap', a: 0, b: 1 });
+    expect(n.team[1]?.defId).toBe('crawler');
     expect(JSON.stringify(s)).toBe(snap);
+    expect(shopAction({ ...s, phase: 'battle' }, { type: 'reroll' }, data).error).toBe('现在不是商店阶段');
   });
 });
 
-describe('阶级解锁与权重 / 槽位', () => {
-  it('解锁回合：T1@1 T2@3 T3@5 T4@7 T5@9 T6@11', () => {
-    expect([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 20].map(maxTierForTurn)).toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6]);
-    expect([1, 4, 5, 8, 9].map(unitSlotsForTurn)).toEqual([3, 3, 4, 4, 5]);
-    expect([1, 2, 3].map(itemSlotsForTurn)).toEqual([1, 1, 2]);
-    expect([1, 5, 9].map(maxItemTierForTurn)).toEqual([1, 2, 3]);
+describe('阶级解锁 / 升级商店', () => {
+  it('按回合：T1@1 T2@3 T3@5 T4@7 T5@9 T6@11，最高阶权重最高', () => {
+    expect([1, 3, 5, 7, 9, 11, 20].map(maxTierForTurn)).toEqual([1, 2, 3, 4, 5, 6, 6]);
+    expect(tierWeights(3)).toEqual([1, 2, 3]);
+    const ctx = makeCtx({ ...start('t'), turn: 5 }, data);
+    const cnt = [0, 0, 0, 0];
+    for (let i = 0; i < 600; i++) cnt[data.unitsById[rollUnitDef(ctx)!].tier]++;
+    expect(cnt[3]).toBeGreaterThan(cnt[1]);
+    expect(cnt[1] + cnt[2] + cnt[3]).toBe(600);
   });
-  it('商店只出已解锁阶，最高阶权重最高、低阶递减', () => {
-    const s = { ...newRun('w', data), turn: 11 };
-    const ctx = makeCtx(s, data);
-    const count = [0, 0, 0, 0, 0, 0, 0];
-    for (let i = 0; i < 600; i++) {
-      rollShop(ctx);
-      for (const sl of ctx.s.shop) if (sl.kind === 'unit') count[data.unitsById[sl.defId].tier]++;
-    }
-    // 每阶的单位数不同，按"每个单位平均出现次数"比较
-    const per = (t: number) => count[t] / data.shopUnitsByTier[t].length;
-    expect(per(6)).toBeGreaterThan(per(1));
-    expect(per(5)).toBeGreaterThan(per(2));
-    const early = { ...newRun('w2', data), turn: 3 };
-    const c2 = makeCtx(early, data);
-    for (let i = 0; i < 100; i++) {
-      rollShop(c2);
-      expect(c2.s.shop.every((x) => x.kind === 'item' || data.unitsById[x.defId].tier <= 2)).toBe(true);
-    }
-  });
-  it('回合 5 起 4 个单位槽，回合 3 起 2 个基建槽', () => {
-    const s = { ...newRun('q', data), turn: 5 };
-    const ctx = makeCtx(s, data);
-    rollShop(ctx);
-    expect(ctx.s.shop.filter((x) => x.kind === 'unit')).toHaveLength(4);
-    expect(ctx.s.shop.filter((x) => x.kind === 'item')).toHaveLength(2);
+  it(`upgradeShop：${UPGRADE_PRICE} 算力提前解锁下一阶并重抽单位格；每局最多 ${MAX_SHOP_LEVEL} 次；阶级 = max(按回合, 升级)`, () => {
+    let s = ok(start('u'), { type: 'freeze', slot: 4 });
+    const eqSlot = s.shop[4];
+    s = ok(s, { type: 'upgradeShop' });
+    expect(s).toMatchObject({ gold: 10 - UPGRADE_PRICE, shopLevel: 1, shopTier: 2 });
+    expect(s.lastEvents[0]).toMatchObject({ type: 'shopLevelUp', shopLevel: 1, tier: 2 });
+    expect(s.shop).toContainEqual(eqSlot);
+    expect(shopMaxTier(s)).toBe(2);
+    s = ok({ ...s, gold: 10 }, { type: 'upgradeShop' });
+    expect(s.shopTier).toBe(3);
+    expect(shopAction({ ...s, gold: 10 }, { type: 'upgradeShop' }, data).error).toMatch(/最多升级 2 次/);
+    expect(shopAction({ ...start('u2'), gold: 3 }, { type: 'upgradeShop' }, data).error).toMatch(/算力不够/);
+    // 回合推进后按回合的阶追上来
+    expect(shopMaxTier({ turn: 9, shopTier: 3 })).toBe(5);
+    expect(s.stats.upgrades).toBe(2);
   });
 });
 
 describe('合并进化', () => {
-  const base = () => ({ ...newRun('m', data), gold: 30, shop: [unitSlot('wrapper'), unitSlot('wrapper'), unitSlot('wrapper'), unitSlot('wrapper'), unitSlot('wrapper'), unitSlot('wrapper')] });
-
-  it('买到同名单位上合并：属性 = 最高值 +1/+1，xp +1', () => {
-    let s = setTeam(base(), [mk('wrapper', { atk: 5, hp: 1 })]);
-    s = act(s, { type: 'buy', slot: 0, to: 0 });
-    expect(s.team[0]).toMatchObject({ atk: 6, hp: 3, xp: 1, level: 1 });
-    expect(units(s)).toHaveLength(1);
-  });
-  it('3 份 → Lv2 并在商店刷出比当前最高阶高一阶的免费单位', () => {
-    let s = act(base(), { type: 'buy', slot: 0 });
-    s = act(s, { type: 'buy', slot: 0 });
-    expect(s.team[0]?.level).toBe(1);
-    s = act(s, { type: 'buy', slot: 0 });
+  it('3 份 → Lv2 并刷出比当前最高阶高一阶的免费单位；6 份 → Lv3', () => {
+    let s = setTeam(start('m'), [mk('wrapper', { xp: 1, atk: 3, hp: 3 })]);
+    s = ok(unitShop({ ...s, gold: 10 }, ['wrapper']), { type: 'buy', slot: 0 });
     expect(s.team[0]).toMatchObject({ level: 2, xp: 2, atk: 4, hp: 4 });
+    const free = s.shop.find((x) => x.free)!;
+    expect(free).toMatchObject({ price: 0, freeReason: 'levelUp' });
+    expect(data.unitsById[free.defId].tier).toBe(2);
     expect(s.lastLevelUp).toEqual({ uid: s.team[0]!.uid, level: 2 });
-    const free = s.shop.filter((x) => x.free);
-    expect(free).toHaveLength(1);
-    expect(free[0].price).toBe(0);
-    expect(free[0].freeReason).toBe('levelUp');
-    expect(data.unitsById[free[0].defId].tier).toBe(maxTierForTurn(s.turn) + 1);
-    // 免费槽：0 算力购买；刷新不会被替换
-    s = act(s, { type: 'reroll' });
-    expect(s.shop.some((x) => x.free)).toBe(true);
-  });
-  it('6 份 → Lv3 满级，再买同名会放到空位', () => {
-    let s = { ...base(), gold: 40, shop: [...base().shop, unitSlot('wrapper')] };
-    for (let i = 0; i < 6; i++) s = act(s, { type: 'buy', slot: s.shop.findIndex((x) => x.defId === 'wrapper' && !x.free) });
-    expect(s.team[0]).toMatchObject({ level: 3, xp: 5 });
-    expect(s.shop.filter((x) => x.free)).toHaveLength(2);
-    const w = s.shop.findIndex((x) => x.defId === 'wrapper');
-    expect(w).toBeGreaterThanOrEqual(0);
-    expect(shopAction(s, { type: 'buy', slot: w, to: 0 }, data).error).toMatch(/满级/);
-    s = act(s, { type: 'buy', slot: w });
-    expect(s.team[1]).toMatchObject({ defId: 'wrapper', level: 1 });
-  });
-  it('免费槽带 freeReason：进化奖励 = levelUp，冻结后下回合仍免费且来源不变；普通槽没有 freeReason', () => {
-    let s = act(base(), { type: 'buy', slot: 0 });
-    s = act(s, { type: 'buy', slot: 0 });
-    s = act(s, { type: 'buy', slot: 0 });
-    expect(s.shop.filter((x) => !x.free).every((x) => x.freeReason === undefined)).toBe(true);
-    const fi = s.shop.findIndex((x) => x.free);
-    expect(s.shop[fi]).toMatchObject({ free: true, freeReason: 'levelUp', price: 0 });
-    s = act(s, { type: 'freeze', slot: fi });
-    s = act(s, { type: 'endShop' });
-    s = act({ ...s, phase: 'result' }, { type: 'continue' });
-    if (s.phase === 'headline') s = act(s, { type: 'chooseHeadline', option: 0 });
-    const kept = s.shop.find((x) => x.free);
-    expect(kept).toMatchObject({ frozen: true, freeReason: 'levelUp', price: 0 });
-  });
-  it('队伍内两个同名单位 merge', () => {
-    let s = setTeam(base(), [mk('crawler', { atk: 3 }), null, mk('crawler', { hp: 7, xp: 1 })]);
-    s = act(s, { type: 'merge', from: 0, to: 2 });
-    expect(s.team[0]).toBeNull();
-    expect(s.team[2]).toMatchObject({ atk: 4, hp: 8, xp: 2, level: 2 });
-    expect(shopAction(setTeam(base(), [mk('crawler'), mk('wrapper')]), { type: 'merge', from: 0, to: 1 }, data).error).toBeTruthy();
+    s = setTeam(s, [mk('wrapper', { level: 2, xp: 4 })]);
+    s = ok(unitShop({ ...s, gold: 10 }, ['wrapper']), { type: 'buy', slot: 0 });
+    expect(s.team[0]!.level).toBe(3);
+    expect(s.stats.lv3).toBe(1);
   });
 });
 
-describe('价格修正', () => {
-  it('priceMod 头条：单位降价 1；不会低于 1', () => {
-    let s = newRun('pm', data);
-    s = { ...s, phase: 'headline', pendingHeadline: data.headlines.find((h) => h.id === 'h_price_war')! };
-    s = act(s, { type: 'chooseHeadline', option: 0 });
-    expect(s.shop.filter((x) => x.kind === 'unit').every((x) => x.price === 2)).toBe(true);
-    s = act(s, { type: 'buy', slot: 0 });
-    expect(s.gold).toBe(8);
-    const d = custom({ headlines: [{ id: 'cheap', title: 't', news: 'n', options: [{ label: 'a', effect: { type: 'priceMod', target: 'all', amount: -9 } }, { label: 'b', effect: { type: 'gold', amount: 1 } }] }] });
-    let s2: RunState = { ...newRun('pm2', d), phase: 'headline', pendingHeadline: d.headlines[0] };
-    s2 = act(s2, { type: 'chooseHeadline', option: 0 }, d);
-    expect(s2.shop.every((x) => x.price === 1)).toBe(true);
+describe('赛场规则（10 张，各一条）', () => {
+  const at = (arena: string, team: Parameters<typeof setTeam>[1] = []) => setTeam(newRun(`ar-${arena}`, data, { arena }), team);
+  const price = (s: RunState, id: string) => shopAction(unitShop(s, [id]), { type: 'freeze', slot: 0 }, data).shop[0].price;
+  it('开源大会：开源单位 -1 价', () => {
+    const s = at('open_summit');
+    expect(price(s, 'crawler')).toBe(2);
+    expect(price(s, 'wrapper')).toBe(3);
   });
-});
-
-describe('基建', () => {
-  const extra: ItemDef[] = [
-    { id: 'i_copy', name: 'copy', desc: '', price: 1, targetKind: 'unit', effect: { type: 'copyStatsFrom' }, icon: '', tier: 1 },
-    { id: 'i_lv', name: 'lv', desc: '', price: 1, targetKind: 'unit', effect: { type: 'levelUp' }, icon: '', tier: 1 },
-    { id: 'i_tok', name: 'tok', desc: '', price: 1, targetKind: 'team', effect: { type: 'summonToken', unitId: 'token_gpu' }, icon: '', tier: 1 },
-    { id: 'i_team', name: 'team', desc: '', price: 1, targetKind: 'team', effect: { type: 'teamBuff', atk: 1, hp: 2, permanent: false }, icon: '', tier: 1 },
-    { id: 'i_front', name: 'front', desc: '', price: 1, targetKind: 'unit', effect: { type: 'pullFront' }, icon: '', tier: 1 },
-    { id: 'i_tf', name: 'tf', desc: '', price: 1, targetKind: 'unit', effect: { type: 'transformRandomSameTier' }, icon: '', tier: 1 },
-    { id: 'i_temp', name: 'temp', desc: '', price: 1, targetKind: 'unit', effect: { type: 'buff', atk: 3, hp: 0, permanent: false }, icon: '', tier: 1 },
-  ];
-  const d = custom({ items: extra });
-  const withItem = (id: string, team = [mk('wrapper', {}, d), mk('kimi', {}, d)]) =>
-    setTeam({ ...newRun('it', d), shop: [itemSlot(id, d.itemsById[id].price)] }, team);
-
-  it('buff（永久）/ buff（临时）', () => {
-    let s = act(withItem('coffee'), { type: 'useItem', slot: 0, target: 0 }, d);
+  it('GPU 荒：战斗开始时双方全体 +1 攻 -1 血', () => {
+    const r = simulateBattle([mk('wrapper')], [mk('kimi')], data, 's', { arena: 'gpu_drought' });
+    expect(of(r, 'arena')[0]).toMatchObject({ arena: 'gpu_drought' });
+    expect(of(r, 'buff').map((e) => [e.unit.side, e.atk, e.hp])).toEqual([['me', 1, -1], ['enemy', 1, -1]]);
+  });
+  it('融资寒冬：每回合 +2 算力，商店少 1 格单位', () => {
+    const s = at('funding_winter');
+    expect(s.shop.filter((x) => x.kind === 'unit')).toHaveLength(3);
+    expect(turnIncome(makeCtx(s, data)).total).toBe(12);
+  });
+  it('刷新狂欢：刷新免费，买单位 +1 价', () => {
+    const s = at('reroll_party');
+    expect(ok(s, { type: 'reroll' }).gold).toBe(10);
+    expect(price(s, 'crawler')).toBe(4);
+  });
+  it('1 号位光环：每次刷新，1 号位永久 +1/+1', () => {
+    const s = ok(at('seat_one_aura', [mk('wrapper')]), { type: 'reroll' });
     expect(s.team[0]).toMatchObject({ atk: 3, hp: 3 });
-    expect(s.gold).toBe(7);
-    expect(s.shop).toHaveLength(0);
-    s = act(withItem('i_temp'), { type: 'useItem', slot: 0, target: 1 }, d);
-    expect(s.team[1]).toMatchObject({ atk: 2, tempAtk: 3 });
   });
-  it('unit 型基建必须选目标', () => {
-    expect(shopAction(withItem('coffee'), { type: 'useItem', slot: 0 }, d).error).toMatch(/选择/);
+  it('装备展：商店多 1 个装备格', () => {
+    expect(at('equip_expo').shop.filter((x) => x.kind === 'equip')).toHaveLength(3);
   });
-  it('shield / gold', () => {
-    expect(act(withItem('firewall'), { type: 'useItem', slot: 0, target: 0 }, d).team[0]?.shield).toBe(3);
-    expect(act(withItem('grant'), { type: 'useItem', slot: 0 }, d).gold).toBe(11);
+  it('人海时代：所有召唤物 +1/+1', () => {
+    const r = simulateBattle([mk('botnet'), mk('labeler')], [mk('token_gpu')], data, 's', { arena: 'folk_era' });
+    expect(of(r, 'summon')[0].unit).toMatchObject({ defId: 'token_shuijun', atk: 2, hp: 2 });
   });
-  it('copyStatsFrom：目标取两者较高属性', () => {
-    const s = act(withItem('i_copy'), { type: 'useItem', slot: 0, target: 0, source: 1 }, d);
-    expect(s.team[0]).toMatchObject({ atk: 2, hp: 5 });
-    expect(shopAction(withItem('i_copy'), { type: 'useItem', slot: 0, target: 0 }, d).error).toBeTruthy();
+  it('研究院：研究员 -1 价', () => {
+    const s = at('institute');
+    expect(price(s, 'claude_chan')).toBe(2);
+    expect(price(s, 'wrapper')).toBe(3);
   });
-  it('levelUp：+1 级 +1/+1 并刷出免费单位；Lv3 不可用', () => {
-    const s = act(withItem('i_lv'), { type: 'useItem', slot: 0, target: 0 }, d);
-    expect(s.team[0]).toMatchObject({ level: 2, xp: 2, atk: 3, hp: 3 });
-    expect(s.shop.some((x) => x.free)).toBe(true);
-    const full = withItem('i_lv', [mk('wrapper', { level: 3, xp: 5 }, d)]);
-    expect(shopAction(full, { type: 'useItem', slot: 0, target: 0 }, d).error).toMatch(/满级/);
+  it('春晚舞台：偶像羁绊人数 +1', () => {
+    const r = simulateBattle([mk('qwen_chan')], [mk('token_gpu')], data, 's', { arena: 'spring_gala' });
+    expect(of(r, 'synergyTier').find((e) => e.key === 'idol')).toMatchObject({ count: 2, tier: 1 });
   });
-  it('summonToken：放到第一个空位；满员报错', () => {
-    const s = act(withItem('i_tok'), { type: 'useItem', slot: 0 }, d);
-    expect(s.team[2]?.defId).toBe('token_gpu');
-    const full = withItem('i_tok', Array.from({ length: 5 }, () => mk('kimi', {}, d)));
-    expect(shopAction(full, { type: 'useItem', slot: 0 }, d).error).toMatch(/满/);
-  });
-  it('teamBuff（临时）', () => {
-    const s = act(withItem('i_team'), { type: 'useItem', slot: 0 }, d);
-    expect(units(s).every((u) => u!.tempAtk === 1 && u!.tempHp === 2)).toBe(true);
-  });
-  it('pullFront：记为本场战斗开始时拉到最前（DESIGN 11.5）', () => {
-    let s = act(withItem('i_front'), { type: 'useItem', slot: 0, target: 1 }, d);
-    expect(s.team[0]?.defId).toBe('wrapper');
-    expect(s.modifiers.battlePullFront).toEqual([s.team[1]!.uid]);
-    s = act(s, { type: 'endShop' }, d);
-    const r = battleForState(s, [mk('gpt_chan', {}, d)], d);
-    const a = r.events.find((e) => e.type === 'attack');
-    expect(a && a.type === 'attack' && a.me.defId).toBe('kimi');
-  });
-  it('transformRandomSameTier：变成同阶别的单位，保留额外属性', () => {
-    const s = act(withItem('i_tf', [mk('wrapper', { atk: 5 }, d)]), { type: 'useItem', slot: 0, target: 0 }, d);
-    const u = s.team[0]!;
-    expect(u.defId).not.toBe('wrapper');
-    expect(d.unitsById[u.defId].tier).toBe(1);
-    expect(u.atk).toBe(d.unitsById[u.defId].atk + 3);
-  });
-});
-
-describe('商店阶段触发器', () => {
-  it('buy：提示词工程师被购买时随机友军永久 +1/+1', () => {
-    let s = setTeam({ ...newRun('t', data), shop: [unitSlot('prompt_eng')] }, [mk('kimi')]);
-    s = act(s, { type: 'buy', slot: 0 });
-    expect(s.team[0]).toMatchObject({ atk: 3, hp: 6 });
-  });
-  it('friendBought：小扎给新买的友军永久 +1/+1（boughtUnit 目标）', () => {
-    let s = setTeam({ ...newRun('t', data), shop: [unitSlot('wrapper')] }, [mk('zuck')]);
-    s = act(s, { type: 'buy', slot: 0 });
-    expect(s.team[1]).toMatchObject({ defId: 'wrapper', atk: 3, hp: 3 });
-  });
-  it('levelUp：达里奥进化时全队永久 +1/+1（含 perLevel 缩放 → Lv2 ×2）', () => {
-    let s = setTeam({ ...newRun('t', data), gold: 20, shop: [unitSlot('dario'), unitSlot('dario')] }, [mk('dario', { xp: 0 }), mk('kimi')]);
-    s = act(s, { type: 'buy', slot: 0 });
-    s = act(s, { type: 'buy', slot: 0 });
-    expect(s.team[0]?.level).toBe(2);
-    expect(s.team[1]).toMatchObject({ atk: 4, hp: 7 }); // +2/+2
-  });
-  it('startTurn：Kimi 回合开始 +1 算力（Lv2 +2）', () => {
-    let s = setTeam(newRun('t', data), [mk('kimi', { level: 2, xp: 2 })]);
-    s = act(s, { type: 'endShop' });
-    s = act({ ...s, phase: 'result' }, { type: 'continue' });
-    if (s.phase === 'headline') s = act(s, { type: 'chooseHeadline', option: 1 });
-    expect(s.gold).toBeGreaterThanOrEqual(12);
-  });
-  it('endTurn：显卡黄牛回合结束给前排 2 点护盾', () => {
-    let s = setTeam(newRun('t', data), [mk('wrapper'), mk('scalper')]);
-    s = act(s, { type: 'endShop' });
-    expect(s.phase).toBe('battle');
-    expect(s.team[0]?.shield).toBe(2);
-  });
-  it('eatItem：老黄使用基建时永久 +2/+2', () => {
-    let s = setTeam({ ...newRun('t', data), shop: [itemSlot('firewall', 2)] }, [mk('huang')]);
-    s = act(s, { type: 'useItem', slot: 0, target: 0 });
-    expect(s.team[0]).toMatchObject({ atk: 7, hp: 9, shield: 3 });
-  });
-  it('friendSummoned（商店）：抱抱脸给基建召唤出的单位 +1/+1（临时）', () => {
-    const d = custom({ items: [{ id: 'i_tok', name: 'tok', desc: '', price: 1, targetKind: 'team', effect: { type: 'summonToken', unitId: 'token_gpu' }, icon: '', tier: 1 }] });
-    let s = setTeam({ ...newRun('t', d), shop: [itemSlot('i_tok', 1)] }, [mk('hf', {}, d)]);
-    s = act(s, { type: 'useItem', slot: 0 }, d);
-    expect(s.team[1]).toMatchObject({ defId: 'token_gpu', tempAtk: 1, tempHp: 1 });
+  it('安全法案：开战时闭源单位各得 2 护盾', () => {
+    const r = simulateBattle([mk('wrapper'), mk('crawler')], [mk('kimi')], data, 's', { arena: 'safety_act' });
+    expect(of(r, 'shield').map((e) => [e.unit.side, e.unit.defId, e.amount])).toEqual([['me', 'wrapper', 2], ['enemy', 'kimi', 2]]);
   });
 });

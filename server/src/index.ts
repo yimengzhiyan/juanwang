@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DEFAULT_EQUIPS } from '@juanwang/shared';
 import { createApp } from './app';
 import { Store } from './store';
 
@@ -44,10 +45,27 @@ function lanAddresses(): string[] {
   return out;
 }
 
+/** 合法装备 id：shared/data/equips.json，缺失时用引擎内置的 12 件 */
+export function loadEquipIds(): Set<string> {
+  const f = join(DATA_DIR, 'equips.json');
+  if (existsSync(f)) {
+    try {
+      const raw = JSON.parse(readFileSync(f, 'utf8')) as unknown;
+      const arr = Array.isArray(raw) ? raw : Object.values(raw as object).find(Array.isArray) ?? [];
+      const ids = new Set((arr as { id?: unknown }[]).map((u) => u?.id).filter((x): x is string => typeof x === 'string'));
+      if (ids.size) return ids;
+    } catch (e) {
+      console.warn(`[server] 读取 ${f} 失败：${(e as Error).message}`);
+    }
+  }
+  return new Set(DEFAULT_EQUIPS.map((e) => e.id));
+}
+
 const store = new Store();
 store.loadFile(STORE_FILE);
 const app = createApp({
   validIds: loadUnitIds(),
+  validEquipIds: loadEquipIds(),
   store,
   distDir: existsSync(DIST_DIR) ? DIST_DIR : undefined,
   trustProxy: process.env.TRUST_PROXY === '1',

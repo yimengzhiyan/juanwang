@@ -1,320 +1,214 @@
 import { describe, expect, it } from 'vitest';
-import { custom, mk, plain, withAb } from './helpers';
-import { simulateBattle } from '../src/engine/battle';
-import type { Ability, BattleEvent, BattleResult, Faction, GameData, Target, UnitInst } from '../src/types';
+import { custom, mk, of, plain, withAb } from './helpers';
+import { simulateBattle, MAX_ACTIONS } from '../src/engine/battle';
+import type { BattleOptions, BattleResult, Faction, GameData, UnitInst } from '../src/types';
 
+// 不同阵营的白板单位（避免意外凑出羁绊）
+const P = (id: string, atk: number, hp: number, faction: Faction = 'open') => plain(id, atk, hp, { faction });
 const d = custom({
   units: [
-    plain('weak', 1, 1), plain('weak2', 1, 2), plain('p33', 3, 3), plain('zero', 0, 5), plain('tank', 1, 30), plain('big', 5, 7),
-    plain('o1', 1, 5, { faction: 'open' }), plain('c1', 1, 5, { faction: 'closed' }), plain('k1', 1, 5, { faction: 'compute' }), plain('k_hp1', 1, 1, { faction: 'compute' }),
-    plain('f1', 1, 5, { faction: 'folk' }),
-    withAb('sb', 1, 5, { trigger: 'startBattle', effect: 'damage', target: 'frontEnemy', amount: 2 }),
-    withAb('sb_nolv', 1, 5, { trigger: 'startBattle', effect: 'damage', target: 'frontEnemy', amount: 2, perLevel: false }),
-    withAb('ba', 2, 10, { trigger: 'beforeAttack', effect: 'multiAttack', target: 'self', amount: 2 }),
-    withAb('hurt', 1, 10, { trigger: 'hurt', effect: 'buff', target: 'self', atk: 2, hp: 0 }),
-    withAb('fs', 1, 1, { trigger: 'faint', effect: 'summon', target: 'self', unitId: 'token_shuijun' }),
-    withAb('ff', 1, 20, { trigger: 'friendFaint', effect: 'buff', target: 'self', amount: 1 }, { faction: 'open' }),
-    withAb('kl', 5, 10, { trigger: 'kill', effect: 'buff', target: 'self', amount: 2 }),
-    withAb('fsum', 1, 20, { trigger: 'friendSummoned', effect: 'buff', target: 'summoned', amount: 1 }, { faction: 'open' }),
-    withAb('es', 3, 10, { trigger: 'enemySummoned', effect: 'damage', target: 'summoned', amount: 2 }),
-    withAb('hfr', 1, 10, { trigger: 'hurtFront', effect: 'shield', target: 'frontFriend', amount: 2 }, { faction: 'open' }),
-    withAb('pb', 1, 5, { trigger: 'startBattle', effect: 'buff', target: 'self', amount: 1, permanent: true }),
-    withAb('cp', 1, 1, { trigger: 'startBattle', effect: 'copyStats', target: 'highestAtkEnemy' }),
-    withAb('sw', 1, 5, { trigger: 'startBattle', effect: 'swapPosition', target: 'backFriend' }, { faction: 'open' }),
-    withAb('gold', 1, 5, { trigger: 'startBattle', effect: 'gold', target: 'self', amount: 2 }),
-    withAb('rr', 1, 5, { trigger: 'startBattle', effect: 'reroll', target: 'self', amount: 1 }, { faction: 'closed' }),
-    withAb('disc', 1, 5, { trigger: 'startBattle', effect: 'discount', target: 'self', amount: 1 }, { faction: 'compute' }),
-    withAb('kill1', 1, 5, { trigger: 'startBattle', effect: 'destroy', target: 'highestAtkEnemy' }),
-    withAb('heal', 1, 10, { trigger: 'hurt', effect: 'heal', target: 'self', amount: 2 }),
-    withAb('push', 1, 5, { trigger: 'startBattle', effect: 'pushBack', target: 'frontEnemy' }),
-    withAb('pull', 1, 5, { trigger: 'startBattle', effect: 'pullFront', target: 'backEnemy' }),
-    withAb('revenge', 1, 1, { trigger: 'faint', effect: 'damage', target: 'killer', amount: 3 }),
-    withAb('sb5', 5, 5, { trigger: 'startBattle', effect: 'damage', target: 'frontEnemy', amount: 1 }),
-    withAb('sb2', 2, 5, { trigger: 'startBattle', effect: 'damage', target: 'frontEnemy', amount: 1 }),
+    P('a1', 1, 10, 'open'), P('a2', 1, 10, 'closed'), P('e1', 1, 10, 'compute'), P('e2', 1, 10, 'folk'),
+    P('big', 5, 1, 'open'), P('one', 1, 1, 'compute'), P('zero', 0, 50, 'open'), P('zero2', 0, 40, 'compute'), P('tank', 1, 30, 'closed'),
+    P('back', 2, 10, 'closed'), P('low', 1, 2, 'folk'),
+    plain('sniper', 3, 10, { faction: 'closed', attackTarget: 'backEnemy' }),
+    withAb('ba', 2, 10, { trigger: 'beforeAttack', effect: 'multiAttack', target: 'self', amount: 2 }, { faction: 'open' }),
+    withAb('hurt', 1, 10, { trigger: 'hurt', effect: 'buff', target: 'self', atk: 2, hp: 0 }, { faction: 'open' }),
+    withAb('fs', 1, 1, { trigger: 'faint', effect: 'summon', target: 'self', unitId: 'token_gpu' }, { faction: 'open' }),
+    withAb('ff', 1, 20, { trigger: 'friendFaint', effect: 'buff', target: 'self', amount: 1 }, { faction: 'closed' }),
+    withAb('kl', 5, 10, { trigger: 'kill', effect: 'buff', target: 'self', amount: 2 }, { faction: 'open' }),
+    withAb('es', 3, 10, { trigger: 'enemySummoned', effect: 'damage', target: 'summoned', amount: 2 }, { faction: 'closed' }),
+    withAb('hfr', 1, 10, { trigger: 'hurtFront', effect: 'shield', target: 'frontFriend', amount: 2 }, { faction: 'compute' }),
+    withAb('pb', 1, 5, { trigger: 'startBattle', effect: 'buff', target: 'self', amount: 1, permanent: true }, { faction: 'open' }),
+    withAb('gold', 1, 5, { trigger: 'startBattle', effect: 'gold', target: 'self', amount: 2 }, { faction: 'closed' }),
+    withAb('sb', 1, 5, { trigger: 'startBattle', effect: 'damage', target: 'frontEnemy', amount: 3 }, { faction: 'open' }),
+    withAb('kill1', 1, 5, { trigger: 'startBattle', effect: 'destroy', target: 'highestAtkEnemy', maxHp: 3, maxHpPerLevel: 2 }, { faction: 'open' }),
+    withAb('steal', 1, 5, { trigger: 'startBattle', effect: 'steal', target: 'lowestHpEnemy', maxHp: 3, maxHpPerLevel: 2 }, { faction: 'open' }),
+    withAb('boom', 4, 1, { trigger: 'faint', effect: 'explode', target: 'allEnemies', perLevel: false }, { faction: 'open' }),
+    withAb('dbl', 3, 5, { trigger: 'startBattle', effect: 'doubleStats', target: 'self' }, { faction: 'open' }),
+    withAb('rev', 1, 3, { trigger: 'faint', effect: 'revive', target: 'self' }, { faction: 'open' }),
+    withAb('rev2', 1, 3, { trigger: 'faint', effect: 'revive', target: 'self', amount: 3 }, { faction: 'open' }),
+    withAb('chain', 5, 20, { trigger: 'kill', effect: 'chain', target: 'self' }, { faction: 'open' }),
+    withAb('cons', 1, 1, { trigger: 'startBattle', effect: 'copyStats', target: 'backFriend', consume: true, amount: 1 }, { faction: 'open' }),
+    withAb('flt', 1, 5, { trigger: 'startBattle', effect: 'buff', target: 'allFriends', atk: 2, hp: 0, filter: { faction: 'closed' } }, { faction: 'compute' }),
+    withAb('form', 1, 5, { trigger: 'startBattle', effect: 'buff', target: 'self', choices: [{ atk: 5, hp: 0 }, { atk: 0, hp: 5 }] }, { faction: 'compute' }),
   ],
 });
-
-const fight = (me: UnitInst[], en: UnitInst[], seed = 's', data: GameData = d, opts = {}) => simulateBattle(me, en, data, seed, opts);
 const u = (id: string, over: Partial<UnitInst> = {}) => mk(id, over, d);
-const of = <T extends BattleEvent['type']>(r: BattleResult, t: T) => r.events.filter((e): e is Extract<BattleEvent, { type: T }> => e.type === t);
-const idx = (r: BattleResult, pred: (e: BattleEvent) => boolean) => r.events.findIndex(pred);
+const fight = (me: UnitInst[], en: UnitInst[], seed = 's', data: GameData = d, opts: BattleOptions = {}): BattleResult => simulateBattle(me, en, data, seed, opts);
+const attackers = (r: BattleResult) => of(r, 'attack').map((e) => e.unit.uid);
 
-describe('同时互击与胜负', () => {
-  it('双方前排同时互相造成伤害，同归于尽 = 和局', () => {
-    const r = fight([u('p33')], [u('p33')]);
-    expect(r.winner).toBe('draw');
-    expect(r.rounds).toBe(1);
-    expect(of(r, 'faint')).toHaveLength(2);
-    expect(of(r, 'attack')[0]).toMatchObject({ round: 1, me: { atk: 3, hits: 1 }, enemy: { atk: 3, hits: 1 } });
+describe('交替开火（DESIGN 12.6）', () => {
+  it('我方 1 号 → 敌方 1 号 → 我方 2 号 → 敌方 2 号 → 循环；默认打最前排', () => {
+    const r = fight([u('a1', { uid: 'A' }), u('a2', { uid: 'B' })], [u('e1', { uid: 'C' }), u('e2', { uid: 'D' })]);
+    expect(of(r, 'start')[0].first).toBe('me');
+    expect(attackers(r).slice(0, 6)).toEqual(['A', 'e_C', 'B', 'e_D', 'A', 'e_C']);
+    expect(of(r, 'attack').slice(0, 4).map((e) => e.target.uid)).toEqual(['e_C', 'A', 'e_C', 'A']);
+    expect(of(r, 'attack')[0]).toMatchObject({ action: 1, hit: 1, hits: 1, unit: { atk: 1 } });
   });
-  it('50 回合未分胜负 = 和局', () => {
-    const r = fight([u('zero')], [u('zero')]);
-    expect(r.winner).toBe('draw');
-    expect(r.rounds).toBe(50);
-    expect(of(r, 'end')[0].winner).toBe('draw');
+  it('first = enemy 时敌方先开火', () => {
+    const r = fight([u('a1', { uid: 'A' })], [u('e1', { uid: 'C' })], 's', d, { first: 'enemy' });
+    expect(attackers(r).slice(0, 2)).toEqual(['e_C', 'A']);
   });
-  it('一方清空即分胜负；事件以 start 开头、end 结尾', () => {
-    const r = fight([u('big')], [u('weak'), u('weak')]);
+  it('跳过阵亡者：轮到的单位死了就由它身后的接上', () => {
+    const r = fight([u('big', { uid: 'A' }), u('back', { uid: 'B' })], [u('one', { uid: 'C' }), u('e2', { uid: 'D', atk: 1 })]);
+    // A 打死 C → D 打 A（A 1 血阵亡）→ 轮到我方 2 号位，但 A 已死，B 顶上
+    expect(attackers(r).slice(0, 3)).toEqual(['A', 'e_D', 'B']);
+  });
+  it(`${MAX_ACTIONS} 次行动未分胜负：按剩余血量总和判定`, () => {
+    const r = fight([u('zero')], [u('zero2')]);
+    expect(r.actions).toBe(MAX_ACTIONS);
+    const end = of(r, 'end')[0];
+    expect(end).toMatchObject({ reason: 'timeout', winner: 'me', hpLeft: { me: 50, enemy: 40 } });
     expect(r.winner).toBe('me');
+    const r2 = fight([u('zero')], [u('zero', { uid: 'z2' })]);
+    expect(r2.winner).toBe('draw');
+    expect(r2.survivors).toBe(0);
+  });
+  it('一方清空即分胜负；survivors = 胜方存活单位数；事件以 start 开头、end 结尾', () => {
+    const r = fight([u('big'), u('tank')], [u('one')]);
+    expect(r.winner).toBe('me');
+    expect(r.survivors).toBe(2);
     expect(r.events[0].type).toBe('start');
     expect(r.events.at(-1)!.type).toBe('end');
-    expect(r.rounds).toBe(2);
-    const r2 = fight([], [u('weak')]);
-    expect(r2.winner).toBe('enemy');
+    expect(fight([], [u('one')]).winner).toBe('enemy');
   });
   it('完全确定性：同输入同种子同事件', () => {
-    const team = () => [u('sb', { uid: 'a' }), u('p33', { uid: 'b' })];
-    const en = () => [u('big', { uid: 'c' }), u('weak2', { uid: 'd' })];
+    const team = () => [u('sb', { uid: 'a' }), u('a1', { uid: 'b' })];
+    const en = () => [u('big', { uid: 'c' }), u('e2', { uid: 'd' })];
     expect(fight(team(), en(), 'k')).toEqual(fight(team(), en(), 'k'));
   });
-  it('enemyAtkMod（头条 enemyDebuff）降低敌方攻击', () => {
-    const r = fight([u('weak2')], [u('p33')], 's', d, { enemyAtkMod: -2 });
-    expect(of(r, 'attack')[0].enemy.atk).toBe(1);
+  it('攻击目标改写：attackTarget = backEnemy', () => {
+    const r = fight([u('sniper')], [u('tank', { uid: 'F' }), u('low', { uid: 'L' })]);
+    expect(of(r, 'attack')[0].target.uid).toBe('e_L');
   });
-  it('临时加成与护盾计入战斗', () => {
-    const r = fight([u('weak', { tempAtk: 2, tempHp: 2, shield: 1 })], [u('p33')]);
-    expect(of(r, 'start')[0].me[0]).toMatchObject({ atk: 3, hp: 3, shield: 1 });
+  it('enemyAtkMod（头条 enemyDebuff）降低敌方攻击；临时加成与护盾计入', () => {
+    const r = fight([u('a1', { tempAtk: 2, tempHp: 2, shield: 1 })], [u('back')], 's', d, { enemyAtkMod: -1 });
+    expect(of(r, 'start')[0].me[0]).toMatchObject({ atk: 3, hp: 12, shield: 1 });
+    expect(of(r, 'attack')[1].unit.atk).toBe(1);
   });
 });
 
 describe('触发器', () => {
-  it('startBattle：开战时先结算技能（在第一次攻击之前）', () => {
-    const r = fight([u('sb')], [u('weak2')]);
+  it('startBattle：开战技能在第一次攻击之前', () => {
+    const r = fight([u('sb')], [u('one', { hp: 3 })]);
     expect(r.winner).toBe('me');
     expect(of(r, 'attack')).toHaveLength(0);
-    expect(of(r, 'ability')[0]).toMatchObject({ trigger: 'startBattle', effect: 'damage' });
+    expect(of(r, 'ability')[0]).toMatchObject({ trigger: 'startBattle', effect: 'damage', repeat: 1 });
   });
-  it('beforeAttack + multiAttack：本次攻击 2 次', () => {
+  it('beforeAttack + multiAttack：本次行动攻击 2 段', () => {
     const r = fight([u('ba')], [u('zero', { hp: 4 })]);
-    expect(of(r, 'attack')[0].me.hits).toBe(2);
-    expect(of(r, 'multiAttack')[0].hits).toBe(2);
-    expect(r.rounds).toBe(1);
+    const atks = of(r, 'attack');
+    expect(atks.slice(0, 2).map((e) => [e.hit, e.hits])).toEqual([[1, 2], [2, 2]]);
     expect(r.winner).toBe('me');
   });
-  it('hurt：受伤后攻击 +2（存活时才触发）', () => {
+  it('hurt：受伤后攻击 +2（存活时）', () => {
     const r = fight([u('hurt')], [u('tank')]);
-    const atks = of(r, 'attack');
-    expect(atks[0].me.atk).toBe(1);
-    expect(atks[1].me.atk).toBe(3);
-    expect(atks[2].me.atk).toBe(5);
+    const mine = of(r, 'attack').filter((e) => e.unit.side === 'me');
+    expect(mine[0].unit.atk).toBe(1);
+    expect(mine[1].unit.atk).toBe(3);
   });
-  it('faint + summon：阵亡时在原位召唤水军', () => {
-    const r = fight([u('fs'), u('weak')], [u('tank')]);
+  it('faint + summon：阵亡时在原位召唤', () => {
+    const r = fight([u('fs'), u('a2')], [u('tank')]);
     const s = of(r, 'summon')[0];
-    expect(s.unit).toMatchObject({ defId: 'token_shuijun', side: 'me', pos: 0, atk: 1, hp: 1 });
-    expect(idx(r, (e) => e.type === 'faint')).toBeLessThan(idx(r, (e) => e.type === 'summon'));
+    expect(s.unit).toMatchObject({ defId: 'token_gpu', side: 'me', pos: 0 });
   });
-  it('friendFaint：友军阵亡时 +1/+1', () => {
-    const r = fight([u('weak'), u('ff')], [u('big', { hp: 50 })]);
-    const b = of(r, 'buff').find((e) => e.unit.defId === 'ff');
-    expect(b).toMatchObject({ atk: 1, hp: 1 });
+  it('friendFaint / kill', () => {
+    const r = fight([u('one'), u('ff')], [u('big', { hp: 50 })]);
+    expect(of(r, 'buff').find((e) => e.unit.defId === 'ff')).toMatchObject({ atk: 1, hp: 1 });
+    const r2 = fight([u('kl')], [u('one'), u('one', { uid: 'x2' }), u('tank')]);
+    const mine = of(r2, 'attack').filter((e) => e.unit.side === 'me');
+    expect(mine.map((e) => e.unit.atk).slice(0, 3)).toEqual([5, 7, 9]);
   });
-  it('kill：击杀后 +2/+2', () => {
-    const r = fight([u('kl')], [u('weak'), u('weak'), u('tank')]);
-    const atks = of(r, 'attack');
-    expect(atks[0].me.atk).toBe(5);
-    expect(atks[1].me.atk).toBe(7);
-    expect(atks[2].me.atk).toBe(9);
-  });
-  it('friendSummoned：友军被召唤时给它 +1/+1（summoned 目标）', () => {
-    const r = fight([u('fs'), u('fsum')], [u('big', { hp: 50 })]);
-    const b = of(r, 'buff').find((e) => e.unit.defId === 'token_shuijun');
-    expect(b).toMatchObject({ atk: 1, hp: 1, newAtk: 2, newHp: 2 });
-  });
-  it('enemySummoned：敌军召唤物出现时对它造成 2 点伤害', () => {
+  it('enemySummoned：敌方召唤物出现时对它造成伤害', () => {
     const r = fight([u('es')], [u('fs'), u('tank')]);
-    const dmg = of(r, 'damage').find((e) => e.unit.defId === 'token_shuijun');
-    expect(dmg).toMatchObject({ source: { defId: 'es' }, amount: 2, hp: 0, kind: 'ability' });
-    expect(of(r, 'faint').some((e) => e.unit.defId === 'token_shuijun')).toBe(true);
+    const dmg = of(r, 'damage').find((e) => e.unit.defId === 'token_gpu' && e.kind === 'ability');
+    expect(dmg?.amount).toBe(2);
   });
-  it('hurtFront：前排友军受伤时给它护盾', () => {
-    const r = fight([u('tank'), u('hfr')], [u('p33', { hp: 100 })]);
-    const sh = of(r, 'shield')[0];
-    expect(sh).toMatchObject({ unit: { defId: 'tank', pos: 0 }, amount: 2 });
-    // 第 2 次攻击被护盾挡下
-    const hits = of(r, 'damage').filter((e) => e.unit.defId === 'tank');
-    expect(hits[1]).toMatchObject({ blocked: 2, amount: 1 });
+  it('hurtFront：前排受伤时给它护盾', () => {
+    const r = fight([u('tank'), u('hfr')], [u('back')], 's', d, { first: 'enemy' });
+    expect(of(r, 'shield')[0]).toMatchObject({ unit: { defId: 'tank' }, amount: 2 });
   });
 });
 
 describe('效果', () => {
-  it('damage 走护盾：护盾吸收一次伤害后消失', () => {
-    const r = fight([u('tank', { shield: 5 })], [u('p33', { hp: 100 })]);
-    const hits = of(r, 'damage').filter((e) => e.unit.defId === 'tank');
-    expect(hits[0]).toMatchObject({ amount: 0, blocked: 3, shield: 0 });
-    expect(hits[1]).toMatchObject({ amount: 3, blocked: 0 });
+  it('护盾是血池：吸收伤害直到打碎（shieldBroken）', () => {
+    const r = fight([u('a1', { shield: 3 })], [u('back')], 's', d, { first: 'enemy' });
+    const hits = of(r, 'damage').filter((e) => e.unit.side === 'me');
+    expect(hits[0]).toMatchObject({ amount: 0, blocked: 2, shield: 1 });
+    expect(hits[1]).toMatchObject({ amount: 1, blocked: 1, shield: 0, shieldBroken: true });
   });
-  it('buff permanent：记入 permanentBuffs（只记我方原队伍）', () => {
-    const me = u('pb');
-    const r = fight([me], [u('pb')]);
-    expect(r.permanentBuffs).toEqual([{ uid: me.uid, atk: 1, hp: 1 }]);
+  it('permanent buff 记入 permanentBuffs；gold 记为下回合收益（只算我方）', () => {
+    const r = fight([u('pb', { uid: 'P' }), u('gold')], [u('gold', { uid: 'g2' })]);
+    expect(r.permanentBuffs).toEqual([{ uid: 'P', atk: 1, hp: 1 }]);
+    expect(r.bonus.gold).toBe(2);
   });
-  it('copyStats：复制目标更高的攻/血', () => {
-    const r = fight([u('cp')], [u('weak'), u('big')]);
-    expect(of(r, 'buff')[0]).toMatchObject({ newAtk: 5, newHp: 7 });
+  it('destroy maxHp：阈值内直接击杀，否则造成阈值伤害；阈值按等级增加', () => {
+    const r = fight([u('kill1')], [u('big', { hp: 3 })]);
+    expect(of(r, 'faint')[0].unit.defId).toBe('big');
+    const r2 = fight([u('kill1')], [u('big', { hp: 9 })]);
+    expect(of(r2, 'damage')[0]).toMatchObject({ amount: 3 });
+    const r3 = fight([u('kill1', { level: 2 })], [u('big', { hp: 5 })]);
+    expect(of(r3, 'damage')[0]).toMatchObject({ amount: 5, hp: 0 });
   });
-  it('swapPosition：和后排友军交换位置', () => {
-    const a = u('sw');
-    const b = u('c1');
-    const r = fight([a, u('k1'), b], [u('tank')]);
-    const mv = of(r, 'move')[0];
-    expect(mv).toMatchObject({ side: 'me', from: 0, to: 2 });
-    expect(mv.order).toEqual([b.uid, expect.any(String), a.uid]);
+  it('copyStats consume：吞并身后友军，属性取高 +amount', () => {
+    const r = fight([u('cons'), u('tank')], [u('zero')]);
+    expect(of(r, 'faint')[0]).toMatchObject({ consumed: true, unit: { defId: 'tank' } });
+    expect(of(r, 'buff')[0]).toMatchObject({ newAtk: 2, newHp: 31 });
   });
-  it('gold / reroll / discount：我方记为下回合收益，敌方不计', () => {
-    const r = fight([u('gold'), u('rr'), u('disc')], [u('gold'), u('tank')]);
-    expect(r.bonus).toEqual({ gold: 2, rerolls: 1, discount: 1 });
-    expect(of(r, 'bonus')).toHaveLength(4);
-  });
-  it('destroy：直接击杀攻击最高的敌人（无视护盾）', () => {
-    const r = fight([u('kill1')], [u('weak'), u('big', { shield: 9 })]);
-    const f = of(r, 'faint')[0];
-    expect(f.unit.defId).toBe('big');
-    expect(f.killer?.defId).toBe('kill1');
-  });
-  it('heal：回血不超过上限', () => {
-    const r = fight([u('heal')], [u('p33', { hp: 100 })]);
-    const h = of(r, 'heal')[0];
-    expect(h).toMatchObject({ amount: 2, hp: 9 });
-    const h2 = of(r, 'heal')[1];
-    expect(h2.hp).toBeLessThanOrEqual(10);
-  });
-  it('pushBack / pullFront：调整敌方站位', () => {
-    const e1 = u('o1');
-    const e2 = u('c1');
-    const e3 = u('k1');
-    const r = fight([u('push')], [e1, e2, e3]);
-    expect(of(r, 'move')[0]).toMatchObject({ side: 'enemy', from: 0, to: 2, order: [`e_${e2.uid}`, `e_${e3.uid}`, `e_${e1.uid}`] });
-    const r2 = fight([u('pull')], [u('o1'), u('c1'), u('big')]);
-    expect(of(r2, 'move')[0]).toMatchObject({ from: 2, to: 0 });
-    expect(of(r2, 'attack')[0].enemy.defId).toBe('big');
-  });
-  it('summon 的召唤上限：每方战场最多 6 个', () => {
-    const team = [u('fs'), u('fs'), u('fs'), u('fs'), u('fs')];
-    const r = fight(team, [u('big', { hp: 99 })]);
-    expect(r.events.every((e) => e.type !== 'start' || e.me.length <= 6)).toBe(true);
+  it('filter：只给闭源友军 +2 攻；choices：随机形态（确定性，两种都会出现）', () => {
+    const r = fight([u('flt'), u('a2'), u('a1')], [u('zero')]);
+    expect(of(r, 'buff').map((e) => e.unit.defId)).toEqual(['a2']);
+    const forms = new Set<number>();
+    for (let i = 0; i < 20; i++) forms.add(of(fight([u('form')], [u('zero')], `f${i}`), 'buff')[0].atk);
+    expect(forms).toEqual(new Set([5, 0]));
   });
 });
 
-describe('目标', () => {
-  const probe = (target: Target, n?: number) =>
-    custom({ base: d, units: [withAb('probe', 1, 3, { trigger: 'startBattle', effect: 'buff', target, amount: 1, ...(n ? { n } : {}) } as Ability, { faction: 'closed' })] });
-  const run = (target: Target, n?: number) => {
-    const dd = probe(target, n);
-    const a = mk('o1', { uid: 'A' }, dd);
-    const p = mk('probe', { uid: 'P' }, dd);
-    const c = mk('k1', { uid: 'C', hp: 2 }, dd);
-    const x = mk('o1', { uid: 'X', hp: 9 }, dd);
-    const y = mk('c1', { uid: 'Y', atk: 4 }, dd);
-    const z = mk('k1', { uid: 'Z', hp: 1 }, dd);
-    const r = simulateBattle([a, p, c], [x, y, z], dd, 'tg');
-    const ab = r.events.find((e) => e.type === 'ability' && e.unit.uid === 'P') as Extract<BattleEvent, { type: 'ability' }>;
-    return ab.targets.map((t) => t.uid);
-  };
-  it.each([
-    ['self', ['P']], ['frontFriend', ['A']], ['backFriend', ['C']], ['adjacentFriends', ['A', 'C']], ['allFriends', ['A', 'P', 'C']],
-    ['lowestHpFriend', ['C']], ['frontEnemy', ['e_X']], ['backEnemy', ['e_Z']], ['allEnemies', ['e_X', 'e_Y', 'e_Z']],
-    ['lowestHpEnemy', ['e_Z']], ['highestAtkEnemy', ['e_Y']],
-  ] as [Target, string[]][])('%s', (target, expected) => {
-    expect(run(target)).toEqual(expected);
+describe('2.0 新效果（DESIGN 13）', () => {
+  it('steal：偷走 ≤ 阈值血量的最弱敌人到我方末尾，否则造成阈值伤害', () => {
+    const r = fight([u('steal'), u('a2')], [u('tank'), u('low', { uid: 'L' })]);
+    const st = of(r, 'steal')[0];
+    expect(st).toMatchObject({ unit: { uid: 'e_L', side: 'enemy' }, to: { uid: 'e_L', side: 'me', pos: 2 } });
+    expect(of(r, 'start')[0].enemy).toHaveLength(2);
+    // 被偷的单位在我方开火
+    expect(of(r, 'attack').some((e) => e.unit.uid === 'e_L' && e.unit.side === 'me')).toBe(true);
+    const r2 = fight([u('steal')], [u('tank')]);
+    expect(of(r2, 'steal')).toHaveLength(0);
+    expect(of(r2, 'damage')[0]).toMatchObject({ amount: 3, kind: 'ability' });
   });
-  it('randomFriend(n) 不含自己、不重复', () => {
-    const t = run('randomFriend', 2);
-    expect(t.sort()).toEqual(['A', 'C']);
-    expect(run('randomFriend')).toHaveLength(1);
+  it('explode：阵亡时对敌方全体造成等于自身攻击的伤害', () => {
+    const r = fight([u('boom')], [u('back'), u('e1')], 's', d, { first: 'enemy' });
+    const ex = of(r, 'explode')[0];
+    expect(ex).toMatchObject({ amount: 4 });
+    expect(ex.targets).toHaveLength(2);
+    expect(of(r, 'damage').filter((e) => e.kind === 'explode').map((e) => e.amount)).toEqual([4, 4]);
   });
-  it('randomEnemy(n)', () => {
-    const t = run('randomEnemy', 2);
-    expect(t).toHaveLength(2);
-    expect(new Set(t).size).toBe(2);
-    expect(t.every((x) => ['e_X', 'e_Y', 'e_Z'].includes(x))).toBe(true);
+  it('doubleStats：本场属性翻倍（一次）', () => {
+    const r = fight([u('dbl')], [u('zero')]);
+    expect(of(r, 'buff')[0]).toMatchObject({ atk: 3, hp: 5, newAtk: 6, newHp: 10 });
   });
-  it('killer：阵亡时对击杀者造成伤害', () => {
-    const r = fight([u('revenge')], [u('p33')]);
-    const ab = of(r, 'ability')[0];
-    expect(ab.trigger).toBe('faint');
-    expect(ab.targets[0].defId).toBe('p33');
-    expect(of(r, 'damage').at(-1)).toMatchObject({ unit: { defId: 'p33' }, amount: 3 });
-    expect(r.winner).toBe('draw');
+  it('revive：阵亡时以 amount 血复活（缺省 1），每场只复活一次', () => {
+    const r = fight([u('rev')], [u('back')], 's', d, { first: 'enemy' });
+    const rv = of(r, 'revive');
+    expect(rv).toHaveLength(1);
+    expect(rv[0]).toMatchObject({ via: 'ability', unit: { defId: 'rev', hp: 1 } });
+    expect(of(r, 'faint').filter((e) => e.unit.defId === 'rev')).toHaveLength(2);
+    expect(of(fight([u('rev2')], [u('back')], 's', d, { first: 'enemy' }), 'revive')[0].unit.hp).toBe(3);
   });
-  it('summoned：见 friendSummoned / enemySummoned 测试；boughtUnit：见商店测试', () => {
-    const r = fight([u('fs'), u('fsum')], [u('big', { hp: 50 })]);
-    const ab = of(r, 'ability').find((e) => e.trigger === 'friendSummoned')!;
-    expect(ab.targets[0].defId).toBe('token_shuijun');
-  });
-});
-
-describe('结算顺序', () => {
-  it('同一触发按攻击高→低：敌方 5 攻先于我方 2 攻', () => {
-    const r = fight([u('sb2')], [u('sb5')]);
-    const abs = of(r, 'ability');
-    expect(abs[0].unit.side).toBe('enemy');
-    expect(abs[1].unit.side).toBe('me');
-  });
-  it('同攻击我方先', () => {
-    const r = fight([u('sb2')], [u('sb2')]);
-    expect(of(r, 'ability')[0].unit.side).toBe('me');
-  });
-});
-
-describe('等级缩放', () => {
-  it.each([[1, 2], [2, 4], [3, 6]])('Lv%i 伤害 = %i', (level, dmg) => {
-    const r = fight([u('sb', { level: level as 1 | 2 | 3 })], [u('tank')]);
-    expect(of(r, 'damage')[0].amount).toBe(dmg);
-  });
-  it('perLevel:false 不缩放', () => {
-    const r = fight([u('sb_nolv', { level: 3 })], [u('tank')]);
-    expect(of(r, 'damage')[0].amount).toBe(2);
-  });
-});
-
-describe('阵营羁绊', () => {
-  const syn = (id: string) => {
-    const r = fight([u(id), u(id), u(id)], [u('zero')]);
-    return { r, s: of(r, 'synergy') };
-  };
-  it('开源 ≥3：全队 +1/+1', () => {
-    const { r, s } = syn('o1');
-    expect(s[0]).toMatchObject({ side: 'me', faction: 'open', count: 3 });
-    expect(of(r, 'buff').filter((e) => e.atk === 1 && e.hp === 1)).toHaveLength(3);
-    expect(of(r, 'attack')[0].me.atk).toBe(2);
-  });
-  it('闭源 ≥3：最前排 3 点护盾', () => {
-    const { r, s } = syn('c1');
-    expect(s[0].faction).toBe('closed');
-    expect(of(r, 'shield')[0]).toMatchObject({ unit: { pos: 0 }, amount: 3 });
-  });
-  it('算力 ≥3：全队攻击 +2 血量 -1（最低 1）', () => {
-    const r = fight([u('k1'), u('k1'), u('k_hp1')], [u('zero')]);
-    expect(of(r, 'synergy')[0].faction).toBe('compute');
-    const b = of(r, 'buff');
-    expect(b[0]).toMatchObject({ atk: 2, hp: -1, newAtk: 3, newHp: 4 });
-    expect(b[2]).toMatchObject({ atk: 2, hp: 0, newHp: 1 });
-  });
-  it('民间 ≥3：召唤 1/1 水军到最后排', () => {
-    const { r, s } = syn('f1');
-    expect(s[0].faction).toBe('folk');
-    expect(of(r, 'summon')[0].unit).toMatchObject({ defId: 'token_shuijun', pos: 3, side: 'me' });
-  });
-  it('不足 3 个不触发；敌方也会触发', () => {
-    const r = fight([u('o1'), u('o1')], [u('c1'), u('c1'), u('c1')]);
-    const s = of(r, 'synergy');
-    expect(s).toHaveLength(1);
-    expect(s[0].side).toBe('enemy');
+  it('chain：击杀后立刻再攻击一次', () => {
+    const r = fight([u('chain')], [u('one'), u('one', { uid: 'o2' }), u('tank')]);
+    const ch = of(r, 'chain');
+    expect(ch.length).toBeGreaterThanOrEqual(2);
+    // 第一次行动里连续打了 3 次
+    expect(of(r, 'attack').filter((e) => e.action === 1)).toHaveLength(3);
   });
 });
 
 describe('事件信息', () => {
-  it('每个事件都有文案；单位引用带 uid/defId/side/pos', () => {
-    const r = fight([u('fs'), u('sb')], [u('p33'), u('weak')]);
-    for (const e of r.events) {
-      expect(typeof e.text).toBe('string');
-      expect(e.text.length).toBeGreaterThan(0);
-      if ('unit' in e) expect(e.unit).toMatchObject({ uid: expect.any(String), defId: expect.any(String), side: expect.stringMatching(/me|enemy/), pos: expect.any(Number) });
-    }
-  });
-  it('faction 类型完整', () => {
-    const f: Faction[] = ['open', 'closed', 'compute', 'folk'];
-    expect(f).toHaveLength(4);
+  it('每个事件都有中文 text；单位引用带 uid/defId/side/pos；start 快照带装备', () => {
+    const r = fight([u('sb'), u('fs'), u('boom')], [u('kl'), u('rev')]);
+    for (const e of r.events) expect(typeof e.text).toBe('string');
+    for (const e of of(r, 'damage')) expect(e.unit).toMatchObject({ uid: expect.any(String), defId: expect.any(String), side: expect.any(String), pos: expect.any(Number) });
+    expect(of(r, 'start')[0].me[0].equips).toEqual({});
   });
 });

@@ -6,12 +6,21 @@ import type { UnitInst } from '@juanwang/shared';
 import { Store, type ResultEntry } from './store';
 
 export const MAX_NAME = 12;
+export const MAX_OPPONENTS = 7;
+const ARCHETYPES = ['open', 'closed', 'compute', 'folk', 'researcher', 'trader', 'idol', 'engineer', 'mixed'];
+function cleanArchetype(v: unknown): string | null {
+  if (v === undefined || v === null || v === '') return null;
+  if (typeof v !== 'string' || !ARCHETYPES.includes(v)) throw new HttpError(400, `archetype 应为 ${ARCHETYPES.join('/')}`);
+  return v;
+}
 export const MAX_TEAM = 5;
 export const MAX_BODY = 16 * 1024;
 
 export interface AppOptions {
   /** 合法的单位 id（含召唤物） */
   validIds: Set<string>;
+  /** 合法的装备 id（缺省：只校验格式） */
+  validEquipIds?: Set<string>;
   store?: Store;
   /** 前端构建产物目录（不存在时只提供 API） */
   distDir?: string;
@@ -57,7 +66,22 @@ function cleanSeed(v: unknown): string {
   if (typeof v !== 'string' || v.length < 1 || v.length > 64) throw new HttpError(400, 'seed 应为 1~64 字符');
   return v;
 }
-function cleanTeam(v: unknown, validIds: Set<string>): UnitInst[] {
+const EQUIP_SLOTS = ['weapon', 'armor', 'trinket'] as const;
+function cleanEquips(v: unknown, i: number, validEquipIds?: Set<string>): UnitInst['equips'] {
+  if (v === undefined || v === null) return {};
+  if (typeof v !== 'object' || Array.isArray(v)) throw new HttpError(400, `team[${i}].equips 应为对象`);
+  const out: UnitInst['equips'] = {};
+  for (const slot of EQUIP_SLOTS) {
+    const e = (v as Record<string, unknown>)[slot] as { defId?: unknown; gold?: unknown } | undefined;
+    if (e === undefined || e === null) continue;
+    const ok = typeof e === 'object' && typeof e.defId === 'string' && /^[a-z0-9_]{1,32}$/.test(e.defId) && (!validEquipIds || validEquipIds.has(e.defId));
+    if (!ok) throw new HttpError(400, `team[${i}].equips.${slot} 非法`);
+    out[slot] = { defId: e.defId as string, gold: e.gold === true };
+  }
+  return out;
+}
+
+function cleanTeam(v: unknown, validIds: Set<string>, validEquipIds?: Set<string>): UnitInst[] {
   if (!Array.isArray(v)) throw new HttpError(400, 'team 应为数组');
   const units = v.filter((x) => x !== null && x !== undefined);
   if (units.length < 1 || units.length > MAX_TEAM || v.length > MAX_TEAM) throw new HttpError(400, `team 应为 1~${MAX_TEAM} 个单位`);
@@ -77,6 +101,7 @@ function cleanTeam(v: unknown, validIds: Set<string>): UnitInst[] {
       shield: num(u.shield, 0, 99),
       tempAtk: num(u.tempAtk, -99, 99),
       tempHp: num(u.tempHp, -99, 99),
+      equips: cleanEquips(u.equips, i, validEquipIds),
     };
   });
 }
@@ -189,29 +214,30 @@ export function createApp(opts: AppOptions) {
       case 'POST /api/snapshot': {
         const b = (await readBody(req)) as Record<string, unknown>;
         if (!isInt(b.turn, 1, 20)) throw new HttpError(400, 'turn 应为 1~20');
-        if (!isInt(b.trophies, 0, 10)) throw new HttpError(400, 'trophies 应为 0~10');
+        if (b.hp !== undefined && !isInt(b.hp, 0, 20)) throw new HttpError(400, 'hp 应为 0~20');
         store.addSnapshot({
-          name: cleanName(b.name), room: cleanRoom(b.room), turn: b.turn, trophies: b.trophies,
-          team: cleanTeam(b.team, opts.validIds), seed: cleanSeed(b.seed), ts: now(),
+          name: cleanName(b.name), room: cleanRoom(b.room), turn: b.turn, hp: (b.hp as number | undefined) ?? 20, archetype: cleanArchetype(b.archetype),
+          team: cleanTeam(b.team, opts.validIds, opts.validEquipIds), seed: cleanSeed(b.seed), ts: now(),
         });
         return [200, { ok: true }];
       }
       case 'GET /api/opponent': {
         const turn = Number(q.get('turn'));
-        const trophies = Number(q.get('trophies') ?? 0);
         if (!isInt(turn, 1, 20)) throw new HttpError(400, 'turn 应为 1~20');
-        if (!isInt(trophies, 0, 10)) throw new HttpError(400, 'trophies 应为 0~10');
+        const limitQ = q.get('limit');
+        const limit = limitQ === null ? MAX_OPPONENTS : Number(limitQ);
+        if (!isInt(limit, 1, MAX_OPPONENTS)) throw new HttpError(400, `limit 应为 1~${MAX_OPPONENTS}`);
         const name = q.get('name') ?? undefined;
         const seed = q.get('seed') ?? undefined;
-        const snap = store.findOpponent({ turn, trophies, room: cleanRoom(q.get('room')), name, seed }, random);
-        if (!snap) return [200, { team: null }];
-        return [200, { team: snap.team, name: snap.name, trophies: snap.trophies, turn: snap.turn, room: snap.room }];
+        const snaps = store.findOpponents({ turn, room: cleanRoom(q.get('room')), name, seed, limit }, random);
+        const opponents = snaps.map((s) => ({ name: s.name, team: s.team, hp: s.hp, archetype: s.archetype, turn: s.turn, room: s.room }));
+        return [200, { opponents }];
       }
       case 'POST /api/result': {
         const b = (await readBody(req)) as Record<string, unknown>;
-        if (!isInt(b.trophies, 0, 10)) throw new HttpError(400, 'trophies 应为 0~10');
+        if (!isInt(b.rank, 1, 8)) throw new HttpError(400, 'rank 应为 1~8');
         if (!isInt(b.turns, 1, 20)) throw new HttpError(400, 'turns 应为 1~20');
-        if (typeof b.won !== 'boolean') throw new HttpError(400, 'won 应为布尔');
+        if (!isInt(b.hp, 0, 20)) throw new HttpError(400, 'hp 应为 0~20');
         let bestUnit: string | null = null;
         if (b.bestUnit !== undefined && b.bestUnit !== null) {
           const id = typeof b.bestUnit === 'string' ? b.bestUnit : (b.bestUnit as { defId?: unknown })?.defId;
@@ -220,13 +246,13 @@ export function createApp(opts: AppOptions) {
         }
         const t = now();
         const entry: ResultEntry = {
-          name: cleanName(b.name), room: cleanRoom(b.room), trophies: b.trophies, turns: b.turns, won: b.won,
+          name: cleanName(b.name), room: cleanRoom(b.room), rank: b.rank, turns: b.turns, hp: b.hp, archetype: cleanArchetype(b.archetype), won: b.rank === 1,
           seed: cleanSeed(b.seed), bestUnit, date: dateKey(t), ts: t,
         };
         const best = store.addResult(entry);
         const board = store.leaderboard({ room: null, date: null }, 100000);
-        const rank = board.findIndex((r) => r.name === entry.name) + 1;
-        return [200, { ok: true, best, rank }];
+        const position = board.findIndex((r) => r.name === entry.name) + 1;
+        return [200, { ok: true, best, position }];
       }
       case 'GET /api/leaderboard': {
         const room = cleanRoom(q.get('room'));
@@ -234,7 +260,7 @@ export function createApp(opts: AppOptions) {
         if (date === 'today') date = dateKey(now());
         if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new HttpError(400, 'date 应为 YYYY-MM-DD 或 today');
         const entries = store.leaderboard({ room, date: date || null }).map((r, i) => ({
-          rank: i + 1, name: r.name, trophies: r.trophies, turns: r.turns, won: r.won, seed: r.seed, bestUnit: r.bestUnit, date: r.date, room: r.room,
+          pos: i + 1, name: r.name, rank: r.rank, turns: r.turns, hp: r.hp, archetype: r.archetype, won: r.won, seed: r.seed, bestUnit: r.bestUnit, date: r.date, room: r.room,
         }));
         return [200, { room, date: date || null, entries }];
       }
