@@ -161,6 +161,7 @@ describe('合并进化', () => {
     const free = s.shop.filter((x) => x.free);
     expect(free).toHaveLength(1);
     expect(free[0].price).toBe(0);
+    expect(free[0].freeReason).toBe('levelUp');
     expect(data.unitsById[free[0].defId].tier).toBe(maxTierForTurn(s.turn) + 1);
     // 免费槽：0 算力购买；刷新不会被替换
     s = act(s, { type: 'reroll' });
@@ -176,6 +177,20 @@ describe('合并进化', () => {
     expect(shopAction(s, { type: 'buy', slot: w, to: 0 }, data).error).toMatch(/满级/);
     s = act(s, { type: 'buy', slot: w });
     expect(s.team[1]).toMatchObject({ defId: 'wrapper', level: 1 });
+  });
+  it('免费槽带 freeReason：进化奖励 = levelUp，冻结后下回合仍免费且来源不变；普通槽没有 freeReason', () => {
+    let s = act(base(), { type: 'buy', slot: 0 });
+    s = act(s, { type: 'buy', slot: 0 });
+    s = act(s, { type: 'buy', slot: 0 });
+    expect(s.shop.filter((x) => !x.free).every((x) => x.freeReason === undefined)).toBe(true);
+    const fi = s.shop.findIndex((x) => x.free);
+    expect(s.shop[fi]).toMatchObject({ free: true, freeReason: 'levelUp', price: 0 });
+    s = act(s, { type: 'freeze', slot: fi });
+    s = act(s, { type: 'endShop' });
+    s = act({ ...s, phase: 'result' }, { type: 'continue' });
+    if (s.phase === 'headline') s = act(s, { type: 'chooseHeadline', option: 0 });
+    const kept = s.shop.find((x) => x.free);
+    expect(kept).toMatchObject({ frozen: true, freeReason: 'levelUp', price: 0 });
   });
   it('队伍内两个同名单位 merge', () => {
     let s = setTeam(base(), [mk('crawler', { atk: 3 }), null, mk('crawler', { hp: 7, xp: 1 })]);

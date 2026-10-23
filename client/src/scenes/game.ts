@@ -1,12 +1,13 @@
 // 对局页（商店阶段 + 头条）：顶栏、羁绊、我方 5 槽、商店、信息条、操作按钮、引导。
 import gsap from 'gsap';
 import {
-  canMerge, rerollCost, tutorialStep, type GameData, type RunState, type ShopActionInput, type TutorialStepId,
+  DIFFICULTY, MAX_TURNS, canMerge, isHeadlineTurn, itemSlotsForTurn, maxTierForTurn, rerollCost, tutorialStep, unitSlotsForTurn,
+  type GameData, type RunState, type ShopActionInput, type TutorialStepId,
 } from '@juanwang/shared';
 import { app, act, go, markSeen, onRun, saveSettings, settings, type Scene } from '../store';
 import { renderSynergy, renderTeam, topbar, updateTopbar } from '../ui/team';
 import { renderShop } from '../ui/shop';
-import { abilityText, esc, FACTION_NAME, TIER_NAME } from '../ui/cards';
+import { abilityText, esc, FACTION_NAME, FREE_LABEL, TIER_NAME } from '../ui/cards';
 import { attachDrag } from '../ui/drag';
 import { closeAllModals, showUnitDetail } from '../ui/modal';
 import { toast } from '../ui/toast';
@@ -90,6 +91,7 @@ export function gameScene(): Scene {
       const u = s.team.find((x) => x?.uid === uid);
       if (u) hints.push(`开战时 ${data.unitsById[u.defId]?.name ?? ''} 上前`);
     }
+    renderNext(s);
     modHint.textContent = hints.join(' · ');
     modHint.style.display = hints.length ? '' : 'none';
     // 商店加成提示
@@ -113,9 +115,70 @@ export function gameScene(): Scene {
     applyTutorial();
   }
 
+  /** 顶部"下回合惊喜"提示：来自引擎规则（头条回合、阶级/槽位解锁、后期扣血） */
+  function renderNext(s: RunState): void {
+    const next = s.turn + 1;
+    const parts: string[] = [];
+    if (next <= MAX_TURNS && s.phase === 'shop') {
+      if (isHeadlineTurn(next, s, data)) parts.push('头条二选一');
+      const t0 = maxTierForTurn(s.turn);
+      const t1 = maxTierForTurn(next);
+      if (t1 > t0) parts.push(`解锁 T${t1} 单位`);
+      if (unitSlotsForTurn(next) > unitSlotsForTurn(s.turn)) parts.push('商店多一个单位格');
+      else if (itemSlotsForTurn(next) > itemSlotsForTurn(s.turn)) parts.push('商店多一个基建格');
+      if (next === DIFFICULTY.lateGameTurn) parts.push(`输一场改扣 ${DIFFICULTY.lateGameLifeLoss} 信心`);
+      parts.splice(2); // 一行放得下：最多两条
+    }
+    notes.style.display = parts.length ? '' : 'none';
+    if (!parts.length) return;
+    const head = parts[0] === '头条二选一' ? `下回合：${parts.join(' · ')}` : `下回合${parts[0]}${parts.length > 1 ? ` · ${parts.slice(1).join(' · ')}` : ''}`;
+    if (notes.dataset.text === head) return;
+    notes.dataset.text = head;
+    notes.innerHTML = `<span class="next-tip"><i>NEXT</i>${esc(head)}</span>`;
+  }
+
+  /** 选中商店单位时，在卡片正下方弹出大号「购买」按钮 + 「查看技能」 */
+  let popSlot = -1;
+  function renderBuyPop(): void {
+    shop.querySelectorAll('.buy-pop').forEach((n) => n.remove());
+    const s = run();
+    if (sel?.kind !== 'shop' || s.phase !== 'shop') {
+      popSlot = -1;
+      return;
+    }
+    const slotIdx = sel.slot;
+    const slot = s.shop[slotIdx];
+    const wrap = shop.querySelector(`[data-shop="${slotIdx}"]`) as HTMLElement | null;
+    if (!slot || !wrap) return;
+    const pop = document.createElement('div');
+    pop.className = 'buy-pop';
+    const poor = slot.price > s.gold;
+    const label = slot.free ? `免费拿<small>${FREE_LABEL[slot.freeReason ?? 'levelUp']}</small>` : `购买 <img src="${ui('gold')}" alt="">${slot.price}`;
+    pop.innerHTML = `<button class="btn btn--go buy-pop-btn${poor ? ' is-poor' : ''}" data-kind="infoBuy">${label}</button><button class="buy-pop-more">查看技能</button>`;
+    wrap.appendChild(pop);
+    // 居中在卡片下方，但不超出商店面板左右边界（此时 pop 左边缘在卡片中线）
+    const pr = shop.getBoundingClientRect();
+    const r = pop.getBoundingClientRect();
+    const l = r.left - r.width / 2;
+    const dx = l < pr.left + 4 ? pr.left + 4 - l : l + r.width > pr.right - 4 ? pr.right - 4 - (l + r.width) : 0;
+    pop.style.setProperty('--dx', `${dx}px`);
+    gsap.set(pop, { xPercent: -50, x: dx });
+    (pop.querySelector('.buy-pop-btn') as HTMLElement).onclick = () => {
+      sfx.click();
+      doBuy(slotIdx);
+    };
+    (pop.querySelector('.buy-pop-more') as HTMLElement).onclick = () => {
+      sfx.click();
+      showUnitDetail(data, slot.defId);
+    };
+    if (popSlot !== slotIdx) gsap.fromTo(pop, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.22, ease: 'back.out(2.5)' });
+    popSlot = slotIdx;
+  }
+
   function renderSelection(): void {
     const s = run();
     el.querySelectorAll('.is-selected,.is-target,.is-merge').forEach((n) => n.classList.remove('is-selected', 'is-target', 'is-merge'));
+    renderBuyPop();
     if (!sel) return;
     if (sel.kind === 'shop') {
       el.querySelector(`[data-src="shop:${sel.slot}"]`)?.classList.add('is-selected');
@@ -173,14 +236,13 @@ export function gameScene(): Scene {
       text.querySelector('.info-head')?.appendChild(a);
     };
     if (!sel) {
-      text.innerHTML = '<span class="info-hint">点卡片看技能 · 拖到队伍购买 · 同名叠加进化<br>拖动队伍换位 · 拖到「出售」卖掉</span>';
+      text.innerHTML = '<span class="info-hint">点卡片，再点「购买」· 也能拖到队伍 · 同名叠加进化<br>拖动队伍换位 · 拖到「出售」卖掉</span>';
     } else if (sel.kind === 'shop') {
       const slot = s.shop[sel.slot];
       const def = data.unitsById[slot.defId];
-      text.innerHTML = `<div class="info-head"><b class="info-name">${esc(def.name)}</b><span class="chip chip--xs tier-${def.tier}">${TIER_NAME[def.tier]}</span><span class="chip chip--xs fac-${def.faction}">${FACTION_NAME[def.faction]}</span></div><p>${esc(abilityText(def))}</p>`;
+      const freeChip = slot.free ? `<span class="chip chip--xs chip--free-${slot.freeReason ?? 'levelUp'}">${FREE_LABEL[slot.freeReason ?? 'levelUp']}</span>` : '';
+      text.innerHTML = `<div class="info-head"><b class="info-name">${esc(def.name)}</b><span class="chip chip--xs tier-${def.tier}">${TIER_NAME[def.tier]}</span><span class="chip chip--xs fac-${def.faction}">${FACTION_NAME[def.faction]}</span>${freeChip}</div><p>${esc(abilityText(def))}</p>`;
       detailLink(def.id);
-      const sel0 = sel;
-      mk(slot.price ? `购买 <img src="${ui('gold')}" alt="">${slot.price}` : '免费拿', 'btn--go', 'infoBuy', () => doBuy(sel0.slot));
     } else if (sel.kind === 'item') {
       const slot = s.shop[sel.slot];
       const it = data.itemsById[slot.defId];
@@ -241,8 +303,7 @@ export function gameScene(): Scene {
       case 'merge':
         if (sel?.kind === 'shop') {
           focus('[data-kind="infoBuy"]');
-          focus('.tslot.is-target,.tslot.is-merge');
-          sub = '再点一次卡片、点「购买」，或点队伍里的位置';
+          sub = '点卡片下方的「购买」（也可以把卡片拖到队伍里）';
         } else {
           const ids = tutStep === 'buy' ? ['crawler'] : [...teamDefs];
           if (!ids.some((id) => focus(`[data-src^="shop:"][data-def="${id}"]`))) focus('[data-src^="shop:"]');
@@ -267,15 +328,21 @@ export function gameScene(): Scene {
             sub = '先点一个商店卡片';
           }
         } else if (!s.tutorial?.sold) {
-          if (sel?.kind === 'team') {
+          // 出售演示：买一个便宜的标注员再卖掉，别卖进化好的 Lv2 爬虫
+          const sellable = s.team.findIndex((u) => u && u.level < 2 && u.defId !== 'crawler');
+          const selU = sel?.kind === 'team' ? s.team[sel.index] : null;
+          if (selU && selU.level < 2) {
             focus('[data-kind="sell"],[data-kind="infoSell"]');
-            sub = '点「出售」';
-          } else if (s.team.filter(Boolean).length < 2) {
-            focus('[data-src^="shop:"]');
-            sub = '冻结好了！先买一个新单位（进化奖励免费），再把用不上的卖掉';
+            sub = '点「出售」，卖掉能回 1 算力';
+          } else if (sellable >= 0) {
+            focus(`.tslot[data-index="${sellable}"] .ucard`);
+            sub = selU ? '这只是进化好的爬虫，别卖！点刚买的单位' : '冻结好了！点一下刚买的单位，再点「出售」';
+          } else if (sel?.kind === 'shop') {
+            focus('[data-kind="infoBuy"]');
+            sub = '冻结好了！点「购买」把它买下来，再卖掉它';
           } else {
-            focus('.tslot .ucard');
-            sub = '冻结好了！再点一个用不上的队伍单位，把它卖掉';
+            if (!focus('[data-src^="shop:"][data-def="labeler"]')) focus('[data-src^="shop:"]');
+            sub = '冻结好了！点一下「标注员」，再点「购买」';
           }
         }
         break;
@@ -324,6 +391,11 @@ export function gameScene(): Scene {
     doAct(to === undefined ? { type: 'buy', slot } : { type: 'buy', slot, to }, src);
   }
   function doSell(index: number): void {
+    const u = run().team[index];
+    if (tutStep === 'freezeSell' && u && u.level >= 2) {
+      toast('这是进化好的 Lv2，留着打架！先买个「标注员」来卖', 'info');
+      return;
+    }
     sel = null;
     doAct({ type: 'sell', index }, teamRow.children[index]?.querySelector('.ucard'));
   }

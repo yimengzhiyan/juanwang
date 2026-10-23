@@ -3,7 +3,7 @@ import { Rng } from '../rng';
 import { clone } from '../clone';
 import {
   ENEMY_TARGETS,
-  type Ability, type EventEffect, type TargetFilter, type GameData, type HeadlineDef, type ItemDef, type Level, type Modifiers,
+  type Ability, type EventEffect, type FreeReason, type TargetFilter, type GameData, type HeadlineDef, type ItemDef, type Level, type Modifiers,
   type RunState, type ShopActionInput, type ShopSlot, type Tier, type Trigger, type UnitDef, type UnitInst,
 } from '../types';
 
@@ -163,9 +163,12 @@ export function slotPrice(ctx: Ctx, slot: Pick<ShopSlot, 'kind' | 'defId' | 'fre
 export function repriceShop(ctx: Ctx): void {
   for (const sl of ctx.s.shop) sl.price = slotPrice(ctx, sl);
 }
-function mkSlot(ctx: Ctx, kind: 'unit' | 'item', defId: string, free = false): ShopSlot {
+function mkSlot(ctx: Ctx, kind: 'unit' | 'item', defId: string, freeReason?: FreeReason): ShopSlot {
   const sl: ShopSlot = { kind, defId, price: 0, frozen: false };
-  if (free) sl.free = true;
+  if (freeReason) {
+    sl.free = true;
+    sl.freeReason = freeReason;
+  }
   sl.price = slotPrice(ctx, sl);
   return sl;
 }
@@ -213,9 +216,9 @@ function tutorialTurn(ctx: Ctx) {
   return ctx.data.tutorial.turns.find((t) => t.turn === ctx.s.turn);
 }
 
-/** 往商店追加一个免费单位槽（进化奖励 / freeUnit） */
-export function addFreeUnitSlot(ctx: Ctx, defId: string): void {
-  ctx.s.shop.push(mkSlot(ctx, 'unit', defId, true));
+/** 往商店追加一个免费单位槽（进化奖励 levelUp / 头条突发 freeUnit = event） */
+export function addFreeUnitSlot(ctx: Ctx, defId: string, reason: FreeReason): void {
+  ctx.s.shop.push(mkSlot(ctx, 'unit', defId, reason));
   sortShop(ctx.s);
 }
 
@@ -290,7 +293,7 @@ function onLevelUp(ctx: Ctx, u: UnitInst): void {
   const tier = Math.min(6, maxTierForTurn(ctx.s.turn) + 1);
   const id = rollUnitDef(ctx, { tier });
   if (id) {
-    addFreeUnitSlot(ctx, id);
+    addFreeUnitSlot(ctx, id, 'levelUp');
     log(ctx, `进化奖励：商店刷出免费的 ${unitName(ctx, id)}`);
   }
 }
@@ -511,7 +514,7 @@ export function applyEventEffect(ctx: Ctx, e: EventEffect): void {
       break;
     case 'freeUnit': {
       const id = rollUnitDef(ctx, { tier: e.tier, faction: e.faction }) ?? rollUnitDef(ctx, { faction: e.faction });
-      if (id) addFreeUnitSlot(ctx, id);
+      if (id) addFreeUnitSlot(ctx, id, 'event');
       break;
     }
     case 'buffTeam':
@@ -703,7 +706,7 @@ export function applyAction(ctx: Ctx, a: ShopActionInput): string | null {
       if (e) return e;
       const slot = s.shop[a.slot];
       if (!slot || slot.kind !== 'unit') return '没有这个单位';
-      if (slot.price > s.gold) return `算力不够，需要 ${slot.price}⚡`;
+      if (slot.price > s.gold) return `算力不够，需要 ${slot.price} 算力`;
       let to = a.to ?? -1;
       let merge = false;
       if (a.to !== undefined) {
@@ -749,7 +752,7 @@ export function applyAction(ctx: Ctx, a: ShopActionInput): string | null {
       if (at >= 0) s.team[at] = null;
       s.gold += u.level;
       if (s.tutorial) s.tutorial.sold = true;
-      log(ctx, `卖掉 ${unitName(ctx, u.defId)}，+${u.level}⚡`);
+      log(ctx, `卖掉 ${unitName(ctx, u.defId)}，+${u.level} 算力`);
       return null;
     }
     case 'reroll': {
@@ -832,7 +835,7 @@ function useItem(ctx: Ctx, slotIdx: number, target?: number, source?: number): s
   if (!slot || slot.kind !== 'item') return '没有这个基建';
   const item = ctx.data.itemsById[slot.defId];
   if (!item) return '未知基建';
-  if (slot.price > s.gold) return `算力不够，需要 ${slot.price}⚡`;
+  if (slot.price > s.gold) return `算力不够，需要 ${slot.price} 算力`;
   const tu = target !== undefined ? s.team[target] : null;
   if (item.targetKind === 'unit' && !tu) return '请选择一个单位';
   const ef = item.effect;

@@ -62,7 +62,7 @@ phase 'result'   → 显示胜负 + state.lastSurprise（若有）→ shopAction
 phase 'over'     → state.won / state.endReason('trophies'|'lives'|'turnLimit') / state.trophies → POST /api/result
 ```
 - 历史：`state.history[]`（每场 `{turn, winner, myTeam, enemyTeam, trophies, lives, opponent?}`；`opponent` 由客户端自己填）。
-- 进化动画：`state.lastLevelUp = {uid, level}`（每次进化覆盖，回合开始清空）。免费奖励槽 `ShopSlot.free = true`。
+- 进化动画：`state.lastLevelUp = {uid, level}`（每次进化覆盖，回合开始清空）。免费奖励槽 `ShopSlot.free = true`，并带 `freeReason`：`'levelUp'`（进化奖励）或 `'event'`（头条/突发 freeUnit 赠送），客户端据此显示「进化奖励」/「头条赠送」。
 - `state.log[]` 是给调试/日志面板的中文流水（最多 200 条）。
 
 ## 2. BattleEvent（客户端按顺序播放）

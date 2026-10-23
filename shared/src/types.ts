@@ -237,7 +237,11 @@ export interface ShopSlot {
   frozen: boolean;
   /** 进化奖励 / 头条送的免费槽：价格 0，刷新不会被替换，回合结束未冻结则消失 */
   free?: boolean;
+  /** 免费槽的来源（free 为真时必有）：levelUp = 进化奖励，event = 头条/突发赠送 */
+  freeReason?: FreeReason;
 }
+
+export type FreeReason = 'levelUp' | 'event';
 
 export interface Modifiers {
   /** 本回合单位/基建价格修正（负数为降价） */

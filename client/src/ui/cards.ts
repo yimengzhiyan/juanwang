@@ -1,5 +1,5 @@
 // 单位卡 / 基建卡 DOM（规格见 ART.md 第 4 节）。尺寸由父容器决定，内部用 cqw 等比缩放。
-import type { GameData, ItemDef, Level, UnitDef } from '@juanwang/shared';
+import type { FreeReason, GameData, ItemDef, Level, UnitDef } from '@juanwang/shared';
 import { assetUrl, avatarUrl, isPhotoAvatar, ui } from '../assets';
 
 export const FACTION_NAME: Record<string, string> = { open: '开源', closed: '闭源', compute: '算力', folk: '民间' };
@@ -32,11 +32,18 @@ export function unitCard(def: UnitDef, st: CardStats, opts: { enemy?: boolean; u
     <div class="uc-stars"><i></i><i></i><i></i><b class="uc-xp"><s></s></b></div>
     <img class="uc-fac" src="${ui(`faction_${def.faction}`)}" alt="${FACTION_NAME[def.faction]}" draggable="false">
     <div class="uc-ava"><img class="${photo ? 'is-photo' : ''}" src="${avatarUrl(def)}" alt="" draggable="false"><span class="uc-flash"></span></div>
-    <div class="uc-name">${esc(def.name)}</div>
+    <div class="uc-name" style="--nl:${nameLen(def.name)}">${esc(def.name)}</div>
     <div class="uc-atk"><span></span></div>
     <div class="uc-hp"><span></span><em class="uc-shield"></em></div>`;
   setCardStats(el, st);
   return el;
+}
+
+/** 名字的"视觉长度"（中文 1、ASCII 0.58），用于自动缩字号 */
+export function nameLen(name: string): number {
+  let n = 0;
+  for (const ch of name) n += /[\x00-\x7F]/.test(ch) ? 0.58 : 1;
+  return Math.max(3, Math.round(n * 100) / 100);
 }
 
 export function setCardStats(el: HTMLElement, st: CardStats): void {
@@ -70,11 +77,14 @@ export function itemCard(def: ItemDef): HTMLElement {
   return el;
 }
 
-/** 价格胶囊 */
-export function priceTag(price: number, affordable: boolean, free = false): HTMLElement {
+/** 免费槽标签文案 */
+export const FREE_LABEL: Record<FreeReason, string> = { levelUp: '进化奖励', event: '头条赠送' };
+
+/** 价格胶囊（免费槽按来源显示「进化奖励」/「头条赠送」） */
+export function priceTag(price: number, affordable: boolean, free: FreeReason | false = false): HTMLElement {
   const el = document.createElement('div');
-  el.className = `price${affordable ? '' : ' is-poor'}${free ? ' is-free' : ''}`;
-  el.innerHTML = free ? '进化奖励' : `<img src="${ui('gold')}" alt="">${price}`;
+  el.className = `price${affordable ? '' : ' is-poor'}${free ? ` is-free is-free--${free}` : ''}`;
+  el.innerHTML = free ? FREE_LABEL[free] : `<img src="${ui('gold')}" alt="">${price}`;
   return el;
 }
 

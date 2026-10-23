@@ -22,6 +22,31 @@ export function shareLink(seed: string): string {
   return `${location.origin}${location.pathname}?seed=${encodeURIComponent(seed)}`;
 }
 
+/** 复制到剪贴板：优先 Clipboard API，退回 execCommand；都失败返回 false */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* 退回旧方法 */
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    Object.assign(ta.style, { position: 'fixed', left: '-9999px', top: '0', opacity: '0' });
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 export function overScene(): Scene {
   const data = app.data;
   const s = app.run!;
@@ -101,12 +126,24 @@ export function overScene(): Scene {
     sfx.click();
     const link = shareLink(s.seed);
     const text = `我在《卷王自走棋》${won ? '登顶了' : `拿了 ${s.trophies} 个热搜`}！同一局来比比：${link}`;
-    try {
-      await navigator.clipboard.writeText(text);
+    if (await copyText(text)) {
       toast('链接已复制，发给朋友打同一局', 'good');
-    } catch {
-      toast(link, 'info', 4000);
+      return;
     }
+    // 复制失败（非 https / 权限被拒）：降级显示链接文本，方便长按手动复制
+    let box = el.querySelector('.over-link') as HTMLElement | null;
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'over-link';
+      box.innerHTML = `<small>自动复制失败，长按下面的链接手动复制：</small><input readonly aria-label="分享链接">`;
+      el.querySelector('.over-btns')!.insertBefore(box, el.querySelector('.over-home'));
+    }
+    const input = box.querySelector('input') as HTMLInputElement;
+    input.value = link;
+    input.onfocus = () => input.select();
+    input.focus();
+    input.select();
+    gsap.fromTo(box, { scale: 0.9, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.25, ease: 'back.out(2)' });
   };
   (el.querySelector('.over-home') as HTMLElement).onclick = () => {
     sfx.click();

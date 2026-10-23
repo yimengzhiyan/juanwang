@@ -1,4 +1,5 @@
-// 战斗页：按 BattleEvent 顺序播放（1x / 2x / 跳过）。我方在下（前排在左），敌方在上（前排在右，朝向我方）。
+// 战斗页：按 BattleEvent 顺序播放（1x / 2x / 跳过）。敌方一排居中在上、我方一排居中在下（都是前排在左），
+// 两排之间隔约 1.5 张卡高；每次攻击双方前排离队冲向中间的"擂台线"相撞（我方向上、敌方向下），火花在接触点。
 import gsap from 'gsap';
 import {
   applyBattleResult, battleForState, offlineOpponent, tutorialEnemy,
@@ -53,7 +54,7 @@ export function battleScene(): Scene {
   arena.className = 'arena';
   arena.innerHTML = `
     <div class="side-label side-label--enemy"><span class="opp-name">匹配对手中…</span></div>
-    <div class="field"></div>
+    <div class="field"><div class="ring-line"></div></div>
     <div class="vs"><span class="vs-l">V</span><span class="vs-r">S</span></div>
     <div class="side-label side-label--me"><span>${esc(settings.name)} 的队伍</span></div>
     <div class="banner-slot"></div>`;
@@ -63,9 +64,14 @@ export function battleScene(): Scene {
   const oppName = arena.querySelector('.opp-name') as HTMLElement;
   const log = document.createElement('div');
   log.className = 'blog';
-  log.innerHTML = '<button class="blog-toggle">战斗日志</button><div class="blog-lines"></div>';
+  log.innerHTML = '<div class="blog-lines"></div><button class="blog-toggle" aria-label="展开战斗日志">展开</button>';
   const logLines = log.querySelector('.blog-lines') as HTMLElement;
-  (log.querySelector('.blog-toggle') as HTMLElement).onclick = () => log.classList.toggle('is-open');
+  const logToggle = log.querySelector('.blog-toggle') as HTMLElement;
+  log.onclick = () => {
+    const open = log.classList.toggle('is-open');
+    logToggle.textContent = open ? '收起' : '展开';
+    if (!open) logLines.scrollTop = 0;
+  };
   el.append(top, arena, log);
 
   const run0 = app.run!;
@@ -111,22 +117,54 @@ export function battleScene(): Scene {
   });
 
   // ───────────── 布局 ─────────────
-  function geom(side: Side): { w: number; h: number; gap: number; x: (pos: number) => number; y: number } {
+  // 两排同宽卡片、各自水平居中；排间距 = 1.5 张卡高；擂台线在两排正中间。
+  const ROW_GAP = 1.5;
+  interface Geo { w: number; h: number; gap: number; x: (pos: number) => number; y: number; mid: number }
+  function metrics(): { W: number; w: number; h: number; gap: number; yEnemy: number; yMe: number; mid: number } {
     const W = field.clientWidth;
     const H = field.clientHeight;
-    const n = Math.max(5, order[side].length);
+    const n = Math.max(5, order.me.length, order.enemy.length);
     const gap = 6;
     const pad = 8;
-    const w = Math.min(80, (W - pad * 2 - gap * (n - 1)) / n);
+    let w = Math.min(84, (W - pad * 2 - gap * (n - 1)) / n);
+    // 竖向放不下（矮屏）时按高度收缩：两排 + 1.5 卡高间距 + 上下标签
+    const maxH = (H - 96) / (2 + ROW_GAP);
+    if ((w * 104) / 84 > maxH) w = (maxH * 84) / 104;
     const h = (w * 104) / 84;
-    const y = side === 'enemy' ? H * 0.2 : H * 0.62;
-    const x = side === 'me' ? (p: number) => pad + p * (w + gap) : (p: number) => W - pad - w - p * (w + gap);
-    return { w, h, gap, x, y };
+    const mid = Math.round(H * 0.5);
+    return { W, w, h, gap, mid, yEnemy: mid - (ROW_GAP / 2) * h - h, yMe: mid + (ROW_GAP / 2) * h };
+  }
+  function geom(side: Side): Geo {
+    const m = metrics();
+    const cnt = Math.max(1, order[side].length);
+    const x0 = (m.W - (cnt * m.w + (cnt - 1) * m.gap)) / 2;
+    return { w: m.w, h: m.h, gap: m.gap, x: (p: number) => x0 + p * (m.w + m.gap), y: side === 'enemy' ? m.yEnemy : m.yMe, mid: m.mid };
   }
   const meLabel = arena.querySelector('.side-label--me') as HTMLElement;
+  const enemyLabel = arena.querySelector('.side-label--enemy') as HTMLElement;
+  const ringLine = field.querySelector('.ring-line') as HTMLElement;
+  /** 标签 / 擂台线 / VS / 横幅 跟随两排位置 */
+  function placeChrome(): void {
+    const m = metrics();
+    const top = field.offsetTop;
+    enemyLabel.style.top = `${Math.max(2, top + m.yEnemy - 40)}px`;
+    meLabel.style.top = `${top + m.yMe + m.h + 14}px`;
+    ringLine.style.top = `${m.mid}px`;
+    vs.style.top = `${top + m.mid}px`;
+    bannerSlot.style.top = `${top + m.mid}px`;
+    bigWordTop = top + m.mid;
+  }
+  let bigWordTop = 0;
+  let lastW = 0;
   function layout(side: Side, dur = 0.25): void {
     const g = geom(side);
-    if (side === 'me') meLabel.style.top = `${field.offsetTop + g.y + g.h + 16}px`;
+    placeChrome();
+    // 召唤导致一方超过 5 人时卡片会整体缩小：另一方也要跟着重排，保证两排同尺寸
+    if (Math.abs(g.w - lastW) > 0.5) {
+      const first = lastW === 0;
+      lastW = g.w;
+      if (!first) layout(side === 'me' ? 'enemy' : 'me', dur);
+    }
     order[side].forEach((uid, i) => {
       const u = units.get(uid);
       if (!u) return;
@@ -136,6 +174,11 @@ export function battleScene(): Scene {
       else gsap.set(u.el, { x: g.x(i), y: g.y });
     });
   }
+  const onResize = (): void => {
+    layout('me', 0);
+    layout('enemy', 0);
+  };
+  window.addEventListener('resize', onResize);
   function makeUnit(s: UnitSnap): BU | null {
     const def = data.unitsById[s.defId];
     if (!def) return null;
@@ -155,18 +198,19 @@ export function battleScene(): Scene {
   }
   const U = (r: UnitRef): BU | undefined => units.get(r.uid);
 
+  /** 技能/羁绊横幅：居中显示在两排之间的空白处（擂台线上），最多两行 */
   function banner(text: string, color: string, dark: string): void {
     const b = document.createElement('div');
     b.className = 'banner';
     b.style.background = color;
-    b.style.boxShadow = `inset 0 -5px 0 ${dark}`;
+    b.style.boxShadow = `inset 0 -4px 0 ${dark}`;
     b.textContent = plain(text);
     bannerSlot.innerHTML = '';
     bannerSlot.appendChild(b);
     gsap
       .timeline({ onComplete: () => b.remove() })
-      .fromTo(b, { xPercent: -110 }, { xPercent: 0, duration: 0.18, ease: 'power2.out' })
-      .to(b, { xPercent: 110, duration: 0.18, ease: 'power2.in' }, '+=0.45');
+      .fromTo(b, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.16, ease: 'back.out(2.5)' })
+      .to(b, { y: -10, opacity: 0, duration: 0.18, ease: 'power2.in' }, '+=0.5');
   }
   function addLog(text: string): void {
     const d = document.createElement('div');
@@ -177,7 +221,8 @@ export function battleScene(): Scene {
   function say(u: BU, line: string): void {
     const b = u.el.querySelector('.say-bubble') as HTMLElement;
     b.textContent = line;
-    b.classList.toggle('below', u.side === 'enemy');
+    // 气泡朝外（敌方向上、我方向下），不挡中间的擂台
+    b.classList.toggle('below', u.side === 'me');
     // 气泡不超出战场左右边界
     const W = field.clientWidth;
     const ux = Number(gsap.getProperty(u.el, 'x')) || 0;
@@ -198,7 +243,8 @@ export function battleScene(): Scene {
   function hitFlash(u: BU): void {
     const f = u.card.querySelector('.uc-flash');
     if (f) gsap.fromTo(f, { opacity: 0.6 }, { opacity: 0, duration: 0.16 });
-    if (!reducedMotion()) gsap.timeline().to(u.card, { x: 6, duration: 0.04 }).to(u.card, { x: -6, duration: 0.04 }).to(u.card, { x: 4, duration: 0.04 }).to(u.card, { x: 0, duration: 0.04 });
+    // 用旋转抖动，避免和冲撞位移（x/y）互相覆盖
+    if (!reducedMotion()) gsap.timeline().to(u.card, { rotation: 5, duration: 0.04 }).to(u.card, { rotation: -5, duration: 0.04 }).to(u.card, { rotation: 3, duration: 0.04 }).to(u.card, { rotation: 0, duration: 0.04 });
   }
   function fl(u: BU, text: string, color: string, dy = -10, size = 24): void {
     const [x, y] = center(u.card);
@@ -220,9 +266,9 @@ export function battleScene(): Scene {
         layout('me', 0);
         layout('enemy', 0);
         if (fast) return;
-        const W = field.clientWidth;
-        order.me.forEach((uid, i) => gsap.from(units.get(uid)!.el, { x: -W * 0.6, duration: 0.35, delay: i * 0.04, ease: 'power3.out' }));
-        order.enemy.forEach((uid, i) => gsap.from(units.get(uid)!.el, { x: `+=${W * 0.8}`, duration: 0.35, delay: i * 0.04, ease: 'power3.out' }));
+        const H = field.clientHeight;
+        order.me.forEach((uid, i) => gsap.from(units.get(uid)!.el, { y: `+=${H * 0.5}`, opacity: 0, duration: 0.35, delay: i * 0.04, ease: 'power3.out' }));
+        order.enemy.forEach((uid, i) => gsap.from(units.get(uid)!.el, { y: `-=${H * 0.5}`, opacity: 0, duration: 0.35, delay: i * 0.04, ease: 'power3.out' }));
         sfx.vs();
         const l = vs.querySelector('.vs-l')!;
         const r = vs.querySelector('.vs-r')!;
@@ -233,7 +279,7 @@ export function battleScene(): Scene {
         const [cx, cy] = center(vs);
         particles.burst(cx, cy, { count: 8, kind: 'dot', colors: ['#FFFFFF'], size: 8, dist: 60, life: 0.4 });
         particles.burst(cx, cy, { count: 4, kind: 'star', colors: ['#FFC53D'], size: 14, dist: 50, life: 0.45 });
-        gsap.to(vs, { scale: 0.5, duration: 0.2, delay: 0.1, ease: 'power2.inOut' });
+        parkVs(0.25);
         await wait(0.25);
         return;
       }
@@ -277,29 +323,39 @@ export function battleScene(): Scene {
         const a = U(ev.me);
         const b = U(ev.enemy);
         if (fast || !a || !b) return;
-        const [ax, ay] = center(a.card);
-        const [bx, by] = center(b.card);
-        const dx = bx - ax;
-        const dy = by - ay;
-        const len = Math.hypot(dx, dy) || 1;
-        const reach = Math.min(46, len * 0.32);
-        const ux = (dx / len) * reach;
-        const uy = (dy / len) * reach;
+        // 双方前排离队，冲到擂台线相撞：我方向上、敌方向下，水平方向在两人中点会合
+        const m = metrics();
+        const ax = Number(gsap.getProperty(a.el, 'x')) || 0;
+        const ay = Number(gsap.getProperty(a.el, 'y')) || 0;
+        const bx = Number(gsap.getProperty(b.el, 'x')) || 0;
+        const by = Number(gsap.getProperty(b.el, 'y')) || 0;
+        const mx = (ax + bx) / 2;
+        const aTo = { x: mx - ax, y: m.mid - ay };
+        const bTo = { x: mx - bx, y: m.mid - m.h - by };
+        gsap.killTweensOf([a.card, b.card], 'x,y,scaleX,scaleY');
+        gsap.set(a.card, { transformOrigin: '50% 0%' });
+        gsap.set(b.card, { transformOrigin: '50% 100%' });
+        gsap.set([a.el, b.el], { zIndex: 5 });
         const tl = gsap.timeline();
-        tl.to(a.card, { x: ux, y: uy, scaleX: 1.12, scaleY: 0.9, duration: 0.15, ease: 'power2.in' }, 0)
-          .to(b.card, { x: -ux, y: -uy, scaleX: 1.12, scaleY: 0.9, duration: 0.15, ease: 'power2.in' }, 0)
+        tl.to(a.card, { ...aTo, duration: 0.16, ease: 'power2.in' }, 0)
+          .to(b.card, { ...bTo, duration: 0.16, ease: 'power2.in' }, 0)
           .add(() => {
             sfx.hit();
-            const mx = (ax + ux + bx - ux) / 2;
-            const my = (ay + uy + by - uy) / 2;
-            particles.burst(mx, my, { count: 6, kind: 'star', colors: ['#FFC53D', '#FFFFFF'], size: 12, dist: 34, life: 0.25 });
-          }, 0.15)
-          .to([a.card, b.card], { x: 0, y: 0, scaleX: 1, scaleY: 1, duration: 0.15, ease: 'power2.out' }, 0.17);
+            const fr = field.getBoundingClientRect();
+            const px = fr.left + mx + m.w / 2;
+            const py = fr.top + m.mid;
+            particles.burst(px, py, { count: 8, kind: 'star', colors: ['#FFC53D', '#FFFFFF'], size: 12, dist: 38, life: 0.28 });
+            particles.burst(px, py, { count: 5, kind: 'dot', colors: ['#FFFFFF'], size: 7, dist: 26, life: 0.22 });
+          }, 0.16)
+          .to([a.card, b.card], { scaleX: 1.1, scaleY: 0.86, duration: 0.05, ease: 'power1.out' }, 0.16)
+          .to([a.card, b.card], { scaleX: 1, scaleY: 1, duration: 0.08, ease: 'power1.out' }, 0.21)
+          .to([a.card, b.card], { x: 0, y: 0, duration: 0.2, ease: 'power2.out' }, 0.3)
+          .set([a.el, b.el], { zIndex: 'auto' });
         if (ev.me.hits > 1 || ev.enemy.hits > 1) {
-          if (ev.me.hits > 1) fl(a, `×${ev.me.hits}`, '#FF8C42', -40, 20);
+          if (ev.me.hits > 1) fl(a, `×${ev.me.hits}`, '#FF8C42', 40, 20);
           if (ev.enemy.hits > 1) fl(b, `×${ev.enemy.hits}`, '#FF8C42', -40, 20);
         }
-        await wait(0.17);
+        await wait(0.2);
         return;
       }
       case 'damage': {
@@ -418,6 +474,14 @@ export function battleScene(): Scene {
     }
   }
 
+  /** VS 标志开场后缩小，停到擂台线右端 */
+  function parkVs(dur: number): void {
+    const W = field.clientWidth;
+    const props = { scale: 0.45, x: W / 2 - 30, opacity: 1 };
+    if (dur > 0) gsap.to(vs, { ...props, duration: dur, delay: 0.1, ease: 'power2.inOut' });
+    else gsap.set(vs, props);
+  }
+
   function shatter(u: BU): void {
     const card = u.card;
     card.classList.add('is-dead');
@@ -455,6 +519,7 @@ export function battleScene(): Scene {
     const big = document.createElement('div');
     big.className = `big-word big-word--${result.winner}`;
     big.textContent = result.winner === 'me' ? '胜利！' : result.winner === 'enemy' ? '失败' : '平局';
+    big.style.top = `${bigWordTop - 28}px`;
     arena.appendChild(big);
     gsap.fromTo(big, { scale: 0 }, { scale: 1, duration: 0.4, ease: 'back.out(2.5)' });
     if (result.winner === 'me') {
@@ -557,7 +622,7 @@ export function battleScene(): Scene {
       }
       layout('me', 0);
       layout('enemy', 0);
-      gsap.set(vs, { scale: 0.5, opacity: 1 });
+      parkVs(0);
       skipping = false;
     }
     setSpeed(1);
@@ -577,6 +642,7 @@ export function battleScene(): Scene {
     el,
     destroy: () => {
       destroyed = true;
+      window.removeEventListener('resize', onResize);
       skipWaits();
       setTimeScale(1);
       particles.clear();

@@ -183,10 +183,12 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
 .uc-ava img.is-photo { object-position: 50% 18%; transform: scale(1.18); transform-origin: 50% 30%; background: #fff; }
 .uc-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
 .has-shield .uc-ava { box-shadow: 0 0 0 2px var(--outline), 0 0 0 5px var(--shield), 0 0 0 7px var(--outline); }
+/* 名字：按长度自动缩字号（--nl = 视觉字数，最小 9px），放不下就折成两行；底边固定，两行时向上长 */
 .uc-name {
-  position: absolute; left: 50%; top: 77cqw; transform: translateX(-50%); max-width: 96cqw;
-  padding: 0.5cqw 5cqw; background: #fff; border: 2px solid var(--outline); border-radius: 99px;
-  font-size: 12.5cqw; font-weight: 700; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 2; color: var(--text);
+  position: absolute; left: 50%; top: calc(92cqw + 4px); transform: translate(-50%, -100%); width: max-content; max-width: 108cqw;
+  padding: 0.5cqw 2cqw; background: #fff; border: 2px solid var(--outline); border-radius: 10px; text-wrap: balance;
+  font-size: max(9px, min(12.5cqw, calc(86cqw / var(--nl, 4)))); font-weight: 700; line-height: 1.1; text-align: center;
+  white-space: normal; overflow-wrap: anywhere; z-index: 2; color: var(--text);
 }
 .uc-atk, .uc-hp {
   position: absolute; top: 92cqw; width: 38cqw; height: 38cqw; display: flex; align-items: center; justify-content: center; z-index: 4;
@@ -227,6 +229,7 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
 .price img { width: 17px; height: 17px; }
 .price.is-poor { background: #DCE4EE; color: #8592A8; }
 .price.is-free { padding: 0 8px; font-size: 11px; font-family: var(--font-ui); background: var(--c-gold); color: var(--outline); }
+.price.is-free--event { background: var(--c-red); color: #fff; }
 
 .fly-ghost, .drag-ghost { position: absolute; z-index: 5; pointer-events: none; margin: 0; }
 .drag-ghost { opacity: 0.95; }
@@ -285,7 +288,33 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
 .syn.is-on.fac-compute { background: var(--f-compute); } .syn.is-on.fac-folk { background: var(--f-folk); }
 
 /* ───────── 对局页 ───────── */
-.notes { flex: none; }
+.notes { flex: none; display: flex; justify-content: center; padding: 2px 12px 0; }
+.next-tip {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%; height: 24px; padding: 0 10px 0 3px; border-radius: 99px;
+  background: rgba(255, 255, 255, 0.88); border: 2px solid var(--outline); font-size: 12.5px; font-weight: 700; color: var(--c-purple-dark);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.next-tip i { font: normal 700 10px/16px var(--font-num); color: #fff; background: var(--c-purple); border-radius: 99px; padding: 0 6px; letter-spacing: 0.5px; }
+/* 商店卡片下方的购买气泡 */
+.buy-pop {
+  position: absolute; left: 50%; top: calc(100% + 8px); z-index: 9; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  transform-origin: 50% 0;
+}
+.buy-pop::before {
+  content: ''; position: absolute; top: -9px; left: calc(50% - var(--dx, 0px)); margin-left: -8px; border: 8px solid transparent; border-top: 0;
+  border-bottom-color: var(--outline);
+}
+.buy-pop-btn { min-height: 50px; padding: 0 16px; font-size: 20px; white-space: nowrap; border-radius: 16px; flex-direction: column; gap: 0; }
+.buy-pop-btn > img { width: 20px; height: 20px; }
+.buy-pop-btn:not(:has(small)) { flex-direction: row; gap: 3px; }
+.buy-pop-btn small { font-size: 11px; -webkit-text-stroke: 1px var(--outline); margin-top: 2px; }
+.buy-pop-btn.is-poor { --btn-c: #C9D3DE; --btn-d: #97A6B8; }
+.buy-pop-more {
+  border: 0; background: rgba(255, 255, 255, 0.92); border-radius: 99px; padding: 4px 10px; min-height: 28px; font-size: 12px; font-weight: 700;
+  color: var(--c-blue-dark); text-decoration: underline; text-underline-offset: 2px; box-shadow: 0 2px 0 rgba(59, 42, 26, 0.15);
+}
+.chip.chip--free-levelUp { background: var(--c-gold); }
+.chip.chip--free-event { background: var(--c-red); color: #fff; }
 .team-area { flex: none; padding: 4px 12px 0; position: relative; }
 .area-label { display: flex; align-items: center; gap: 6px; height: 40px; font-weight: 700; font-size: 15px; }
 .area-label small { color: var(--text-sub); font-size: 12px; }
@@ -319,6 +348,7 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
 .sslot.is-frozen { background: var(--frozen); border: 2px solid var(--shield); }
 .sslot.is-frozen .ucard, .sslot.is-frozen .icard { background: #EAF8FF; }
 .sslot.is-free { background: #FFF1C9; border: 2px solid var(--c-gold); }
+.sslot.is-free--event { background: #FFE3E3; border-color: var(--c-red); }
 .frost { position: absolute; left: -8px; bottom: -8px; width: 28px; height: 28px; z-index: 6; }
 .shop-empty { grid-column: 1 / -1; text-align: center; color: var(--text-sub); padding: 24px 0; font-size: 14px; }
 
@@ -502,16 +532,18 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
 .speed button:not([data-sp='skip']) { min-width: 44px; }
 .topbar--battle .hud-trophy { flex: none; }
 .arena { flex: 1; position: relative; min-height: 0; }
-.field { position: absolute; inset: 30px 0 70px; }
+.field { position: absolute; inset: 0 0 56px; }
+.ring-line { position: absolute; left: 14px; right: 14px; height: 0; border-top: 3px dashed rgba(59, 42, 26, 0.18); pointer-events: none; }
 .bunit { position: absolute; left: 0; top: 0; }
 .bunit .ucard { cursor: pointer; }
 .side-label { position: absolute; left: 12px; right: 12px; text-align: center; font-size: 14px; font-weight: 700; z-index: 2; }
 .side-label span { background: rgba(255, 255, 255, 0.88); border: 2.5px solid var(--outline); border-radius: 99px; padding: 3px 12px; display: inline-block; }
 .side-label--enemy { top: 4px; }
+.side-label span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
 .side-label--enemy span { background: #FFE3E3; }
-.side-label--me { top: 70%; }
+.side-label--me { top: 75%; }
 .vs {
-  position: absolute; left: 50%; top: calc(30px + (100% - 100px) * 0.47); width: 96px; height: 96px; margin: -48px 0 0 -48px; display: flex; z-index: 3; opacity: 0;
+  position: absolute; left: 50%; top: 50%; width: 96px; height: 96px; margin: -48px 0 0 -48px; display: flex; z-index: 3; opacity: 0;
   pointer-events: none;
 }
 .vs span {
@@ -520,11 +552,13 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
 }
 .vs-l { background: var(--c-blue); border-radius: 48px 0 0 48px; border-right-width: 2px !important; }
 .vs-r { background: var(--c-red); border-radius: 0 48px 48px 0; border-left-width: 2px !important; }
-.banner-slot { position: absolute; left: 0; right: 0; top: calc(30px + (100% - 100px) * 0.47 - 20px); height: 40px; overflow: hidden; z-index: 20; pointer-events: none; }
+/* 技能横幅：两排之间的空白处居中（top 由 JS 设到擂台线） */
+.banner-slot { position: absolute; left: 12px; right: 12px; top: 50%; height: 0; z-index: 20; pointer-events: none; display: flex; justify-content: center; }
 .banner {
-  height: 40px; display: block; line-height: 34px; text-align: center; padding: 0 14px; color: #fff; font-size: 15px; font-weight: 700;
-  -webkit-text-stroke: 2px var(--outline); paint-order: stroke fill; border-top: 3px solid var(--outline); border-bottom: 3px solid var(--outline);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  position: absolute; top: 0; translate: 0 -50%; max-width: 100%; padding: 6px 14px 8px; border: 3px solid var(--outline); border-radius: 14px;
+  text-align: center; color: #fff; font-size: 14px; font-weight: 700; line-height: 1.3;
+  -webkit-text-stroke: 2px var(--outline); paint-order: stroke fill;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .say-bubble {
   position: absolute; left: 0; bottom: calc(100% + 8px); transform-origin: 50% 100%; z-index: 8; white-space: nowrap; max-width: 160px;
@@ -548,14 +582,18 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
 .big-word--me { color: var(--c-gold); }
 .big-word--enemy { color: var(--c-red); }
 .big-word--draw { color: #C9D3DE; }
-.blog { position: absolute; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 4; }
-.blog-toggle { border: 2.5px solid var(--outline); background: rgba(255, 255, 255, 0.9); border-radius: 12px; font-size: 13px; font-weight: 700; padding: 6px 12px; min-height: 36px; }
-.blog-lines {
-  margin-top: 4px; background: rgba(255, 255, 255, 0.92); border: 2.5px solid var(--outline); border-radius: 12px; padding: 4px 10px; font-size: 12px; line-height: 1.5;
-  height: 58px; overflow: hidden; color: var(--text-sub);
+/* 战斗日志：默认两行，点一下展开 */
+.blog {
+  position: absolute; left: 10px; right: 10px; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 4; cursor: pointer;
+  display: flex; align-items: flex-start; gap: 6px; background: rgba(255, 255, 255, 0.85); border: 2.5px solid var(--outline); border-radius: 12px; padding: 3px 4px 3px 10px;
 }
+.blog-lines { flex: 1; min-width: 0; font-size: 12px; line-height: 18px; height: 36px; overflow: hidden; color: var(--text-sub); }
+.blog-lines div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .blog-lines div:first-child { color: var(--text); font-weight: 700; }
-.blog.is-open .blog-lines { height: 180px; overflow-y: auto; }
+.blog-toggle { flex: none; border: 2px solid var(--outline); background: #fff; border-radius: 99px; font-size: 12px; font-weight: 700; padding: 0 10px; height: 28px; margin-top: 2px; }
+.blog.is-open { background: rgba(255, 255, 255, 0.96); }
+.blog.is-open .blog-lines { height: 200px; overflow-y: auto; }
+.blog.is-open .blog-lines div { white-space: normal; }
 
 /* 结算 */
 .result-mask { position: absolute; inset: 0; z-index: 30; background: rgba(31, 42, 68, 0.35); display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -605,6 +643,9 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
 .over-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .over-btns .over-again { width: 100%; }
 .over-home { align-self: center; -webkit-text-stroke: 0; }
+.over-link { display: flex; flex-direction: column; gap: 4px; background: rgba(255, 255, 255, 0.92); border: 2.5px solid var(--outline); border-radius: 14px; padding: 8px 10px; }
+.over-link small { font-size: 12px; font-weight: 700; color: var(--text-sub); }
+.over-link input { width: 100%; height: 36px; border: 2px solid var(--panel-sunk-line); border-radius: 10px; padding: 0 8px; font-size: 13px; color: var(--text); background: #fff; }
 .over-team { width: 100%; display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; font-size: 12px; color: var(--text-sub); font-weight: 700; }
 .over-team .mini-ava { width: 40px; height: 40px; }
 

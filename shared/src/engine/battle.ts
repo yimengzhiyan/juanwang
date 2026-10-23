@@ -341,7 +341,7 @@ class Battle {
           if (ab.effect === 'reroll') this.bonus.rerolls += amt;
           if (ab.effect === 'discount') this.bonus.discount += amt;
         }
-        const label = ab.effect === 'gold' ? `下回合 +${amt}⚡` : ab.effect === 'reroll' ? `下回合 ${amt} 次免费刷新` : `下回合单位降价 ${amt}`;
+        const label = ab.effect === 'gold' ? `下回合 +${amt} 算力` : ab.effect === 'reroll' ? `下回合 ${amt} 次免费刷新` : `下回合单位降价 ${amt}`;
         this.emit({ type: 'bonus', side: u.side, unit: this.ref(u), kind: ab.effect, amount: amt, text: `${this.name(u)}：${label}` });
         break;
       }

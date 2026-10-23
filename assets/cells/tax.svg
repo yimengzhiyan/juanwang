@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-<defs><linearGradient id="g" x1="16" y1="12" x2="112" y2="116" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#22E5FF"/><stop offset="1" stop-color="#3D5AFE"/></linearGradient>
-<radialGradient id="bg" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#22E5FF" stop-opacity="0.28"/><stop offset="1" stop-color="#3D5AFE" stop-opacity="0"/></radialGradient>
-<filter id="nb" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.5"/></filter></defs>
-<circle cx="64" cy="64" r="60" fill="url(#bg)"/>
-<g fill="none" stroke="url(#g)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" filter="url(#nb)" opacity="0.7"><path d="M32 14H96V112L86 104L75 112L64 104L53 112L42 104L32 112Z"/><path d="M46 36h36M46 52h36M46 68h20"/><path d="M76 92l12-14"/><circle cx="76" cy="78" r="1"/><circle cx="88" cy="92" r="1"/></g>
-<g fill="none" stroke="url(#g)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M32 14H96V112L86 104L75 112L64 104L53 112L42 104L32 112Z"/><path d="M46 36h36M46 52h36M46 68h20"/><path d="M76 92l12-14"/><circle cx="76" cy="78" r="1"/><circle cx="88" cy="92" r="1"/></g>
-<g fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"><path d="M32 14H96V112L86 104L75 112L64 104L53 112L42 104L32 112Z"/><path d="M46 36h36M46 52h36M46 68h20"/><path d="M76 92l12-14"/><circle cx="76" cy="78" r="1"/><circle cx="88" cy="92" r="1"/></g>
-</svg>

@@ -60,6 +60,7 @@ describe('EventEffect 每种效果', () => {
     const f = s.shop.filter((x) => x.free);
     expect(f).toHaveLength(1);
     expect(f[0].price).toBe(0);
+    expect(f[0].freeReason).toBe('event');
     expect(data.unitsById[f[0].defId].faction).toBe('open');
     const s2 = shopAction(s, { type: 'buy', slot: s.shop.indexOf(s.shop.find((x) => x.free)!) }, data);
     expect(s2.gold).toBe(10);

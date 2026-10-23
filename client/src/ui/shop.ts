@@ -9,7 +9,7 @@ export function renderShop(unitsEl: HTMLElement, itemsEl: HTMLElement, s: RunSta
   let nUnits = 0;
   s.shop.forEach((slot, i) => {
     const wrap = document.createElement('div');
-    wrap.className = `sslot${slot.frozen ? ' is-frozen' : ''}${slot.free ? ' is-free' : ''}`;
+    wrap.className = `sslot${slot.frozen ? ' is-frozen' : ''}${slot.free ? ` is-free is-free--${slot.freeReason ?? 'levelUp'}` : ''}`;
     wrap.dataset.shop = String(i);
     const affordable = slot.price <= s.gold;
     if (slot.kind === 'unit') {
@@ -20,7 +20,7 @@ export function renderShop(unitsEl: HTMLElement, itemsEl: HTMLElement, s: RunSta
       c.dataset.src = `shop:${i}`;
       c.dataset.tut = 'shop-unit';
       wrap.appendChild(c);
-      wrap.appendChild(priceTag(slot.price, affordable, !!slot.free));
+      wrap.appendChild(priceTag(slot.price, affordable, slot.free ? (slot.freeReason ?? 'levelUp') : false));
       unitsEl.appendChild(wrap);
     } else {
       const def = data.itemsById[slot.defId];
