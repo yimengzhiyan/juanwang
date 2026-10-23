@@ -1,24 +1,30 @@
-// 新手引导：气泡 + 允许/高亮规则。步骤来自 tutorialStep(state)，文案来自 tutorial.json。
+// 新手引导：气泡 + 允许/高亮规则。步骤来自 tutorialStep(state, data)，文案来自 tutorial.json。
+// 2.0 顺序：buy → fight → equip → merge → synergy → (fight) → headline → (fight) → done。
 import gsap from 'gsap';
-import type { GameData, RunState, TutorialStepId } from '@juanwang/shared';
+import type { GameData, TutorialStepId } from '@juanwang/shared';
 import { avatarUrl } from '../assets';
 import { esc } from './cards';
 
-export type Kind = 'shopUnit' | 'shopItem' | 'team' | 'reroll' | 'freeze' | 'sell' | 'fight' | 'infoBuy' | 'infoUse' | 'infoSell';
-const ALL: Kind[] = ['shopUnit', 'shopItem', 'team', 'reroll', 'freeze', 'sell', 'fight', 'infoBuy', 'infoUse', 'infoSell'];
+export type Kind =
+  | 'shopUnit' | 'shopEquip' | 'shopCons' | 'team' | 'reroll' | 'freeze' | 'sell' | 'fight' | 'upgrade'
+  | 'infoBuy' | 'infoUse' | 'infoSell';
+const ALL: Kind[] = ['shopUnit', 'shopEquip', 'shopCons', 'team', 'reroll', 'freeze', 'sell', 'fight', 'upgrade', 'infoBuy', 'infoUse', 'infoSell'];
 
 export function allowedKinds(step: TutorialStepId | null): Set<Kind> {
   switch (step) {
     case 'buy':
     case 'buyAgain':
-    case 'merge':
+    case 'synergy':
       return new Set(['shopUnit', 'team', 'infoBuy']);
+    case 'merge':
+      return new Set(['shopUnit', 'team', 'infoBuy', 'reroll']);
     case 'fight':
-      return new Set(['fight']);
+      return new Set(['fight', 'shopUnit', 'team', 'infoBuy']);
+    case 'equip':
     case 'item':
-      return new Set(['shopItem', 'team', 'infoUse']);
+      return new Set(['shopEquip', 'team', 'infoBuy']);
     case 'freezeSell':
-      return new Set(['shopUnit', 'shopItem', 'freeze', 'team', 'sell', 'infoSell', 'infoBuy']);
+      return new Set(['shopUnit', 'shopEquip', 'freeze', 'team', 'sell', 'infoSell', 'infoBuy']);
     case 'headline':
       return new Set();
     default:
@@ -30,6 +36,9 @@ export interface Bubble {
   el: HTMLElement;
   set: (step: TutorialStepId | null, text: string, sub?: string) => void;
 }
+
+/** 气泡上显示的 7 步 */
+const ORDER: TutorialStepId[] = ['buy', 'fight', 'equip', 'merge', 'synergy', 'headline', 'done'];
 
 export function tutorialBubble(data: GameData, onSkip: () => void, onDone: () => void): Bubble {
   const el = document.createElement('div');
@@ -43,7 +52,6 @@ export function tutorialBubble(data: GameData, onSkip: () => void, onDone: () =>
   (el.querySelector('.tut-skip') as HTMLElement).onclick = onSkip;
   (el.querySelector('.tut-done') as HTMLElement).onclick = onDone;
   let last = '';
-  const order: TutorialStepId[] = ['buy', 'buyAgain', 'fight', 'merge', 'item', 'freezeSell', 'headline', 'done'];
   return {
     el,
     set(step, text, sub = '') {
@@ -52,7 +60,8 @@ export function tutorialBubble(data: GameData, onSkip: () => void, onDone: () =>
       el.dataset.step = step;
       (el.querySelector('.tut-text') as HTMLElement).innerHTML = esc(text);
       (el.querySelector('.tut-sub') as HTMLElement).innerHTML = esc(sub);
-      (el.querySelector('.tut-step') as HTMLElement).textContent = step === 'done' ? '完成' : `第 ${order.indexOf(step) + 1}/8 步`;
+      const i = ORDER.indexOf(step);
+      (el.querySelector('.tut-step') as HTMLElement).textContent = step === 'done' ? '完成' : `第 ${i < 0 ? 1 : i + 1}/${ORDER.length} 步`;
       el.classList.toggle('is-done', step === 'done');
       const key = step + text;
       if (key !== last) {
@@ -66,9 +75,4 @@ export function tutorialBubble(data: GameData, onSkip: () => void, onDone: () =>
 export function stepText(data: GameData, step: TutorialStepId): string {
   const s = data.tutorial?.steps[step];
   return typeof s === 'string' ? s : (s?.text ?? '');
-}
-
-/** 当前 freezeSell 的子状态 */
-export function freezeSellState(s: RunState): { froze: boolean; sold: boolean } {
-  return { froze: !!s.tutorial?.froze, sold: !!s.tutorial?.sold };
 }

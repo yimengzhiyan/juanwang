@@ -57,37 +57,50 @@ export interface Snapshot {
   name: string;
   room?: string;
   turn: number;
-  trophies: number;
+  hp: number;
+  archetype?: string;
   team: UnitInst[];
   seed: string;
 }
-export interface OpponentRes {
-  team: UnitInst[] | null;
-  name?: string;
-  trophies?: number;
+export interface OpponentSnap {
+  name: string;
+  team: UnitInst[];
+  hp?: number;
+  archetype?: string;
   turn?: number;
   room?: string;
 }
-export interface LbEntry {
-  rank: number;
+export interface ResultReq {
   name: string;
-  trophies: number;
+  room?: string;
+  rank: number;
   turns: number;
+  hp: number;
+  archetype?: string;
+  seed: string;
+  bestUnit?: string;
+}
+export interface LbEntry {
+  pos: number;
+  name: string;
+  rank: number;
+  turns: number;
+  hp: number;
+  archetype?: string | null;
   won: boolean;
   seed: string;
   bestUnit?: string | { defId: string } | null;
   date?: string;
-  room?: string;
+  room?: string | null;
 }
 
 export const api = {
   ping: () => req<{ ok: boolean }>('GET', '/healthz', undefined, 1500),
   daily: () => req<{ date: string; seed: string }>('GET', '/api/daily', undefined, 1500),
   snapshot: (s: Snapshot) => req<{ ok: boolean }>('POST', '/api/snapshot', s),
-  opponent: (p: { turn: number; trophies: number; room?: string; name?: string; seed?: string }) =>
-    req<OpponentRes>('GET', `/api/opponent?${qs(p)}`),
-  result: (r: { name: string; room?: string; trophies: number; turns: number; won: boolean; seed: string; bestUnit?: string }) =>
-    req<{ ok: boolean; best: boolean; rank: number }>('POST', '/api/result', r),
+  opponents: (p: { turn: number; room?: string; name?: string; seed?: string; limit?: number }) =>
+    req<{ opponents: OpponentSnap[] }>('GET', `/api/opponent?${qs(p)}`),
+  result: (r: ResultReq) => req<{ ok: boolean; best: boolean; position: number }>('POST', '/api/result', r),
   leaderboard: (p: { room?: string; date?: string }) =>
     req<{ entries: LbEntry[]; room?: string; date?: string }>('GET', `/api/leaderboard?${qs(p)}`),
 };

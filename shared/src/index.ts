@@ -25,5 +25,3 @@ export { generateArchetypeTeam, generateBotTeam, botPlayTurn, scaleTeam, profile
 export { DIFFICULTY, opponentScale, type Difficulty } from './engine/difficulty';
 export { tutorialStep, tutorialEnemy, offlineOpponent } from './tutorial';
 export { battleForState, battleOptionsFor, runTurnOffline } from './engine/helpers';
-/** @deprecated 1.0 兼容导出，2.0 客户端迁移后删除 */
-export { unitSlotsForTurn, itemSlotsForTurn, WIN_TROPHIES, SYNERGY_THRESHOLD, SYNERGY_DESC } from './compat';

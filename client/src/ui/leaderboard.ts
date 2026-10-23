@@ -3,8 +3,7 @@ import type { GameData } from '@juanwang/shared';
 import { api, todayCN, type LbEntry } from '../net';
 import { settings } from '../store';
 import { openModal } from './modal';
-import { esc, miniAvatar } from './cards';
-import { ui } from '../assets';
+import { esc, miniAvatar, synIcon, synName } from './cards';
 
 type Tab = 'all' | 'room' | 'today';
 
@@ -61,11 +60,13 @@ export function openLeaderboard(data: GameData, initial: Tab = 'all'): void {
 function row(data: GameData, e: LbEntry): string {
   const best = typeof e.bestUnit === 'string' ? e.bestUnit : e.bestUnit?.defId;
   const me = e.name === settings.name;
-  return `<div class="lb-row${me ? ' is-me' : ''}${e.rank <= 3 ? ` top${e.rank}` : ''}">
-    <span class="lb-rank">${e.rank}</span>
+  const arch = e.archetype && e.archetype !== 'mixed' ? e.archetype : null;
+  return `<div class="lb-row${me ? ' is-me' : ''}${e.pos <= 3 ? ` top${e.pos}` : ''}">
+    <span class="lb-rank">${e.pos}</span>
     ${best ? miniAvatar(data, best) : '<span class="mini-ava"></span>'}
-    <span class="lb-name">${esc(e.name)}${e.won ? ' <b class="lb-crown">登顶</b>' : ''}</span>
-    <span class="lb-score"><img src="${ui('fire')}" alt="">${e.trophies}</span>
+    <span class="lb-name">${esc(e.name)}${e.won ? ' <b class="lb-crown">吃鸡</b>' : ''}</span>
+    <span class="lb-place r${Math.min(4, e.rank)}">第${e.rank}名</span>
+    ${arch ? `<img class="lb-arch-ico" src="${synIcon(arch)}" alt="${esc(synName(arch))}" title="${esc(synName(arch))}流">` : '<span class="lb-arch-ico"></span>'}
     <span class="lb-turns">${e.turns} 回合</span>
   </div>`;
 }

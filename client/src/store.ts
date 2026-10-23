@@ -27,7 +27,16 @@ export const settings = {
   muted: lsGet<boolean>('muted', false),
   tutorialDone: lsGet<boolean>('tutorialDone', false),
   seen: new Set<string>(lsGet<string[]>('seen', [])),
+  /** 达成过的成就 id（结局页"首次达成"） */
+  achievements: new Set<string>(lsGet<string[]>('ach', [])),
 };
+/** 记录成就，返回其中首次达成的 */
+export function recordAchievements(ids: string[]): string[] {
+  const fresh = ids.filter((id) => !settings.achievements.has(id));
+  for (const id of fresh) settings.achievements.add(id);
+  if (fresh.length) lsSet('ach', [...settings.achievements]);
+  return fresh;
+}
 export function saveSettings(): void {
   lsSet('name', settings.name);
   lsSet('room', settings.room);
@@ -41,6 +50,7 @@ export function markSeen(ids: Iterable<string>): void {
   for (const id of ids) {
     if (!settings.seen.has(id)) {
       settings.seen.add(id);
+      if (app.run) app.newSeen.push(id);
       changed = true;
     }
   }
@@ -55,11 +65,6 @@ export function markSeen(ids: Iterable<string>): void {
 // ───────────── 对局 ─────────────
 export type RunMode = 'normal' | 'daily' | 'tutorial' | 'shared';
 
-export interface OpponentInfo {
-  name: string;
-  real: boolean;
-}
-
 export const app = {
   data: null as unknown as GameData,
   run: null as RunState | null,
@@ -69,9 +74,12 @@ export const app = {
   /** 结果是否已上传 */
   uploaded: false,
   lastRank: null as number | null,
-  opponent: null as OpponentInfo | null,
   /** 引导"完成"气泡已确认 */
   tutAck: false,
+  /** 本局新点亮的图鉴单位 */
+  newSeen: [] as string[],
+  /** 本局首次达成的成就（结局页算一次后缓存） */
+  freshAch: null as string[] | null,
 };
 
 type RunListener = (next: RunState, prev: RunState | null, action?: ShopActionInput) => void;
@@ -96,8 +104,9 @@ export function startRun(seed: string, mode: RunMode): RunState {
   app.startedAt = Date.now();
   app.uploaded = false;
   app.lastRank = null;
-  app.opponent = null;
   app.tutAck = false;
+  app.newSeen = [];
+  app.freshAch = null;
   setRun(run);
   return run;
 }
@@ -111,7 +120,7 @@ export function act(action: ShopActionInput): RunState {
 }
 
 // ───────────── 场景路由 ─────────────
-export type SceneName = 'loading' | 'home' | 'game' | 'battle' | 'over';
+export type SceneName = 'loading' | 'home' | 'arena' | 'game' | 'battle' | 'over';
 export interface Scene {
   el: HTMLElement;
   destroy?: () => void;
@@ -126,6 +135,11 @@ export function setSceneRoot(el: HTMLElement): void {
 }
 export function registerScene(name: SceneName, f: SceneFactory): void {
   factories.set(name, f);
+}
+/** 按当前对局阶段进入对应场景 */
+export function goRun(): void {
+  const p = app.run?.phase;
+  go(p === 'arena' ? 'arena' : p === 'battle' ? 'battle' : p === 'over' ? 'over' : 'game');
 }
 export function currentScene(): SceneName | null {
   return current?.name ?? null;

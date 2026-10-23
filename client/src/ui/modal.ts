@@ -1,7 +1,7 @@
 // 通用弹窗 + 单位/基建详情卡。
 import gsap from 'gsap';
-import type { GameData, UnitInst } from '@juanwang/shared';
-import { abilityText, esc, FACTION_NAME, TIER_NAME, unitCard } from './cards';
+import { EQUIP_SLOTS, type GameData, type UnitInst } from '@juanwang/shared';
+import { abilityText, esc, FACTION_NAME, ROLE_NAME, SLOT_NAME, TIER_NAME, unitCard } from './cards';
 import { assetUrl } from '../assets';
 import { sfx } from '../fx/sound';
 
@@ -77,16 +77,21 @@ export function closeAllModals(): void {
   if (root) root.innerHTML = '';
 }
 
-/** 单位详情：技能描述、阵营、阶级、台词、当前属性 */
-export function showUnitDetail(data: GameData, defId: string, inst?: Pick<UnitInst, 'atk' | 'hp' | 'level'> & Partial<UnitInst>, extra?: HTMLElement): ModalHandle | null {
+/** 单位详情：技能、阵营/职业、阶级、装备、台词、当前属性（stats = 含装备的有效属性） */
+export function showUnitDetail(
+  data: GameData,
+  defId: string,
+  inst?: Pick<UnitInst, 'atk' | 'hp' | 'level'> & Partial<UnitInst>,
+  opts: { stats?: { atk: number; hp: number }; extra?: HTMLElement } = {},
+): ModalHandle | null {
   const def = data.unitsById[defId];
   if (!def) return null;
   sfx.click();
   const body = document.createElement('div');
   body.className = 'detail';
-  const atk = (inst?.atk ?? def.atk) + (inst?.tempAtk ?? 0);
-  const hp = (inst?.hp ?? def.hp) + (inst?.tempHp ?? 0);
-  const card = unitCard(def, { atk, hp, level: inst?.level ?? 1, xp: inst?.xp, shield: inst?.shield, atkBuffed: !!inst?.tempAtk });
+  const atk = opts.stats?.atk ?? (inst?.atk ?? def.atk) + (inst?.tempAtk ?? 0);
+  const hp = opts.stats?.hp ?? (inst?.hp ?? def.hp) + (inst?.tempHp ?? 0);
+  const card = unitCard(def, { atk, hp, level: inst?.level ?? 1, xp: inst?.xp, shield: inst?.shield, atkBuffed: !!inst?.tempAtk, equips: inst?.equips });
   const left = document.createElement('div');
   left.className = 'detail-card';
   left.appendChild(card);
@@ -100,6 +105,7 @@ export function showUnitDetail(data: GameData, defId: string, inst?: Pick<UnitIn
     <div class="detail-chips">
       <span class="chip chip--tier tier-${def.tier}">${def.token ? '召唤物' : TIER_NAME[def.tier]}</span>
       <span class="chip chip--fac fac-${def.faction}"><img src="${assetUrl(`ui/faction_${def.faction}.svg`)}" alt="">${FACTION_NAME[def.faction]}</span>
+      ${def.role ? `<span class="chip"><img src="${assetUrl(`ui/role_${def.role}.svg`)}" alt="">${ROLE_NAME[def.role]}</span>` : ''}
       ${inst ? `<span class="chip">Lv${inst.level}</span>` : ''}
     </div>
     <div class="detail-stats">攻击 <b>${atk}</b> · 血量 <b>${hp}</b></div>
@@ -107,13 +113,59 @@ export function showUnitDetail(data: GameData, defId: string, inst?: Pick<UnitIn
   const skill = document.createElement('div');
   skill.className = 'detail-skill';
   skill.innerHTML = `<b>技能</b>${esc(abilityText(def))}`;
+  const eqs = document.createElement('div');
+  eqs.className = 'detail-eqs';
+  const list = EQUIP_SLOTS.map((slot) => {
+    const e = inst?.equips?.[slot];
+    const d = e ? data.equipsById[e.defId] : undefined;
+    if (!d || !e) return '';
+    return `<div class="detail-eq${e.gold ? ' is-gold' : ''}"><img src="${assetUrl(d.icon)}" alt=""><div><b>${e.gold ? '金·' : ''}${esc(d.name)}</b><small>${SLOT_NAME[slot]}</small><span>${esc(e.gold ? d.goldDesc : d.desc)}</span></div></div>`;
+  }).join('');
+  eqs.innerHTML = list;
   const lines = document.createElement('div');
   lines.className = 'detail-lines';
-  lines.innerHTML = (def.lines ?? []).map((l) => `<span class="say">“${esc(l)}”</span>`).join('');
+  const all = [...(def.lines?.general ?? []), ...(def.lines?.onSynergy ?? [])];
+  lines.innerHTML = all.map((l) => `<span class="say">“${esc(l)}”</span>`).join('');
   const top = document.createElement('div');
   top.className = 'detail-top';
   top.append(left, right);
-  body.append(top, skill, lines);
-  if (extra) body.appendChild(extra);
+  body.append(top, skill);
+  if (list) body.appendChild(eqs);
+  body.appendChild(lines);
+  if (opts.extra) body.appendChild(opts.extra);
   return openModal({ body, cls: 'modal--detail' });
+}
+
+/** 装备 / 消耗品详情 */
+export function showItemDetail(data: GameData, kind: 'equip' | 'consumable', id: string, gold = false): ModalHandle | null {
+  const body = document.createElement('div');
+  body.className = 'detail item-detail';
+  if (kind === 'equip') {
+    const d = data.equipsById[id];
+    if (!d) return null;
+    body.innerHTML = `<div class="detail-top"><div class="item-ico${gold ? ' is-gold' : ''}"><img src="${assetUrl(d.icon)}" alt=""></div><div class="detail-info"><div class="detail-name">${gold ? '金·' : ''}${esc(d.name)}</div><div class="detail-chips"><span class="chip"><img src="${assetUrl(`ui/slot_${d.slot}.svg`)}" alt="">${SLOT_NAME[d.slot]}</span><span class="chip">${d.price} 算力</span></div></div></div>
+      <div class="detail-skill"><b>效果</b>${esc(gold ? d.goldDesc : d.desc)}</div>${gold ? '' : `<div class="detail-skill gold"><b>金色</b>${esc(d.goldDesc)}</div>`}
+      <p class="item-tip">同名两件合成金色版；卖掉单位时每件折算 1 算力（金色 2）。</p>`;
+  } else {
+    const d = data.consumablesById[id];
+    if (!d) return null;
+    body.innerHTML = `<div class="detail-top"><div class="item-ico"><img src="${assetUrl(d.icon)}" alt=""></div><div class="detail-info"><div class="detail-name">${esc(d.name)}</div><div class="detail-chips"><span class="chip">消耗品</span><span class="chip">${d.targetKind === 'unit' ? '选一个单位' : '买下立即生效'}</span></div></div></div>
+      <div class="detail-skill"><b>效果</b>${esc(d.desc)}</div>`;
+  }
+  sfx.click();
+  return openModal({ body, cls: 'modal--detail' });
+}
+
+/** 确认框 */
+export function confirmBox(text: string, ok: string, onOk: () => void): ModalHandle {
+  const body = document.createElement('div');
+  body.className = 'confirm';
+  body.innerHTML = `<p>${esc(text)}</p><div class="confirm-btns"><button class="btn btn--white btn--sm c-no">取消</button><button class="btn btn--go btn--sm c-ok">${esc(ok)}</button></div>`;
+  const m = openModal({ body, cls: 'modal--confirm', closeButton: false });
+  (body.querySelector('.c-no') as HTMLElement).onclick = () => m.close();
+  (body.querySelector('.c-ok') as HTMLElement).onclick = () => {
+    m.close();
+    onOk();
+  };
+  return m;
 }

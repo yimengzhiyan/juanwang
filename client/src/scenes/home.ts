@@ -1,6 +1,7 @@
 // 首页：Logo、开始一局、每日挑战、好友房、图鉴、排行榜、新手引导、昵称。
 import gsap from 'gsap';
-import { app, go, newSeed, saveSettings, settings, startRun, type Scene } from '../store';
+import { app, goRun, newSeed, saveSettings, settings, startRun, type Scene } from '../store';
+import { updateDock } from '../ui/lobby';
 import { assetUrl, avatarUrl } from '../assets';
 import { openModal } from '../ui/modal';
 import { openCodex } from '../ui/codex';
@@ -14,6 +15,7 @@ import { esc } from '../ui/cards';
 export function homeScene(): Scene {
   const data = app.data;
   const el = document.createElement('div');
+  updateDock(null);
   const resumable = app.run && app.run.phase !== 'over' && app.run.phase !== 'battle';
   const featured = ['gpt_chan', 'claude_chan', 'deepseek_chan', 'qwen_chan', 'huang'].map((id) => data.unitsById[id]).filter(Boolean);
   el.innerHTML = `
@@ -22,7 +24,7 @@ export function homeScene(): Scene {
       <button class="hud-mute" aria-label="静音"></button>
     </div>
     <img class="home-logo" src="${assetUrl('logo.svg')}" alt="卷王自走棋">
-    <div class="home-tagline">买 AI 单位 · 排兵布阵 · 自动互撞 · 拿满 10 个热搜登顶</div>
+    <div class="home-tagline">8 人淘汰赛 · 流派羁绊 · 装备 · 活到最后就是卷王</div>
     <div class="home-heroes">${featured.map((d, i) => `<img style="--i:${i}" src="${avatarUrl(d)}" alt="">`).join('')}</div>
     <div class="home-name panel"><label>昵称</label><input maxlength="12" value="${esc(settings.name)}" aria-label="昵称"><span class="home-room"></span></div>
     <div class="home-btns">
@@ -73,21 +75,21 @@ export function homeScene(): Scene {
         fn();
       };
   };
-  on('.h-resume', () => go('game'));
+  on('.h-resume', () => goRun());
   on('.h-start', () => {
     startRun(newSeed(), 'normal');
-    go('game');
+    goRun();
   });
   on('.h-daily', async () => {
     const res = await api.daily();
     const seed = res?.seed ?? `daily-${todayCN()}`;
     startRun(seed, 'daily');
     toast(`今日挑战 ${seed.replace('daily-', '')}：所有人同一张开局`, 'info', 2200);
-    go('game');
+    goRun();
   });
   on('.h-tut', () => {
     startRun('tutorial', 'tutorial');
-    go('game');
+    goRun();
   });
   on('.h-codex', () => openCodex(data));
   on('.h-lb', () => openLeaderboard(data));

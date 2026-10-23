@@ -4,7 +4,7 @@ import gsap from 'gsap';
 import type { ShopActionInput } from '@juanwang/shared';
 import { getGameData } from './gameData';
 import { assetUrl, preload } from './assets';
-import { app, act, currentScene, go, registerScene, setRun, setSceneRoot, settings, startRun, type RunMode } from './store';
+import { app, act, currentScene, go, goRun, registerScene, setRun, setSceneRoot, settings, startRun, type RunMode } from './store';
 import { mountAnims } from './fx/anims';
 import { particles } from './fx/particles';
 import { mountModals, closeAllModals } from './ui/modal';
@@ -13,6 +13,10 @@ import { homeScene } from './scenes/home';
 import { gameScene, pendingExtra } from './scenes/game';
 import { battleCtl, battleScene } from './scenes/battle';
 import { overScene } from './scenes/over';
+import { arenaScene } from './scenes/arena';
+import { resultCtl } from './scenes/result';
+import { mountLobbyDock } from './ui/lobby';
+import { setCardData } from './ui/cards';
 import { api, isOnline, onOnlineChange } from './net';
 
 gsap.config({ nullTargetWarn: false });
@@ -32,6 +36,7 @@ mountToast(shell);
 
 onOnlineChange(() => document.body.classList.toggle('is-offline', !isOnline()));
 registerScene('home', homeScene);
+registerScene('arena', arenaScene);
 registerScene('game', gameScene);
 registerScene('battle', battleScene);
 registerScene('over', overScene);
@@ -47,6 +52,8 @@ async function boot(): Promise<void> {
   const text = shell.querySelector('.load-text') as HTMLElement;
   try {
     app.data = getGameData();
+    setCardData(app.data);
+    mountLobbyDock(shell.parentElement!, app.data);
   } catch (e) {
     text.textContent = `内容数据出错：${(e as Error).message}`;
     console.warn(e);
@@ -63,10 +70,10 @@ async function boot(): Promise<void> {
   if (seed) {
     startRun(seed.slice(0, 64), seed.startsWith('daily-') ? 'daily' : 'shared');
     history.replaceState(null, '', location.pathname + (params.has('debug') ? '?debug' : ''));
-    go('game');
+    goRun();
   } else if (!settings.tutorialDone && !params.has('notut')) {
     startRun('tutorial', 'tutorial');
-    go('game');
+    goRun();
   } else go('home');
 }
 
@@ -94,18 +101,27 @@ if (new URLSearchParams(location.search).has('debug')) {
         const n = act(a);
         if (!n.error) {
           closeAllModals();
-          go('game');
+          goRun();
         }
         return n;
       }
+      if (a.type === 'choosePveReward') {
+        resultCtl.pick(a.index);
+        closeAllModals();
+        return app.run;
+      }
       const n = act(a);
       if (n.phase === 'battle' && currentScene() !== 'battle') go('battle');
+      if (a.type === 'chooseArena' && !n.error) go('game');
       return n;
     },
     start(seed: string, mode: RunMode = 'normal') {
       startRun(seed, mode);
       closeAllModals();
-      go('game');
+      goRun();
+    },
+    get bigShown() {
+      return battleCtl.bigShown;
     },
     go,
     setRun,

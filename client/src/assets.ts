@@ -35,13 +35,19 @@ export function isPhotoAvatar(def: Pick<UnitDef, 'id' | 'avatar'>): boolean {
 }
 
 export const ui = (name: string): string => assetUrl(`ui/${name}.svg`);
+export const fxArt = (name: string): string => assetUrl(`fx/${name}.svg`);
+/** 素材是否存在（构建期文件列表） */
+export const hasAsset = (path: string): boolean => files.has(path.replace(/^\/+/, ''));
+/** 任意相对路径头像（对手 / PVE）：characters、units 走 png 优先规则 */
+export const artUrl = (path: string): string => assetUrl(resolveArt(path));
 
 /** 预加载：头像、基建、UI、Logo、背景、字体。onProgress(0..1) */
 export async function preload(data: GameData, onProgress: (p: number) => void): Promise<void> {
   const urls = new Set<string>();
   for (const u of data.units) urls.add(avatarUrl(u));
-  for (const it of data.items) urls.add(assetUrl(it.icon));
-  for (const f of list) if (f.startsWith('ui/') || f.startsWith('fx/')) urls.add(assetUrl(f));
+  for (const it of data.equips) urls.add(assetUrl(it.icon));
+  for (const it of data.consumables) urls.add(assetUrl(it.icon));
+  for (const f of list) if (/^(ui|fx|arenas|pve|opponents)\//.test(f)) urls.add(assetUrl(f));
   urls.add(assetUrl('logo.svg'));
   urls.add(assetUrl('bg_home.svg'));
   const jobs: Promise<unknown>[] = [...urls].map(

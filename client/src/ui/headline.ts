@@ -1,7 +1,7 @@
 // 头条弹窗（报纸风）+ 突发"号外"条幅 + 事件效果文案。
 import gsap from 'gsap';
-import type { EventEffect, HeadlineDef, SurpriseDef } from '@juanwang/shared';
-import { esc, FACTION_NAME } from './cards';
+import { DIFFICULTY, type EventEffect, type HeadlineDef, type SurpriseDef } from '@juanwang/shared';
+import { esc, FACTION_NAME, SLOT_NAME, synName } from './cards';
 import { sfx } from '../fx/sound';
 import { reducedMotion } from '../fx/anims';
 
@@ -19,7 +19,7 @@ export function effectText(e: EventEffect): string {
     case 'gold':
       return `立即 ${sign(e.amount)} 算力`;
     case 'priceMod': {
-      const t = e.target === 'item' ? '基建' : e.target === 'all' ? '商品' : '单位';
+      const t = e.target === 'item' ? '装备' : e.target === 'all' ? '商品' : '单位';
       return `本回合${t}价格 ${sign(e.amount)}`;
     }
     case 'freeUnit':
@@ -49,7 +49,42 @@ export function effectText(e: EventEffect): string {
     case 'levelUpRandom':
       return '随机一个单位进化 +1 级';
     case 'lifeTrade':
-      return `失去 1 信心，换 +${e.amount} 算力和免费刷新`;
+      return `失去 ${DIFFICULTY.lifeTradeHp} 热度，换 +${e.amount} 算力和免费刷新`;
+    case 'enemyBuff':
+      return `本场敌方全体 ${stat(e.atk, e.hp)}`;
+    case 'firstStrike':
+      return e.side === 'me' ? '本场我方先手' : '本场敌方先手';
+    case 'swapFronts':
+      return '开战时双方前排互换阵营';
+    case 'battleStatMul': {
+      const who = e.side === 'me' ? '我方' : e.side === 'enemy' ? '敌方' : '双方';
+      const parts: string[] = [];
+      if (e.atk && e.atk !== 1) parts.push(`攻 ×${e.atk}`);
+      if (e.hp && e.hp !== 1) parts.push(`血 ×${e.hp}`);
+      return `本场${who}${parts.join(' ') || '属性不变'}`;
+    }
+    case 'addEnemyBoss':
+      return `敌方多一个 ${e.atk}/${e.hp} Boss，赢了对手掉血 ×${e.rewardMul}`;
+    case 'goldenEquips':
+      return '本场我方装备全部按金色生效';
+    case 'summonBuff':
+      return `本场召唤物 ${stat(e.atk, e.hp)}`;
+    case 'damageOpponent':
+      return `${e.target === 'leader' ? '热度最高的对手' : '随机一名对手'}立即 -${e.amount} 热度`;
+    case 'stealEnemy':
+      return '开战时挖走一名敌人';
+    case 'selfHpLoss':
+      return `立即失去 ${e.amount} 热度`;
+    case 'battleSummon':
+      return `开战时${e.side === 'me' ? '我方' : '敌方'}召唤 ${e.count} 个单位`;
+    case 'synergyBonus':
+      return `本回合 ${synName(e.key)} 羁绊人数 +${e.amount}`;
+    case 'wager':
+      return `对赌：赢了下回合 +${e.winGold} 算力，输了多掉 ${e.loseHp} 热度`;
+    case 'benchEnemy':
+      return '开战时请一名敌人下场';
+    case 'freeEquip':
+      return `商店送一件免费${e.gold ? '金色' : ''}${e.slot ? SLOT_NAME[e.slot] : '装备'}`;
   }
 }
 export const effectsText = (list: EventEffect[]): string => list.map(effectText).join('，');
