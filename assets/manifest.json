@@ -101,7 +101,9 @@
     "seat_one_aura": "arenas/seat_one_aura.svg",
     "equip_expo": "arenas/equip_expo.svg",
     "folk_era": "arenas/folk_era.svg",
-    "institute": "arenas/institute.svg"
+    "institute": "arenas/institute.svg",
+    "spring_gala": "arenas/spring_gala.svg",
+    "safety_act": "arenas/safety_act.svg"
   },
   "opponents": {
     "shuijun_hq": "opponents/shuijun_hq.svg",

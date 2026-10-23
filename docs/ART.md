@@ -358,7 +358,7 @@ SVG 统一约定：主描边 `#3B2A1A`（512 图 10~12px、128 图 5px、64 图 
 | `ui/slot_weapon\|armor\|trinket.svg` | 48×48 | 空装备槽：浅灰 `#AEBBCB` 虚线剑 / 盾 / 戒指，放在 `--panel-sunk` 底上 |
 | `ui/gold_frame.svg` | 64×64 | 金色装备边框，九宫格用：`border-image: url(gold_frame.svg) 16 / 16px round;`（四角菱形钉，边上居中圆钉） |
 | `items/coffee\|press\|pivot.svg` | 128×128 | 3 个消耗品贴纸（与基建同款白边圆贴纸） |
-| `arenas/<id>.svg` | 320×200 | 8 张赛场卡插画，自带 18px 圆角 + 5px 深棕描边，可直接当卡面上半部 |
+| `arenas/<id>.svg` | 320×200 | 10 张赛场卡插画（含 spring_gala 春晚舞台、safety_act 安全法案），自带 18px 圆角 + 5px 深棕描边，可直接当卡面上半部 |
 | `opponents/shuijun_hq\|hallucination_lab.svg` | 512×512 | 非角色 AI 对手头像，彩色圆底同单位图 |
 | `pve/hallucination_horde\|gpu_legion.svg` | 640×200 | "怪物来袭"条幅，标题字已转曲在图里 |
 | `fx/shield_shard\|steal_hand\|boom\|revive_wing\|chain_bolt.svg` | 128×128 | 单色特效图形：`fill="currentColor"`，根节点 `color="#FFFFFF"`；内联 SVG 用 CSS `color` 染色，`<img>`/canvas 用时默认白色，需染色用 `mask-image` + 背景色 |
