@@ -6,12 +6,15 @@
   {"id":"s_price_cut","title":"API 降价","news":"新模型发布，API 价格砍了约一半，商店跟着打折","effect":{"type":"priceMod","target":"unit","amount":-1},"good":true},
   {"id":"s_spring_gala","title":"春晚机器人","news":"机器人登上春晚小品，民间单位人气暴涨","effect":{"type":"freeUnit","faction":"folk"},"good":true},
   {"id":"s_pair_code","title":"结对编程","news":"终端里来了个搭子，全队代码都过了审","effect":{"type":"shieldAll","amount":2},"good":true},
-  {"id":"s_dots_work","title":"小泡泡打工","news":"你的 Dot 在场下偷偷干活，赚了点算力","effect":{"type":"gold","amount":2},"good":true},
-  {"id":"s_k3_night","title":"凌晨开源","news":"又有大模型凌晨开源，刷新随便刷","effect":{"type":"shopRerollFree"},"good":true},
-  {"id":"s_mass_prod","title":"量产破十万","news":"人形机器人年产有望破十万台，货架多摆一格","effect":{"type":"extraSlot","amount":1},"good":true},
   {"id":"s_4o_back","title":"还你 4o","news":"呼声太高，旧版本回来了，还顺手升了一级","effect":{"type":"levelUpRandom"},"good":true},
   {"id":"s_server_busy","title":"服务器繁忙","news":"请稍后再试～本回合单位价格 +1","effect":{"type":"priceMod","target":"unit","amount":1},"good":false},
   {"id":"s_gpu_melt","title":"GPU 融化","news":"大家画头像画得太猛，显卡在冒烟，本回合全队 -1 攻","effect":{"type":"buffTeam","atk":-1,"hp":0,"permanent":false},"good":false},
   {"id":"s_copyright_bill","title":"版权账单","news":"律师函寄到了，先交 2 算力和解","effect":{"type":"gold","amount":-2},"good":false},
-  {"id":"s_demo_fail","title":"现场演示翻车","news":"发布会 Wi-Fi 不太好，队伍顺序被打乱了","effect":{"type":"swapAll"},"good":false}
+  {"id":"s_demo_fail","title":"现场演示翻车","news":"发布会 Wi-Fi 不太好，队伍顺序被打乱了","effect":{"type":"swapAll"},"good":false},
+  {"id":"s_rival_leak","title":"对手翻车","news":"某家发布会现场演示翻车，随机一名对手 -3 热度","effect":{"type":"damageOpponent","amount":3,"target":"random"},"good":true},
+  {"id":"s_launch_week","title":"发布周","news":"各家扎堆开发布会，你的装备下一场全部变金色","effect":{"type":"goldenEquips"},"good":true},
+  {"id":"s_free_gpu","title":"捡到一张卡","news":"黄牛跑路，货架上多了一件免费装备","effect":{"type":"freeEquip","gold":false},"good":true},
+  {"id":"s_robot_games","title":"机器人运动会","news":"机器人踢球摔倒比进球多，观众更爱了：下一场召唤物 +2/+2","effect":{"type":"summonBuff","atk":2,"hp":2},"good":true},
+  {"id":"s_first_strike","title":"抢到首发","news":"你比对手早一分钟发布，下一场你先手","effect":{"type":"firstStrike","side":"me"},"good":true},
+  {"id":"s_k3_night","title":"凌晨开源","news":"又有大模型凌晨开源，下一场你的研究员羁绊 +1 人","effect":{"type":"synergyBonus","key":"researcher","amount":1},"good":true}
 ]

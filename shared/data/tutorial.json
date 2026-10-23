@@ -1,36 +1,39 @@
 {
-  "_schema": "按 shared/src/types.ts 的 TutorialDef：turns[] = {turn, units: 商店单位 defId[], items: 商店基建 id[], enemy: [{defId, atk?, hp?, level?}] 前排在前}；headlineTurn/headline 指定引导头条；steps 的 key 只能是 buy/buyAgain/fight/merge/item/freezeSell/headline/done，值 {text, target?}，target 是给客户端的高亮提示（shop-unit / shop-item / team / fight / freeze / sell / headline）。流程：回合1 buy→buyAgain→fight；回合2 merge(凑满 3 个进化 Lv2)→item→freezeSell(冻结 + 买标注员再卖掉)→fight；回合3 headline→fight→done。",
-  "seed": "tutorial-v1",
+  "_schema": "2.0 引导局（TutorialDef）：turns[] = {turn, units: 商店单位 defId[], equips: 商店装备 id[], consumables?: 消耗品 id[], enemy: [{defId, atk?, hp?, level?}] 前排在前}；headlineTurn/headline 指定引导头条；order = 步骤顺序（fight 可重复）。steps 值 {text, target?}，target 为客户端高亮提示（shop-unit / shop-equip / team-unit / synergy-bar / fight / headline）。流程：回合1 buy→fight（看交替开火）；回合2 equip→merge→synergy→fight；回合3 headline→fight→done。buyAgain/item/freezeSell 为 1.0 兼容键，引擎切到 2.0 后可忽略。",
+  "seed": "tutorial-v2",
   "headlineTurn": 3,
-  "headline": "h_redpack",
+  "headline": "h_dots",
+  "order": ["buy", "fight", "equip", "merge", "synergy", "fight", "headline", "fight", "done"],
   "turns": [
     {
       "turn": 1,
-      "units": ["crawler", "crawler", "labeler"],
-      "items": ["firewall"],
-      "enemy": [{"defId": "botnet", "atk": 1, "hp": 1}]
+      "units": ["botnet", "botnet", "crawler", "labeler"],
+      "equips": ["dataset"],
+      "enemy": [{"defId": "crawler", "atk": 1, "hp": 1}]
     },
     {
       "turn": 2,
-      "units": ["crawler", "labeler", "prompt_eng", "botnet"],
-      "items": ["dataset"],
-      "enemy": [{"defId": "crawler", "atk": 1, "hp": 1}, {"defId": "botnet", "atk": 1, "hp": 1}]
+      "units": ["botnet", "labeler", "prompt_eng", "crawler"],
+      "equips": ["dataset", "gpu_h100"],
+      "enemy": [{"defId": "crawler", "atk": 1, "hp": 2}, {"defId": "wrapper", "atk": 1, "hp": 1}]
     },
     {
       "turn": 3,
-      "units": ["doubao_chan", "qwen_chan", "wrapper"],
-      "items": ["quantize", "jumpbox"],
-      "enemy": [{"defId": "labeler", "atk": 1, "hp": 2}, {"defId": "botnet", "atk": 1, "hp": 1}]
+      "units": ["doubao_chan", "qwen_chan", "botnet", "labeler"],
+      "equips": ["firewall", "trending"],
+      "enemy": [{"defId": "labeler", "atk": 1, "hp": 2}, {"defId": "wrapper", "atk": 1, "hp": 2}]
     }
   ],
   "steps": {
-    "buy": {"text": "点一下「数据爬虫」卡片，再点「购买」：花 3 算力，它会进到你的队伍", "target": "shop-unit"},
-    "buyAgain": {"text": "再买一只同名爬虫：点一下卡片，再点「购买」，它会叠到第一只身上（2/3），属性 +1/+1", "target": "shop-unit"},
-    "fight": {"text": "点「开战」！最左边的单位打头阵，双方自动互撞", "target": "fight"},
-    "merge": {"text": "商店又来了一只爬虫！点一下卡片，再点「购买」凑满 3 只，进化成 Lv2，还会送你一个高阶单位", "target": "shop-unit"},
-    "item": {"text": "基建能强化单位：买下「数据集」，再点你的爬虫，永久 +1/+2", "target": "shop-item"},
-    "freezeSell": {"text": "冻结一个喜欢的商店槽，下回合还在；再买下「标注员」，然后把它卖掉，看看出售能回多少算力（别卖进化好的爬虫）", "target": "freeze"},
-    "headline": {"text": "AI 圈出大事了！头条二选一：现在拿算力，还是攒到下回合？", "target": "headline"},
-    "done": {"text": "上手完成！拿满 10 个热搜就能登顶，信心归零就再来一局", "target": "fight"}
+    "buy": {"text": "点「水军机器人」买下它（3 算力）；再买一只同名的，会直接叠到它身上", "target": "shop-unit"},
+    "fight": {"text": "点「开战」！双方从 1 号位开始轮流开火：你的 1 号 → 对面 1 号 → 你的 2 号……", "target": "fight"},
+    "equip": {"text": "装备永久生效！买下「数据集」，把它拖到水军机器人身上，防具槽就亮了", "target": "shop-equip"},
+    "merge": {"text": "再买一只水军机器人叠上去：凑满 3 只进化 Lv2，商店还会送你一个高阶单位", "target": "shop-unit"},
+    "synergy": {"text": "再买一个「标注员」：民间 ×2 羁绊点亮！开战会多召唤一个水军，看队伍上方的徽章", "target": "synergy-bar"},
+    "headline": {"text": "AI 圈出大事了！头条会改变这一场的战场：召唤物变强，还是商店多一格？", "target": "headline"},
+    "done": {"text": "上手完成！7 名对手各有流派，活到最后就是卷王", "target": "fight"},
+    "buyAgain": {"text": "再买一只同名的水军机器人，它会叠到第一只身上", "target": "shop-unit"},
+    "item": {"text": "买下装备，拖到一个单位身上，它会永久生效", "target": "shop-equip"},
+    "freezeSell": {"text": "喜欢的商店格可以冻结留到下回合；不要的单位可以卖掉回点算力", "target": "freeze"}
   }
 }

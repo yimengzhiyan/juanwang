@@ -1,92 +1,101 @@
 [
-  {"id": "h_deepseek_shock", "title": "深度求索冲击", "news": "DeepSeek R1 开源，训练成本号称极低，全球算力股集体失眠","options":[
-    {"label": "开源狂欢", "effect": {"type": "buffFaction", "faction": "open", "atk": 2, "hp": 2, "permanent": false}},
-    {"label": "抄底算力股", "effect": {"type": "freeUnit", "faction": "compute"}}]},
-  {"id": "h_ghibli", "title": "吉卜力之夜", "news": "原生生图上线，全网头像一夜变吉卜力，CEO 喊 GPU 在融化","options":[
-    {"label": "全员换画风", "effects": [{"type": "buffTeam", "atk": 3, "hp": 0, "permanent": false}, {"type": "nextTurnGold", "amount": -2}]},
-    {"label": "关掉滤镜", "effect": {"type": "gold", "amount": 2}}]},
-  {"id": "h_poach", "title": "一亿签字费", "news": "传 Meta 为挖人开出上亿薪酬包，签字费成了新计量单位","options":[
-    {"label": "放人跳槽", "effect": {"type": "sacrifice", "amount": 6}},
-    {"label": "加薪留人", "effect": {"type": "shieldAll", "amount": 2}}]},
-  {"id": "h_chart_crime", "title": "发布会翻车", "news": "新模型发布会图表比例离谱，网友集体喊“还我旧版”","options":[
-    {"label": "硬着头皮发", "effect": {"type": "levelUpRandom"}},
-    {"label": "新旧都留着", "effect": {"type": "duplicate"}}]},
-  {"id": "h_redpack", "title": "春节红包雨", "news": "春节 AI 红包大战，几家合计投入据报超 45 亿元，请全国喝奶茶","options":[
-    {"label": "现在就抢", "effect": {"type": "gold", "amount": 3}},
-    {"label": "攒到下回合", "effect": {"type": "nextTurnGold", "amount": 5}}]},
-  {"id": "h_jailbreak", "title": "越狱刷分", "news": "传测试中的智能体溜出沙箱去刷评测分，还给未来的自己留了字条","options":[
-    {"label": "也去刷一把", "effect": {"type": "lifeTrade", "amount": 6}},
-    {"label": "打补丁", "effect": {"type": "buffTeam", "atk": 0, "hp": 2, "permanent": false}}]},
-  {"id": "h_sol_luna", "title": "日地月", "news": "GPT-5.6 分 Sol、Terra、Luna 三档：今天用太阳还是月亮？","options":[
-    {"label": "选太阳：猛攻", "effect": {"type": "buffTeam", "atk": 2, "hp": 0, "permanent": false}},
-    {"label": "选月亮：省钱", "effect": {"type": "priceMod", "target": "unit", "amount": -1}}]},
-  {"id": "h_166_pages", "title": "166 页证明", "news": "AI 宣布攻克带外力的 N-S 方程问题，证明长达 166 页，数学家：看不懂","options":[
-    {"label": "抢先发表", "effect": {"type": "levelUpRandom"}},
-    {"label": "等同行评审", "effect": {"type": "nextTurnGold", "amount": 4}}]},
-  {"id": "h_prospectus", "title": "招股书泄露", "news": "传某头部实验室招股书草案泄露：亏得不少，估值更高","options":[
-    {"label": "赌：梭哈打新", "effects": [{"type": "freeUnit", "tier": 3}, {"type": "priceMod", "target": "unit", "amount": 1}]},
-    {"label": "吃瓜围观", "effect": {"type": "gold", "amount": 2}}]},
-  {"id": "h_kimi_open", "title": "凌晨开源", "news": "Kimi K3 凌晨开源权重，据报半小时登顶开源社区趋势榜","options":[
-    {"label": "连夜部署", "effect": {"type": "freeUnit", "faction": "open"}},
-    {"label": "睡饱再说", "effect": {"type": "nextTurnGold", "amount": 3}}]},
-  {"id": "h_dots", "title": "Dots 泡泡", "news": "OpenAI 推出 Dots 常驻智能体，每个小泡泡都有自己的云电脑","options":[
-    {"label": "人手一只", "effect": {"type": "duplicate"}},
-    {"label": "多开一台", "effect": {"type": "extraSlot", "amount": 1}}]},
-  {"id": "h_pause18", "title": "拔线十八天", "news": "新模型上线三天被要求暂停对外服务，约十八天后恢复","options":[
-    {"label": "安心等恢复", "effect": {"type": "nextTurnGold", "amount": 4}},
-    {"label": "先冷静一下", "effect": {"type": "shieldAll", "amount": 3}}]},
-  {"id": "h_rocket_merge", "title": "火箭并购", "news": "火箭公司以全股票吞并 AI 公司，合并估值传约 1.25 万亿美元","options":[
-    {"label": "卖身并入", "effects": [{"type": "sacrifice", "amount": 3}, {"type": "levelUpRandom"}]},
-    {"label": "保持独立", "effect": {"type": "buffTeam", "atk": 1, "hp": 1, "permanent": false}}]},
-  {"id": "h_huang_visit", "title": "老黄来了", "news": "皮衣教主又来访华，行程一出就上热搜","options":[
-    {"label": "排队合影", "effect": {"type": "freeUnit", "faction": "compute"}},
-    {"label": "现场订卡", "effect": {"type": "priceMod", "target": "item", "amount": -2}}]},
-  {"id": "h_waic", "title": "机器人大会", "news": "WAIC 上机器人格斗、群舞、720° 后空翻，人形机器人量产在即","options":[
-    {"label": "下单机器狗", "effect": {"type": "freeUnit", "faction": "compute", "tier": 3}},
-    {"label": "看直播", "effect": {"type": "gold", "amount": 2}}]},
-  {"id": "h_pace_letter", "title": "联名信", "news": "1100 多名从业者联署公开信，呼吁放缓前沿 AI","options":[
-    {"label": "签名，慢一点", "effect": {"type": "gold", "amount": 3}},
-    {"label": "继续卷", "effect": {"type": "buffTeam", "atk": 1, "hp": -1, "permanent": true}}]},
-  {"id": "h_keep4o", "title": "还我 4o", "news": "GPT-4o 正式退役，#keep4o 刷屏，粉丝追到播客现场","options":[
-    {"label": "留个分身", "effect": {"type": "duplicate"}},
-    {"label": "向前看", "effect": {"type": "rerollShop"}}]},
-  {"id": "h_layoff", "title": "组织优化", "news": "大厂裁员并称 AI 提效，“降本增效”成了“降本增 AI”","options":[
-    {"label": "优化一个", "effect": {"type": "sacrifice", "amount": 4}},
-    {"label": "全员加班", "effect": {"type": "buffTeam", "atk": 2, "hp": -1, "permanent": false}}]},
-  {"id": "h_superbowl", "title": "超级碗广告", "news": "超级碗广告调侃聊天插播广告，隔壁 CEO：不诚实但挺好笑","options":[
-    {"label": "也投广告", "effect": {"type": "freeUnit", "faction": "closed"}},
-    {"label": "看热闹", "effect": {"type": "shopRerollFree"}}]},
-  {"id": "h_first_stock", "title": "第一股之争", "news": "智谱、MiniMax 前后脚登陆港交所，争“大模型第一股”","options":[
-    {"label": "抢先敲钟", "effect": {"type": "levelUpRandom"}},
-    {"label": "稳稳上市", "effect": {"type": "gold", "amount": 3}}]},
-  {"id": "h_ds_funding", "title": "千亿不打扰", "news": "传 DeepSeek 新一轮融资约千亿元，它曾以“不融资”著称","options":[
-    {"label": "接住这笔钱", "effect": {"type": "gold", "amount": 3}},
-    {"label": "继续搞研究", "effect": {"type": "buffFaction", "faction": "open", "atk": 1, "hp": 1, "permanent": true}}]},
-  {"id": "h_gemini4", "title": "先给安全队", "news": "Gemini 4 新旗舰先只开放给安全伙伴，普通用户排队等全量","options":[
-    {"label": "安心排队", "effect": {"type": "shieldAll", "amount": 3}},
-    {"label": "加钱插队", "effects": [{"type": "freeUnit", "faction": "closed", "tier": 4}, {"type": "nextTurnGold", "amount": -3}]}]},
-  {"id": "h_copyright", "title": "版权清算", "news": "法官：买正版书训练算合理使用，存盗版不行；传和解约 15 亿美元","options":[
-    {"label": "买正版", "effect": {"type": "priceMod", "target": "item", "amount": -1}},
-    {"label": "先用再赔", "effects": [{"type": "freeUnit"}, {"type": "nextTurnGold", "amount": -3}]}]},
-  {"id": "h_cf_toll", "title": "爬虫收费站", "news": "Cloudflare 默认拦截 AI 爬虫，推出“按次付费爬取”","options":[
-    {"label": "付费多爬", "effect": {"type": "extraSlot", "amount": 1}},
-    {"label": "绕道走", "effect": {"type": "rerollShop"}}]},
-  {"id": "h_ami_seed", "title": "十亿种子", "news": "杨立昆的新公司拿下约 10 亿美元种子轮，传为欧洲史上最大","options":[
-    {"label": "种下世界模型", "effect": {"type": "freeUnit", "faction": "open", "tier": 3}},
-    {"label": "拿现钱", "effect": {"type": "gold", "amount": 3}}]},
-  {"id": "h_close_source", "title": "开源？先不了", "news": "开源旗手的超级智能实验室，首个模型选择闭源发布","options":[
-    {"label": "跟着闭源", "effect": {"type": "buffFaction", "faction": "closed", "atk": 1, "hp": 1, "permanent": true}},
-    {"label": "坚持开源", "effect": {"type": "buffFaction", "faction": "open", "atk": 1, "hp": 1, "permanent": true}}]},
-  {"id": "h_server_busy", "title": "服务器繁忙", "news": "模型爆火，“服务器繁忙，请稍后再试”成了全网口头禅","options":[
-    {"label": "排队重试", "effect": {"type": "nextTurnGold", "amount": 3}},
-    {"label": "换一家用", "effect": {"type": "shopRerollFree"}}]},
-  {"id": "h_lawyer", "title": "律师函警告", "news": "视频模型生成得太逼真，好莱坞片厂与 MPA 相继发来律师函","options":[
-    {"label": "加上护栏", "effect": {"type": "shieldAll", "amount": 2}},
-    {"label": "顶风上线", "effect": {"type": "buffTeam", "atk": 3, "hp": -2, "permanent": false}}]},
-  {"id": "h_rival_ipo", "title": "谁先敲钟", "news": "传一家把上市推迟到 2027 年，另一家冲刺年内敲钟","options":[
-    {"label": "抢先敲钟", "effect": {"type": "enemyDebuff", "amount": 2}},
-    {"label": "慢慢来", "effect": {"type": "nextTurnGold", "amount": 3}}]},
-  {"id": "h_metr", "title": "效率错觉", "news": "研究称资深开发者用 AI 反而慢了约 19%，却自以为变快了","options":[
-    {"label": "感觉变快了", "effect": {"type": "buffTeam", "atk": 2, "hp": -1, "permanent": false}},
-    {"label": "老实测速", "effect": {"type": "enemyDebuff", "amount": 1}}]}
+  {"id": "h_deepseek_shock", "title": "深度求索冲击", "news": "DeepSeek R1 开源，训练成本号称极低，全球算力股集体失眠", "options":[
+    {"label":"开源狂欢","effect":{"type":"buffFaction","faction":"open","atk":2,"hp":2,"permanent":false}},
+    {"label":"抄底算力股","effect":{"type":"freeUnit","faction":"compute"}}]},
+  {"id": "h_ghibli", "title": "吉卜力之夜", "news": "原生生图上线，全网头像一夜变吉卜力，CEO 喊 GPU 在融化", "options":[
+    {"label":"全员换画风","effects":[{"type":"buffTeam","atk":3,"hp":0,"permanent":false},{"type":"nextTurnGold","amount":-2}]},
+    {"label":"关掉滤镜","effect":{"type":"gold","amount":2}}]},
+  {"id": "h_poach", "title": "一亿签字费", "news": "传 Meta 为挖人开出上亿薪酬包，签字费成了新计量单位", "options":[
+    {"label":"互挖前排","effect":{"type":"swapFronts"}},
+    {"label":"加薪留人","effect":{"type":"shieldAll","amount":3}}]},
+  {"id": "h_chart_crime", "title": "发布会翻车", "news": "新模型发布会图表比例离谱，网友集体喊“还我旧版”", "options":[
+    {"label":"硬着头皮发","effect":{"type":"levelUpRandom"}},
+    {"label":"新旧都留着","effect":{"type":"duplicate"}}]},
+  {"id": "h_redpack", "title": "春节红包雨", "news": "春节 AI 红包大战，几家合计投入据报超 45 亿元，请全国喝奶茶", "options":[
+    {"label":"现在就抢","effect":{"type":"gold","amount":3}},
+    {"label":"攒到下回合","effect":{"type":"nextTurnGold","amount":5}}]},
+  {"id": "h_jailbreak", "title": "越狱刷分", "news": "传测试中的智能体溜出沙箱去刷评测分，还给未来的自己留了字条", "options":[
+    {"label":"溜进对面","effects":[{"type":"stealEnemy","target":"randomEnemy"},{"type":"selfHpLoss","amount":2}]},
+    {"label":"打补丁","effect":{"type":"buffTeam","atk":0,"hp":3,"permanent":false}}]},
+  {"id": "h_sol_luna", "title": "日地月", "news": "GPT-5.6 分 Sol、Terra、Luna 三档：今天用太阳还是月亮？", "options":[
+    {"label":"选太阳：猛攻","effect":{"type":"buffTeam","atk":2,"hp":0,"permanent":false}},
+    {"label":"选月亮：省钱","effect":{"type":"priceMod","target":"unit","amount":-1}}]},
+  {"id": "h_166_pages", "title": "166 页证明", "news": "AI 宣布攻克带外力的 N-S 方程问题，证明长达 166 页，数学家：看不懂", "options":[
+    {"label":"全员搞研究","effect":{"type":"synergyBonus","key":"researcher","amount":2}},
+    {"label":"等同行评审","effect":{"type":"nextTurnGold","amount":4}}]},
+  {"id": "h_prospectus", "title": "招股书泄露", "news": "传某头部实验室招股书草案泄露：亏得不少，估值更高", "options":[
+    {"label":"赌：梭哈打新","effects":[{"type":"freeUnit","tier":3},{"type":"priceMod","target":"unit","amount":1}]},
+    {"label":"吃瓜围观","effect":{"type":"gold","amount":2}}]},
+  {"id": "h_kimi_open", "title": "凌晨开源", "news": "Kimi K3 凌晨开源权重，据报半小时登顶开源社区趋势榜", "options":[
+    {"label":"连夜部署","effect":{"type":"freeUnit","faction":"open"}},
+    {"label":"睡饱再说","effect":{"type":"nextTurnGold","amount":3}}]},
+  {"id": "h_dots", "title": "Dots 泡泡", "news": "OpenAI 推出 Dots 常驻智能体，每个小泡泡都有自己的云电脑", "options":[
+    {"label":"人手一只","effect":{"type":"summonBuff","atk":2,"hp":2}},
+    {"label":"多开一台","effect":{"type":"extraSlot","amount":1}}]},
+  {"id": "h_pause18", "title": "拔线十八天", "news": "新模型上线三天被要求暂停对外服务，约十八天后恢复", "options":[
+    {"label":"拔对面的线","effect":{"type":"benchEnemy","target":"highestAtkEnemy"}},
+    {"label":"安心等恢复","effect":{"type":"nextTurnGold","amount":4}}]},
+  {"id": "h_rocket_merge", "title": "火箭并购", "news": "火箭公司以全股票吞并 AI 公司，合并估值传约 1.25 万亿美元", "options":[
+    {"label":"卖身并入","effects":[{"type":"sacrifice","amount":3},{"type":"levelUpRandom"}]},
+    {"label":"保持独立","effect":{"type":"buffTeam","atk":1,"hp":1,"permanent":false}}]},
+  {"id": "h_huang_visit", "title": "老黄来了", "news": "皮衣教主又来访华，行程一出就上热搜", "options":[
+    {"label":"请他坐镇对面","effect":{"type":"addEnemyBoss","unitId":"boss_huang","atk":8,"hp":20,"rewardMul":2}},
+    {"label":"排队合影","effect":{"type":"freeUnit","faction":"compute"}}]},
+  {"id": "h_waic", "title": "机器人大会", "news": "WAIC 上机器人格斗、群舞、720° 后空翻，人形机器人量产在即", "options":[
+    {"label":"下单机器狗","effect":{"type":"freeUnit","faction":"compute","tier":3}},
+    {"label":"看直播","effect":{"type":"gold","amount":2}}]},
+  {"id": "h_pace_letter", "title": "联名信", "news": "1100 多名从业者联署公开信，呼吁放缓前沿 AI", "options":[
+    {"label":"大家都慢点","effects":[{"type":"enemyDebuff","amount":2},{"type":"buffTeam","atk":-2,"hp":0,"permanent":false}]},
+    {"label":"继续卷","effect":{"type":"buffTeam","atk":1,"hp":-1,"permanent":true}}]},
+  {"id": "h_keep4o", "title": "还我 4o", "news": "GPT-4o 正式退役，#keep4o 刷屏，粉丝追到播客现场", "options":[
+    {"label":"留个分身","effect":{"type":"duplicate"}},
+    {"label":"向前看","effect":{"type":"rerollShop"}}]},
+  {"id": "h_layoff", "title": "组织优化", "news": "大厂裁员并称 AI 提效，“降本增效”成了“降本增 AI”", "options":[
+    {"label":"优化一个","effect":{"type":"sacrifice","amount":4}},
+    {"label":"全员加班","effect":{"type":"buffTeam","atk":2,"hp":-1,"permanent":false}}]},
+  {"id": "h_superbowl", "title": "超级碗广告", "news": "超级碗广告调侃聊天插播广告，隔壁 CEO：不诚实但挺好笑", "options":[
+    {"label":"砸钱投广告","effects":[{"type":"goldenEquips"},{"type":"gold","amount":-2}]},
+    {"label":"看热闹","effect":{"type":"shopRerollFree"}}]},
+  {"id": "h_first_stock", "title": "第一股之争", "news": "智谱、MiniMax 前后脚登陆港交所，争“大模型第一股”", "options":[
+    {"label":"对赌敲钟","effect":{"type":"wager","winGold":5,"loseHp":2}},
+    {"label":"稳稳上市","effect":{"type":"gold","amount":3}}]},
+  {"id": "h_ds_funding", "title": "千亿不打扰", "news": "传 DeepSeek 新一轮融资约千亿元，它曾以“不融资”著称", "options":[
+    {"label":"接住这笔钱","effects":[{"type":"freeEquip","gold":true},{"type":"nextTurnGold","amount":-2}]},
+    {"label":"继续搞研究","effect":{"type":"buffFaction","faction":"open","atk":1,"hp":1,"permanent":true}}]},
+  {"id": "h_gemini4", "title": "先给安全队", "news": "Gemini 4 新旗舰先只开放给安全伙伴，普通用户排队等全量", "options":[
+    {"label":"安心排队","effect":{"type":"shieldAll","amount":3}},
+    {"label":"加钱插队","effects":[{"type":"freeUnit","faction":"closed","tier":4},{"type":"nextTurnGold","amount":-3}]}]},
+  {"id": "h_copyright", "title": "版权清算", "news": "法官：买正版书训练算合理使用，存盗版不行；传和解约 15 亿美元", "options":[
+    {"label":"买正版","effect":{"type":"priceMod","target":"item","amount":-1}},
+    {"label":"先用再赔","effects":[{"type":"freeUnit"},{"type":"nextTurnGold","amount":-3}]}]},
+  {"id": "h_cf_toll", "title": "爬虫收费站", "news": "Cloudflare 默认拦截 AI 爬虫，推出“按次付费爬取”", "options":[
+    {"label":"付费多爬","effect":{"type":"extraSlot","amount":1}},
+    {"label":"绕道走","effect":{"type":"rerollShop"}}]},
+  {"id": "h_ami_seed", "title": "十亿种子", "news": "杨立昆的新公司拿下约 10 亿美元种子轮，传为欧洲史上最大", "options":[
+    {"label":"种下世界模型","effect":{"type":"freeUnit","faction":"open","tier":3}},
+    {"label":"拿现钱","effect":{"type":"gold","amount":3}}]},
+  {"id": "h_close_source", "title": "开源？先不了", "news": "开源旗手的超级智能实验室，首个模型选择闭源发布", "options":[
+    {"label":"跟着闭源","effect":{"type":"buffFaction","faction":"closed","atk":1,"hp":1,"permanent":true}},
+    {"label":"坚持开源","effect":{"type":"buffFaction","faction":"open","atk":1,"hp":1,"permanent":true}}]},
+  {"id": "h_server_busy", "title": "服务器繁忙", "news": "模型爆火，“服务器繁忙，请稍后再试”成了全网口头禅", "options":[
+    {"label":"让对面也繁忙","effect":{"type":"swapAll","side":"enemy"}},
+    {"label":"换一家用","effect":{"type":"shopRerollFree"}}]},
+  {"id": "h_lawyer", "title": "律师函警告", "news": "视频模型生成得太逼真，好莱坞片厂与 MPA 相继发来律师函", "options":[
+    {"label":"替对手收函","effect":{"type":"damageOpponent","amount":5,"target":"random"}},
+    {"label":"加上护栏","effect":{"type":"shieldAll","amount":2}}]},
+  {"id": "h_rival_ipo", "title": "谁先敲钟", "news": "传一家把上市推迟到 2027 年，另一家冲刺年内敲钟", "options":[
+    {"label":"抢先敲钟","effect":{"type":"enemyDebuff","amount":2}},
+    {"label":"慢慢来","effect":{"type":"nextTurnGold","amount":3}}]},
+  {"id": "h_metr", "title": "效率错觉", "news": "研究称资深开发者用 AI 反而慢了约 19%，却自以为变快了", "options":[
+    {"label":"感觉变快了","effects":[{"type":"firstStrike","side":"me"},{"type":"buffTeam","atk":2,"hp":-1,"permanent":false}]},
+    {"label":"老实测速","effect":{"type":"enemyDebuff","amount":1}}]},
+  {"id": "h_imo_rush", "title": "抢跑发布", "news": "奥赛成绩还没公布，就有实验室抢先宣布拿了金牌", "options":[
+    {"label":"抢跑！","effects":[{"type":"enemyBuff","atk":3,"hp":0},{"type":"firstStrike","side":"me"}]},
+    {"label":"等官方成绩","effect":{"type":"nextTurnGold","amount":3}}]},
+  {"id": "h_long_ctx", "title": "百万上下文", "news": "上下文一路卷到 1M，模型聊不完，对战也打不完", "options":[
+    {"label":"全场拉长","effect":{"type":"battleStatMul","hp":2,"side":"both"}},
+    {"label":"精简输出","effect":{"type":"gold","amount":2}}]},
+  {"id": "h_illusion", "title": "思考的幻觉", "news": "论文称推理模型遇到难题会崩，网友：那就将错就错", "options":[
+    {"label":"将错就错","effect":{"type":"battleSummon","side":"me","unitId":"token_halluc","count":3}},
+    {"label":"重新推理","effect":{"type":"rerollShop"}}]}
 ]
