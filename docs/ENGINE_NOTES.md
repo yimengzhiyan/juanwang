@@ -291,3 +291,6 @@ phase 'over'     → state.end = {rank, won, reason, turns, hp, archetype, arche
 1. （已解决）阵营门槛改为 2/3/5，5 格队伍可以凑满最高档。
 2. 流派强弱不均（第 8.1 节）：工程师/民间明显偏强（T1 民间工程师双线单位太多，水军机器人尤其强），商人最弱（吃鸡率 0.3%），闭源、算力偏弱（算力没有 T4 单位，只有 56% 的局能凑到 ×3）。
 3. 1.0 客户端尚未迁移：`npm run build` 通过（shared 暂留 5 个 @deprecated 兼容导出：unitSlotsForTurn / itemSlotsForTurn / WIN_TROPHIES / SYNERGY_THRESHOLD / SYNERGY_DESC，见 `shared/src/compat.ts`），但 `npm run typecheck:client` 会报错，迁移完成后把它并回 `typecheck` 并删除 compat.ts。
+
+## 8.2 平衡后的流派表（2026-10-23 晚，数据版本见 git）
+每流派 200 局：民间 3.27 / 开源 3.52 / 算力 3.68 / 商人 3.78 / 闭源 3.81 / 工程师 3.88 / 研究员 3.89 / 偶像 3.92（平均名次）。吃鸡率 10%～24.5%，胜率贡献 54.7%～57.2%。玩家整体略强于 AI（先手 + 头条/PVE 选择权），属有意保留的休闲向手感。8.1 节的旧表作废。

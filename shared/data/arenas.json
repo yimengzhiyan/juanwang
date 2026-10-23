@@ -8,5 +8,5 @@
   {"id":"folk_era","name":"人海时代","desc":"所有召唤物 +1/+1：民间水军淹没战场","icon":"arenas/folk_era.svg","effect":{"type":"summonBuff","atk":1,"hp":1}},
   {"id":"institute","name":"研究院","desc":"研究员便宜 1 算力：越养越强的学术派","icon":"arenas/institute.svg","effect":{"type":"priceMod","kind":"unit","amount":-1,"filter":{"role":"researcher"}}},
   {"id":"spring_gala","name":"春晚舞台","desc":"偶像羁绊人数 +1：两个偶像就能开演唱会","icon":"arenas/spring_gala.svg","effect":{"type":"synergyBonus","key":"idol","amount":1}},
-  {"id":"safety_act","name":"安全法案","desc":"开战时闭源单位各得 2 护盾：铜墙铁壁再加厚","icon":"arenas/safety_act.svg","effect":{"type":"startShield","amount":2,"filter":{"faction":"closed"}}}
+  {"id":"safety_act","name":"安全法案","desc":"开战时闭源单位各得 3 护盾：铜墙铁壁再加厚","icon":"arenas/safety_act.svg","effect":{"type":"startShield","amount":3,"filter":{"faction":"closed"}}}
 ]

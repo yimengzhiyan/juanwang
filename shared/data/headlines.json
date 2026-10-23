@@ -1,9 +1,9 @@
 [
   {"id": "h_deepseek_shock", "title": "深度求索冲击", "news": "DeepSeek R1 开源，训练成本号称极低，全球算力股集体失眠", "options":[
-    {"label":"开源狂欢","effect":{"type":"buffFaction","faction":"open","atk":2,"hp":2,"permanent":false}},
+    {"label":"开源狂欢","effect":{"type":"buffFaction","faction":"open","atk":1,"hp":1,"permanent":false}},
     {"label":"抄底算力股","effect":{"type":"freeUnit","faction":"compute"}}]},
   {"id": "h_ghibli", "title": "吉卜力之夜", "news": "原生生图上线，全网头像一夜变吉卜力，CEO 喊 GPU 在融化", "options":[
-    {"label":"全员换画风","effects":[{"type":"buffTeam","atk":3,"hp":0,"permanent":false},{"type":"nextTurnGold","amount":-2}]},
+    {"label":"算力烧到融化","effects":[{"type":"buffFaction","faction":"compute","atk":2,"hp":0,"permanent":false},{"type":"nextTurnGold","amount":-2}]},
     {"label":"关掉滤镜","effect":{"type":"gold","amount":2}}]},
   {"id": "h_poach", "title": "一亿签字费", "news": "传 Meta 为挖人开出上亿薪酬包，签字费成了新计量单位", "options":[
     {"label":"互挖前排","effect":{"type":"swapFronts"}},
@@ -18,7 +18,7 @@
     {"label":"溜进对面","effects":[{"type":"stealEnemy","target":"randomEnemy"},{"type":"selfHpLoss","amount":2}]},
     {"label":"打补丁","effect":{"type":"buffTeam","atk":0,"hp":3,"permanent":false}}]},
   {"id": "h_sol_luna", "title": "日地月", "news": "GPT-5.6 分 Sol、Terra、Luna 三档：今天用太阳还是月亮？", "options":[
-    {"label":"选太阳：猛攻","effect":{"type":"buffTeam","atk":2,"hp":0,"permanent":false}},
+    {"label":"选太阳：闭源猛攻","effect":{"type":"buffFaction","faction":"closed","atk":2,"hp":0,"permanent":false}},
     {"label":"选月亮：省钱","effect":{"type":"priceMod","target":"unit","amount":-1}}]},
   {"id": "h_166_pages", "title": "166 页证明", "news": "AI 宣布攻克带外力的 N-S 方程问题，证明长达 166 页，数学家：看不懂", "options":[
     {"label":"全员搞研究","effect":{"type":"synergyBonus","key":"researcher","amount":2}},
@@ -30,7 +30,7 @@
     {"label":"连夜部署","effect":{"type":"freeUnit","faction":"open"}},
     {"label":"睡饱再说","effect":{"type":"nextTurnGold","amount":3}}]},
   {"id": "h_dots", "title": "Dots 泡泡", "news": "OpenAI 推出 Dots 常驻智能体，每个小泡泡都有自己的云电脑", "options":[
-    {"label":"人手一只","effect":{"type":"summonBuff","atk":2,"hp":2}},
+    {"label":"人手一只","effect":{"type":"summonBuff","atk":1,"hp":1}},
     {"label":"多开一台","effect":{"type":"extraSlot","amount":1}}]},
   {"id": "h_pause18", "title": "拔线十八天", "news": "新模型上线三天被要求暂停对外服务，约十八天后恢复", "options":[
     {"label":"拔对面的线","effect":{"type":"benchEnemy","target":"highestAtkEnemy"}},
@@ -81,7 +81,7 @@
     {"label":"让对面也繁忙","effect":{"type":"swapAll","side":"enemy"}},
     {"label":"换一家用","effect":{"type":"shopRerollFree"}}]},
   {"id": "h_lawyer", "title": "律师函警告", "news": "视频模型生成得太逼真，好莱坞片厂与 MPA 相继发来律师函", "options":[
-    {"label":"替对手收函","effect":{"type":"damageOpponent","amount":5,"target":"random"}},
+    {"label":"替对手收函","effect":{"type":"damageOpponent","amount":3,"target":"random"}},
     {"label":"加上护栏","effect":{"type":"shieldAll","amount":2}}]},
   {"id": "h_rival_ipo", "title": "谁先敲钟", "news": "传一家把上市推迟到 2027 年，另一家冲刺年内敲钟", "options":[
     {"label":"抢先敲钟","effect":{"type":"enemyDebuff","amount":2}},
