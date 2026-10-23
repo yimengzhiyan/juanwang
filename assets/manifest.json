@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "style": "bright-cartoon",
   "note": "units/*.svg 为占位图；用户用 GPT 生成同名 PNG 放到 units/<id>.png 后，客户端优先加载 PNG（见 docs/PROMPTS_GPT.md 放置路径表）",
   "characters": {
@@ -55,7 +55,10 @@
     "jumpbox": "items/jumpbox.svg",
     "alignment": "items/alignment.svg",
     "quantize": "items/quantize.svg",
-    "rlhf": "items/rlhf.svg"
+    "rlhf": "items/rlhf.svg",
+    "coffee": "items/coffee.svg",
+    "press": "items/press.svg",
+    "pivot": "items/pivot.svg"
   },
   "ui": {
     "atk": "ui/atk.svg",
@@ -73,6 +76,52 @@
     "sell": "ui/sell.svg",
     "star": "ui/star.svg"
   },
+  "roles": {
+    "researcher": "ui/role_researcher.svg",
+    "trader": "ui/role_trader.svg",
+    "idol": "ui/role_idol.svg",
+    "engineer": "ui/role_engineer.svg"
+  },
+  "tiers": {
+    "tier_1": "ui/tier_1.svg",
+    "tier_2": "ui/tier_2.svg",
+    "tier_3": "ui/tier_3.svg"
+  },
+  "slots": {
+    "weapon": "ui/slot_weapon.svg",
+    "armor": "ui/slot_armor.svg",
+    "trinket": "ui/slot_trinket.svg",
+    "gold_frame": "ui/gold_frame.svg"
+  },
+  "arenas": {
+    "open_summit": "arenas/open_summit.svg",
+    "gpu_drought": "arenas/gpu_drought.svg",
+    "funding_winter": "arenas/funding_winter.svg",
+    "reroll_party": "arenas/reroll_party.svg",
+    "seat_one_aura": "arenas/seat_one_aura.svg",
+    "equip_expo": "arenas/equip_expo.svg",
+    "folk_era": "arenas/folk_era.svg",
+    "institute": "arenas/institute.svg"
+  },
+  "opponents": {
+    "shuijun_hq": "opponents/shuijun_hq.svg",
+    "hallucination_lab": "opponents/hallucination_lab.svg"
+  },
+  "pve": {
+    "hallucination_horde": "pve/hallucination_horde.svg",
+    "gpu_legion": "pve/gpu_legion.svg"
+  },
+  "fx": {
+    "shield_shard": "fx/shield_shard.svg",
+    "steal_hand": "fx/steal_hand.svg",
+    "boom": "fx/boom.svg",
+    "revive_wing": "fx/revive_wing.svg",
+    "chain_bolt": "fx/chain_bolt.svg",
+    "crown": "fx/crown.svg",
+    "spark": "fx/spark.svg",
+    "spark_gold": "fx/spark_gold.svg"
+  },
+  "note2": "2.0: items 里 coffee/press/pivot 为消耗品；slots.gold_frame 用作 border-image（slice 16）；fx 新增 5 个为单色图形（fill=currentColor，根节点 color=#FFFFFF，内联时可用 CSS color 染色，<img> 时用 mask-image 染色）",
   "branding": {
     "logo": "logo.svg",
     "bg_home": "bg_home.svg"
