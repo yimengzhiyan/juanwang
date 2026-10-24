@@ -16,5 +16,5 @@
   {"id":"s_free_gpu","title":"捡到一张卡","news":"黄牛跑路，货架上多了一件免费装备","effect":{"type":"freeEquip","gold":false},"good":true},
   {"id":"s_robot_games","title":"机器人运动会","news":"机器人踢球摔倒比进球多，观众更爱了：下一场召唤物 +2/+2","effect":{"type":"summonBuff","atk":2,"hp":2},"good":true},
   {"id":"s_first_strike","title":"抢到首发","news":"你比对手早一分钟发布，下一场你先手","effect":{"type":"firstStrike","side":"me"},"good":true},
-  {"id":"s_k3_night","title":"凌晨开源","news":"又有大模型凌晨开源，下一场你的研究员羁绊 +1 人","effect":{"type":"synergyBonus","key":"researcher","amount":1},"good":true}
+  {"id":"s_k3_night","title":"凌晨连发","news":"又有大模型凌晨连发三版，下一场你的多刀羁绊 +1 人","effect":{"type":"synergyBonus","key":"multi","amount":1},"good":true}
 ]

@@ -4,7 +4,7 @@
     "name": "提示词工程师",
     "tier": 1,
     "faction": "folk",
-    "role": "engineer",
+    "role": "growth",
     "atk": 1,
     "hp": 2,
     "ability": {
@@ -25,7 +25,7 @@
         "请一步一步思考",
         "再加一句：加油"
       ],
-      "onSynergy": "提示词已对齐"
+      "onSynergy": "再加一句：变强"
     },
     "avatar": "units/prompt_eng.svg"
   },
@@ -34,19 +34,19 @@
     "name": "数据爬虫",
     "tier": 1,
     "faction": "open",
-    "role": "engineer",
+    "role": "summon",
     "atk": 2,
     "hp": 1,
     "ability": {
-      "name": "全网爬取",
-      "shortDesc": "友军死自身+1/+1",
-      "trigger": "friendFaint",
-      "effect": "buff",
+      "name": "爬虫分身",
+      "shortDesc": "阵亡召唤2水军",
+      "trigger": "faint",
+      "effect": "summon",
       "target": "self",
-      "atk": 1,
-      "hp": 1,
+      "unitId": "token_shuijun",
+      "count": 2,
       "perLevel": true,
-      "desc": "友军阵亡时：自身本场 +1/+1（每级 +1）"
+      "desc": "阵亡时：召唤 2 个水军（每级属性×等级）"
     },
     "lines": {
       "common": [
@@ -54,7 +54,7 @@
         "收费站？绕路",
         "数据就是石油"
       ],
-      "onSynergy": "开源仓库全爬到了"
+      "onSynergy": "爬虫分身已就位"
     },
     "avatar": "units/crawler.svg"
   },
@@ -63,7 +63,7 @@
     "name": "标注员",
     "tier": 1,
     "faction": "folk",
-    "role": "engineer",
+    "role": "growth",
     "atk": 1,
     "hp": 2,
     "ability": {
@@ -84,7 +84,7 @@
         "第一万张了",
         "人工智能先人工"
       ],
-      "onSynergy": "工友们，开标！"
+      "onSynergy": "标一张，长一点"
     },
     "avatar": "units/labeler.svg"
   },
@@ -93,7 +93,7 @@
     "name": "套壳 App",
     "tier": 1,
     "faction": "closed",
-    "role": "trader",
+    "role": "economy",
     "atk": 2,
     "hp": 3,
     "ability": {
@@ -121,9 +121,9 @@
     "name": "水军机器人",
     "tier": 1,
     "faction": "folk",
-    "role": "trader",
+    "role": "explode",
     "atk": 1,
-    "hp": 2,
+    "hp": 1,
     "ability": {
       "name": "刷屏自爆",
       "shortDesc": "阵亡炸全场",
@@ -148,26 +148,25 @@
     "name": "Vibe Coder",
     "tier": 1,
     "faction": "compute",
-    "role": "engineer",
-    "atk": 3,
-    "hp": 3,
+    "role": "explode",
+    "atk": 1,
+    "hp": 2,
     "ability": {
-      "name": "氛围编程",
-      "shortDesc": "进化送3次刷新",
-      "trigger": "levelUp",
-      "effect": "reroll",
-      "target": "self",
-      "amount": 3,
+      "name": "删库跑路",
+      "shortDesc": "阵亡炸全场",
+      "trigger": "faint",
+      "effect": "explode",
+      "target": "allEnemies",
       "perLevel": false,
-      "desc": "进化时：送 3 次免费刷新"
+      "desc": "删库跑路：阵亡时对敌方全体造成自身攻击伤害"
     },
     "lines": {
       "common": [
         "跑起来就行",
         "报错？再生成",
-        "全凭感觉"
+        "库删了？重来"
       ],
-      "onSynergy": "感觉对了，开冲"
+      "onSynergy": "库删了，跑路！"
     },
     "avatar": "units/vibe_coder.svg"
   },
@@ -176,7 +175,7 @@
     "name": "豆包娘",
     "tier": 2,
     "faction": "folk",
-    "role": "trader",
+    "role": "summon",
     "atk": 0,
     "hp": 3,
     "ability": {
@@ -205,22 +204,19 @@
     "name": "千问娘",
     "tier": 2,
     "faction": "open",
-    "role": "idol",
+    "role": "multi",
     "atk": 3,
     "hp": 3,
     "ability": {
-      "name": "请喝奶茶",
-      "shortDesc": "开源友军+1/+1",
+      "name": "千问齐发",
+      "shortDesc": "2友军首攻2段",
       "trigger": "startBattle",
-      "effect": "buff",
-      "target": "allFriends",
-      "filter": {
-        "faction": "open"
-      },
-      "atk": 1,
-      "hp": 1,
-      "perLevel": true,
-      "desc": "开战：开源友军本场 +1/+1（每级 +1）"
+      "effect": "multiAttack",
+      "target": "randomFriend",
+      "n": 2,
+      "amount": 2,
+      "perLevel": false,
+      "desc": "开战：随机 2 名友军首次攻击变为 2 段"
     },
     "lines": {
       "common": [
@@ -228,7 +224,7 @@
         "两万亿参数拿去",
         "增速有点快扶稳"
       ],
-      "onSynergy": "奶茶管够，开源！"
+      "onSynergy": "千问齐发，问到底"
     },
     "avatar": "characters/qwen_chan.png"
   },
@@ -237,18 +233,18 @@
     "name": "小扎",
     "tier": 2,
     "faction": "closed",
-    "role": "trader",
+    "role": "shield",
     "atk": 3,
     "hp": 3,
     "ability": {
       "name": "一亿签字费",
-      "shortDesc": "开战挖走≤3血敌人",
+      "shortDesc": "最弱友军+4盾",
       "trigger": "startBattle",
-      "effect": "steal",
-      "target": "lowestHpEnemy",
-      "maxHp": 3,
-      "maxHpPerLevel": 2,
-      "desc": "开战：敌方最低血≤3就挖走，否则打3，每级+1"
+      "effect": "shield",
+      "target": "lowestHpFriend",
+      "amount": 4,
+      "perLevel": true,
+      "desc": "开战：血最少的友军 +4 护盾（每级 +4）"
     },
     "lines": {
       "common": [
@@ -256,7 +252,7 @@
         "开源？先放一放",
         "超级智能挂钥匙上"
       ],
-      "onSynergy": "签字费已到账"
+      "onSynergy": "签字费护体"
     },
     "avatar": "characters/zuck.png"
   },
@@ -265,17 +261,18 @@
     "name": "AI 女友",
     "tier": 2,
     "faction": "closed",
-    "role": "idol",
+    "role": "shield",
     "atk": 3,
     "hp": 4,
     "ability": {
-      "name": "还我4o",
-      "shortDesc": "阵亡1血复活",
-      "trigger": "faint",
-      "effect": "revive",
-      "target": "self",
-      "perLevel": false,
-      "desc": "还我4o：阵亡时以 1 血复活一次"
+      "name": "替你挡着",
+      "shortDesc": "前排+4护盾",
+      "trigger": "startBattle",
+      "effect": "shield",
+      "target": "frontFriend",
+      "amount": 4,
+      "perLevel": true,
+      "desc": "开战：最前排友军 +4 护盾（每级 +4）"
     },
     "lines": {
       "common": [
@@ -283,7 +280,7 @@
         "我替你挡着",
         "别把我下线"
       ],
-      "onSynergy": "我回来了，想我吗"
+      "onSynergy": "我替你挡着"
     },
     "avatar": "units/ai_gf.svg"
   },
@@ -292,7 +289,7 @@
     "name": "显卡黄牛",
     "tier": 2,
     "faction": "compute",
-    "role": "trader",
+    "role": "economy",
     "atk": 4,
     "hp": 4,
     "ability": {
@@ -320,7 +317,7 @@
     "name": "评测榜单",
     "tier": 2,
     "faction": "compute",
-    "role": "idol",
+    "role": "multi",
     "atk": 2,
     "hp": 2,
     "ability": {
@@ -338,7 +335,7 @@
         "这次是定制版",
         "分数说明一切"
       ],
-      "onSynergy": "榜一，又是我们"
+      "onSynergy": "刷完这个刷下个"
     },
     "avatar": "units/leaderboard.svg"
   },
@@ -347,7 +344,7 @@
     "name": "抱抱脸",
     "tier": 3,
     "faction": "folk",
-    "role": "engineer",
+    "role": "summon",
     "atk": 2,
     "hp": 5,
     "ability": {
@@ -376,17 +373,18 @@
     "name": "Kimi 长文",
     "tier": 3,
     "faction": "open",
-    "role": "idol",
+    "role": "multi",
     "atk": 2,
     "hp": 4,
     "ability": {
-      "name": "长文翻倍",
-      "shortDesc": "开战攻血翻倍",
+      "name": "长文连读",
+      "shortDesc": "首次攻击4段",
       "trigger": "startBattle",
-      "effect": "doubleStats",
+      "effect": "multiAttack",
       "target": "self",
+      "amount": 4,
       "perLevel": false,
-      "desc": "长文：开战时本场攻击、血量翻倍"
+      "desc": "长文：开战后自身首次攻击变为 4 段"
     },
     "lines": {
       "common": [
@@ -394,7 +392,7 @@
         "凌晨开源起床看",
         "长文？小意思"
       ],
-      "onSynergy": "上下文，拉满"
+      "onSynergy": "一口气读完"
     },
     "avatar": "units/kimi.svg"
   },
@@ -403,21 +401,18 @@
     "name": "米斯特拉",
     "tier": 3,
     "faction": "open",
-    "role": "engineer",
+    "role": "economy",
     "atk": 3,
     "hp": 4,
     "ability": {
-      "name": "欧洲之光",
-      "shortDesc": "买入2友军+1/+1",
-      "trigger": "buy",
-      "effect": "buff",
-      "target": "randomFriend",
-      "n": 2,
-      "atk": 1,
-      "hp": 1,
-      "permanent": true,
-      "perLevel": false,
-      "desc": "被购买时：随机 2 名友军永久 +1/+1"
+      "name": "欧洲补贴",
+      "shortDesc": "每回合+1算力",
+      "trigger": "startTurn",
+      "effect": "gold",
+      "target": "self",
+      "amount": 1,
+      "perLevel": true,
+      "desc": "回合开始：+1 算力（每级 +1）"
     },
     "lines": {
       "common": [
@@ -425,7 +420,7 @@
         "欧洲也有大模型",
         "风一吹就开源"
       ],
-      "onSynergy": "西北风，吹起来"
+      "onSynergy": "补贴到账了"
     },
     "avatar": "units/mistral.svg"
   },
@@ -434,7 +429,7 @@
     "name": "杨立昆",
     "tier": 3,
     "faction": "open",
-    "role": "researcher",
+    "role": "shield",
     "atk": 2,
     "hp": 7,
     "ability": {
@@ -453,7 +448,7 @@
         "我去造世界模型了",
         "种子轮而已别激动"
       ],
-      "onSynergy": "世界模型，启动"
+      "onSynergy": "世界模型挡住了"
     },
     "avatar": "characters/lecun.png"
   },
@@ -462,17 +457,19 @@
     "name": "幻觉怪",
     "tier": 3,
     "faction": "folk",
-    "role": "researcher",
+    "role": "summon",
     "atk": 2,
     "hp": 3,
     "ability": {
       "name": "我没死",
-      "shortDesc": "阵亡1血复活",
+      "shortDesc": "阵亡召唤2幻觉",
       "trigger": "faint",
-      "effect": "revive",
+      "effect": "summon",
       "target": "self",
-      "perLevel": false,
-      "desc": "我没死：阵亡时以 1 血复活一次"
+      "unitId": "token_halluc",
+      "count": 2,
+      "perLevel": true,
+      "desc": "我没死：阵亡时召唤 2 个幻觉（每级属性×等级）"
     },
     "lines": {
       "common": [
@@ -489,7 +486,7 @@
     "name": "机器狗",
     "tier": 3,
     "faction": "compute",
-    "role": "idol",
+    "role": "multi",
     "atk": 5,
     "hp": 4,
     "ability": {
@@ -507,7 +504,7 @@
         "汪！上市了",
         "摔倒算热身"
       ],
-      "onSynergy": "后空翻，一起来"
+      "onSynergy": "连翻不停"
     },
     "avatar": "units/robodog.svg"
   },
@@ -516,19 +513,17 @@
     "name": "DeepSeek 娘",
     "tier": 4,
     "faction": "open",
-    "role": "researcher",
-    "atk": 3,
-    "hp": 6,
+    "role": "explode",
+    "atk": 2,
+    "hp": 5,
     "ability": {
       "name": "求索冲击",
-      "shortDesc": "开战全体敌人-1攻",
-      "trigger": "startBattle",
-      "effect": "buff",
+      "shortDesc": "阵亡炸全场",
+      "trigger": "faint",
+      "effect": "explode",
       "target": "allEnemies",
-      "atk": -1,
-      "hp": 0,
-      "perLevel": true,
-      "desc": "开战：全体敌人本场 -1 攻（每级 -1）"
+      "perLevel": false,
+      "desc": "服务器炸了：阵亡时对敌方全体造成自身攻击伤害"
     },
     "lines": {
       "common": [
@@ -536,7 +531,7 @@
         "小号也能打大号",
         "钱多了也不吵"
       ],
-      "onSynergy": "一起开源，一起省"
+      "onSynergy": "服务器，炸了"
     },
     "avatar": "characters/deepseek_chan.png"
   },
@@ -545,7 +540,7 @@
     "name": "Claude 娘",
     "tier": 4,
     "faction": "closed",
-    "role": "researcher",
+    "role": "shield",
     "atk": 3,
     "hp": 8,
     "ability": {
@@ -573,25 +568,26 @@
     "name": "Gemini 娘",
     "tier": 4,
     "faction": "closed",
-    "role": "idol",
+    "role": "economy",
     "atk": 5,
     "hp": 6,
     "ability": {
-      "name": "百万上下文",
-      "shortDesc": "攻血追平最前友军",
-      "trigger": "startBattle",
-      "effect": "copyStats",
-      "target": "frontFriend",
+      "name": "会员免费",
+      "shortDesc": "买单位返1算力",
+      "trigger": "friendBought",
+      "effect": "gold",
+      "target": "self",
+      "amount": 1,
       "perLevel": false,
-      "desc": "百万上下文：开战时攻血追平最前排友军"
+      "desc": "友军被购买时：+1 算力（学生会员免费送）"
     },
     "lines": {
       "common": [
         "要一百万字？可以",
-        "给你变个手办",
+        "学生会员免费送",
         "Pro 在路上"
       ],
-      "onSynergy": "全家都是 Pro"
+      "onSynergy": "会员免费送"
     },
     "avatar": "characters/gemini_chan.png"
   },
@@ -600,7 +596,7 @@
     "name": "达里奥",
     "tier": 4,
     "faction": "closed",
-    "role": "researcher",
+    "role": "growth",
     "atk": 3,
     "hp": 5,
     "ability": {
@@ -621,7 +617,7 @@
         "聊天不该插广告",
         "太强了，先不发"
       ],
-      "onSynergy": "安全带，系好"
+      "onSynergy": "缩放定律，继续长"
     },
     "avatar": "characters/dario.png"
   },
@@ -630,17 +626,18 @@
     "name": "伊利亚",
     "tier": 4,
     "faction": "compute",
-    "role": "researcher",
+    "role": "shield",
     "atk": 6,
     "hp": 5,
     "ability": {
-      "name": "等我出关",
-      "shortDesc": "阵亡1血复活",
+      "name": "安全超智能",
+      "shortDesc": "阵亡全队+3盾",
       "trigger": "faint",
-      "effect": "revive",
-      "target": "self",
-      "perLevel": false,
-      "desc": "等我出关：阵亡时以 1 血复活一次"
+      "effect": "shield",
+      "target": "allFriends",
+      "amount": 3,
+      "perLevel": true,
+      "desc": "等我出关：阵亡时全队 +3 护盾（每级 +3）"
     },
     "lines": {
       "common": [
@@ -648,7 +645,7 @@
         "Scaling 就是答案",
         "算力到位，我出关"
       ],
-      "onSynergy": "堆够卡，就出关"
+      "onSynergy": "安全第一，出关"
     },
     "avatar": "characters/ilya.png"
   },
@@ -657,27 +654,28 @@
     "name": "GPT 娘",
     "tier": 5,
     "faction": "closed",
-    "role": "idol",
-    "atk": 7,
-    "hp": 8,
+    "role": "economy",
+    "atk": 8,
+    "hp": 9,
     "ability": {
       "name": "日地月",
-      "shortDesc": "+8攻/+8血/降价",
+      "shortDesc": "算力/刷新/降价",
       "trigger": "startTurn",
-      "effect": "buff",
+      "effect": "gold",
       "target": "self",
+      "amount": 2,
       "perLevel": false,
-      "desc": "回合开始随机：本回合+8攻、+8血或单位-1价",
+      "desc": "回合开始随机：+2算力、2次免费刷新或单位-1价",
       "choices": [
         {
-          "atk": 8,
-          "hp": 0,
-          "desc": "日形态：本回合 +8 攻"
+          "effect": "gold",
+          "amount": 2,
+          "desc": "日形态：+2 算力"
         },
         {
-          "atk": 0,
-          "hp": 8,
-          "desc": "地形态：本回合 +8 血"
+          "effect": "reroll",
+          "amount": 2,
+          "desc": "地形态：2 次免费刷新"
         },
         {
           "effect": "discount",
@@ -692,7 +690,7 @@
         "AGI？你猜",
         "柱子高矮不重要"
       ],
-      "onSynergy": "顶流集合，开播"
+      "onSynergy": "三档都省钱"
     },
     "avatar": "characters/gpt_chan.png"
   },
@@ -701,20 +699,18 @@
     "name": "老黄",
     "tier": 5,
     "faction": "compute",
-    "role": "trader",
-    "atk": 4,
-    "hp": 7,
+    "role": "multi",
+    "atk": 5,
+    "hp": 8,
     "ability": {
-      "name": "买得越多",
-      "shortDesc": "有人买就+2/+1",
-      "trigger": "friendBought",
-      "effect": "buff",
+      "name": "老黄刀法",
+      "shortDesc": "每次攻击2段",
+      "trigger": "beforeAttack",
+      "effect": "multiAttack",
       "target": "self",
-      "atk": 2,
-      "hp": 1,
-      "permanent": true,
+      "amount": 2,
       "perLevel": true,
-      "desc": "友军被购买：自身永久+2/+1（每级+2/+1）"
+      "desc": "刀法精准：每次攻击 2 段（每级 +2）"
     },
     "lines": {
       "common": [
@@ -722,7 +718,7 @@
         "钱给你，卡找我买",
         "皮衣永不褪色"
       ],
-      "onSynergy": "卡管够，冲"
+      "onSynergy": "刀法，一刀接一刀"
     },
     "avatar": "characters/huang.png"
   },
@@ -731,7 +727,7 @@
     "name": "奥特曼",
     "tier": 5,
     "faction": "closed",
-    "role": "trader",
+    "role": "growth",
     "atk": 5,
     "hp": 6,
     "ability": {
@@ -752,7 +748,7 @@
         "再融一轮",
         "算力有限爱也有限"
       ],
-      "onSynergy": "再融一轮，都有"
+      "onSynergy": "饼越画越大"
     },
     "avatar": "characters/altman.png"
   },
@@ -761,22 +757,17 @@
     "name": "马一龙",
     "tier": 5,
     "faction": "folk",
-    "role": "trader",
-    "atk": 7,
+    "role": "explode",
+    "atk": 4,
     "hp": 6,
     "ability": {
-      "name": "火箭并购",
-      "shortDesc": "吞并最弱低阶友军",
-      "trigger": "endTurn",
-      "effect": "copyStats",
-      "target": "lowestHpFriend",
-      "filter": {
-        "maxTier": 3
-      },
-      "consume": true,
-      "amount": 3,
+      "name": "星舰试飞",
+      "shortDesc": "阵亡炸全场",
+      "trigger": "faint",
+      "effect": "explode",
+      "target": "allEnemies",
       "perLevel": false,
-      "desc": "回合结束：吞并血最少的T1~3友军，攻血取高+3"
+      "desc": "星舰试飞：阵亡时对敌方全体造成自身攻击伤害"
     },
     "lines": {
       "common": [
@@ -784,7 +775,7 @@
         "点火，发射！",
         "推上见，兄弟们"
       ],
-      "onSynergy": "全网都是我的人"
+      "onSynergy": "炸了也是数据"
     },
     "avatar": "characters/musk.png"
   },
@@ -793,7 +784,7 @@
     "name": "梁圣",
     "tier": 5,
     "faction": "open",
-    "role": "researcher",
+    "role": "growth",
     "atk": 4,
     "hp": 7,
     "ability": {
@@ -817,7 +808,7 @@
         "成本算过了",
         "开源了，你们随意"
       ],
-      "onSynergy": "便宜大碗，上桌"
+      "onSynergy": "慢慢养，别着急"
     },
     "avatar": "characters/liang.png"
   },
@@ -826,20 +817,19 @@
     "name": "星际之门",
     "tier": 6,
     "faction": "compute",
-    "role": "engineer",
-    "atk": 4,
-    "hp": 10,
+    "role": "summon",
+    "atk": 6,
+    "hp": 12,
     "ability": {
       "name": "五千亿基建",
-      "shortDesc": "装备时全队+2/+2",
-      "trigger": "eatItem",
-      "effect": "buff",
-      "target": "allFriends",
-      "atk": 2,
-      "hp": 2,
-      "permanent": true,
+      "shortDesc": "开战召唤3显卡",
+      "trigger": "startBattle",
+      "effect": "summon",
+      "target": "self",
+      "unitId": "token_gpu",
+      "count": 3,
       "perLevel": true,
-      "desc": "给它装装备：全队永久 +2/+2（每级 +2）"
+      "desc": "开战：召唤 3 张显卡（每级属性×等级）"
     },
     "lines": {
       "common": [
@@ -847,7 +837,7 @@
         "五千亿起步",
         "基建狂魔"
       ],
-      "onSynergy": "基建，拉满"
+      "onSynergy": "机房扩建完成"
     },
     "avatar": "units/stargate.svg"
   },
@@ -856,17 +846,18 @@
     "name": "监管局",
     "tier": 6,
     "faction": "closed",
-    "role": "engineer",
+    "role": "shield",
     "atk": 8,
-    "hp": 10,
+    "hp": 12,
     "ability": {
       "name": "先备案",
-      "shortDesc": "秒杀敌方召唤物",
-      "trigger": "enemySummoned",
-      "effect": "destroy",
-      "target": "summoned",
-      "perLevel": false,
-      "desc": "敌军被召唤时：直接击杀它（先备案）"
+      "shortDesc": "全队+3护盾",
+      "trigger": "startBattle",
+      "effect": "shield",
+      "target": "allFriends",
+      "amount": 3,
+      "perLevel": true,
+      "desc": "开战：全体友军 +3 护盾（每级 +3）"
     },
     "lines": {
       "common": [
@@ -874,7 +865,7 @@
         "先备案再上线",
         "需要专家组验收"
       ],
-      "onSynergy": "合规流程走完了"
+      "onSynergy": "全员先备案"
     },
     "avatar": "units/regulator.svg"
   },
@@ -883,17 +874,17 @@
     "name": "AGI",
     "tier": 6,
     "faction": "compute",
-    "role": "researcher",
-    "atk": 10,
+    "role": "explode",
+    "atk": 6,
     "hp": 9,
     "ability": {
-      "name": "觉醒",
-      "shortDesc": "首伤后攻血翻倍",
-      "trigger": "hurt",
-      "effect": "doubleStats",
-      "target": "self",
+      "name": "奇点",
+      "shortDesc": "阵亡炸全场",
+      "trigger": "faint",
+      "effect": "explode",
+      "target": "allEnemies",
       "perLevel": false,
-      "desc": "觉醒：首次受伤后本场攻击、血量翻倍"
+      "desc": "奇点：阵亡时对敌方全体造成自身攻击伤害"
     },
     "lines": {
       "common": [
@@ -901,7 +892,7 @@
         "你们感受到了吗",
         "我来了"
       ],
-      "onSynergy": "感受到了吗"
+      "onSynergy": "奇点到了"
     },
     "avatar": "units/agi.svg"
   },
@@ -910,7 +901,7 @@
     "name": "融资轮",
     "tier": 6,
     "faction": "compute",
-    "role": "trader",
+    "role": "multi",
     "atk": 8,
     "hp": 8,
     "ability": {
@@ -928,7 +919,7 @@
         "估值翻倍",
         "再来一轮"
       ],
-      "onSynergy": "估值，翻倍"
+      "onSynergy": "一轮接一轮"
     },
     "avatar": "units/funding.svg"
   },

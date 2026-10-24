@@ -29,9 +29,9 @@
     "fight": {"text": "点「开战」！双方从 1 号位开始轮流开火：你的 1 号 → 对面 1 号 → 你的 2 号……", "target": "fight"},
     "equip": {"text": "装备永久生效！买下「数据集」，把它拖到水军机器人身上，防具槽就亮了", "target": "shop-equip"},
     "merge": {"text": "再买一只水军机器人叠上去：凑满 3 只进化 Lv2，商店还会送你一个高阶单位", "target": "shop-unit"},
-    "synergy": {"text": "再买一个「标注员」：民间 ×2 羁绊点亮！开战会多召唤一个水军，看队伍上方的徽章", "target": "synergy-bar"},
+    "synergy": {"text": "再买一个「标注员」：民间 ×2 羁绊点亮，开战多召唤一个水军！卡角还有打法标签（多刀/护盾/召唤/自爆/成长/经济），凑 2 个同打法也会点亮", "target": "synergy-bar"},
     "headline": {"text": "AI 圈出大事了！头条会改变这一场的战场：召唤物变强，还是商店多一格？", "target": "headline"},
-    "done": {"text": "上手完成！7 名对手各有流派，活到最后就是卷王", "target": "fight"},
+    "done": {"text": "上手完成！4 阵营 × 6 打法随你搭，7 名对手各有流派，活到最后就是卷王", "target": "fight"},
     "buyAgain": {"text": "再买一只同名的水军机器人，它会叠到第一只身上", "target": "shop-unit"},
     "item": {"text": "买下装备，拖到一个单位身上，它会永久生效", "target": "shop-equip"},
     "freezeSell": {"text": "喜欢的商店格可以冻结留到下回合；不要的单位可以卖掉回点算力", "target": "freeze"}

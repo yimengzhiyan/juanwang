@@ -21,7 +21,7 @@
     {"label":"选太阳：闭源猛攻","effect":{"type":"buffFaction","faction":"closed","atk":2,"hp":0,"permanent":false}},
     {"label":"选月亮：省钱","effect":{"type":"priceMod","target":"unit","amount":-1}}]},
   {"id": "h_166_pages", "title": "166 页证明", "news": "AI 宣布攻克带外力的 N-S 方程问题，证明长达 166 页，数学家：看不懂", "options":[
-    {"label":"全员搞研究","effect":{"type":"synergyBonus","key":"researcher","amount":2}},
+    {"label":"论文养人：成长+2","effect":{"type":"synergyBonus","key":"growth","amount":2}},
     {"label":"等同行评审","effect":{"type":"nextTurnGold","amount":4}}]},
   {"id": "h_prospectus", "title": "招股书泄露", "news": "传某头部实验室招股书草案泄露：亏得不少，估值更高", "options":[
     {"label":"赌：梭哈打新","effects":[{"type":"freeUnit","tier":3},{"type":"priceMod","target":"unit","amount":1}]},

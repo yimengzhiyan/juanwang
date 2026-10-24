@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // 内容数据自检：node shared/data/check.mjs
-// 错误（exit 1）：id 重复/缺失、阶级/阵营/职业分布、非法 trigger/effect/target、事件效果非法、文案超长、引用不存在、
+// 错误（exit 1）：id 重复/缺失、阶级/阵营/打法关键词分布（DESIGN 16：每词 5~6 个、T1~T2 ≥2、自爆必须带 explode）、非法 trigger/effect/target、事件效果非法、文案超长、引用不存在、
 //                 装备槽与固定 id、赛场/对手/PVE 字段与引用。
 // 警告（不影响退出码）：assets/ 下缺少的头像与图标（美术任务补图，含 arenas/ 与 items/coffee 等新图）、1.0 遗留字段。
-// 字段口径：DESIGN 第 15 节（2.0）+ shared/src/types.ts + docs/ENGINE_NOTES.md（含 DESIGN 11 扩展：filter/consume/maxHp/choices/effects[]）。
+// 字段口径：DESIGN 第 15~16 节（2.0 / 2.1）+ shared/src/types.ts + docs/ENGINE_NOTES.md（含 DESIGN 11 扩展：filter/consume/maxHp/choices/effects[]）。
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,7 +24,9 @@ const OLD_EFFECTS = ['damage', 'buff', 'shield', 'summon', 'copyStats', 'swapPos
 // DESIGN 13：2.0 新效果。steal 可带 maxHp/maxHpPerLevel（同 destroy：血量 ≤ 阈值才偷，否则造成阈值伤害）
 const NEW_EFFECTS = ['steal', 'explode', 'doubleStats', 'revive', 'chain'];
 const EFFECTS = [...OLD_EFFECTS, ...NEW_EFFECTS];
-const ROLES = ['researcher', 'trader', 'idol', 'engineer'];
+// DESIGN 16（2.1）：职业改为 6 个打法关键词，字段仍叫 role
+const ROLES = ['multi', 'shield', 'summon', 'explode', 'growth', 'economy'];
+const ROLE_NAME = { multi: '多刀', shield: '护盾', summon: '召唤', explode: '自爆', growth: '成长', economy: '经济' };
 const TARGETS = ['self', 'frontFriend', 'backFriend', 'adjacentFriends', 'randomFriend', 'allFriends', 'lowestHpFriend', 'frontEnemy', 'backEnemy', 'randomEnemy', 'allEnemies', 'lowestHpEnemy', 'highestAtkEnemy', 'killer', 'summoned', 'boughtUnit'];
 const FACTIONS = ['open', 'closed', 'compute', 'folk'];
 const ABILITY_KEYS = ['name', 'shortDesc', 'trigger', 'effect', 'target', 'amount', 'atk', 'hp', 'permanent', 'perLevel', 'n', 'unitId', 'count', 'desc', 'filter', 'consume', 'maxHp', 'maxHpPerLevel', 'choices'];
@@ -104,6 +106,7 @@ for (const u of units) if (u.token && !TOKENS.includes(u.id) && !MOBS.includes(u
 
 const facCount = Object.fromEntries(FACTIONS.map((f) => [f, 0]));
 const roleFac = Object.fromEntries(ROLES.map((r) => [r, Object.fromEntries(FACTIONS.map((f) => [f, 0]))]));
+const roleTier = Object.fromEntries(ROLES.map((r) => [r, []]));
 const newEffUnits = [];
 const trigUse = Object.fromEntries(TRIGGERS.map((t) => [t, []]));
 const effUse = Object.fromEntries(EFFECTS.map((e) => [e, []]));
@@ -116,7 +119,13 @@ for (const u of units) {
   if (!Number.isInteger(u.hp) || u.hp < 1) err(`${at}: hp 应 ≥ 1`);
   if (!u.token) {
     if (!ROLES.includes(u.role)) err(`${at}: role 应为 ${ROLES.join('/')}，实际 ${u.role}`);
-    else if (FACTIONS.includes(u.faction)) roleFac[u.role][u.faction]++;
+    else {
+      if (FACTIONS.includes(u.faction)) roleFac[u.role][u.faction]++;
+      roleTier[u.role].push(u.tier);
+      // 自爆打法：技能必须是阵亡爆炸（含 explode）
+      const effs = [u.ability?.effect, ...(u.ability?.choices ?? []).map((c) => c.effect)];
+      if (u.role === 'explode' && !effs.includes('explode')) err(`${at}: 自爆关键词的单位技能必须含 explode`);
+    }
   } else if (u.role !== undefined) err(`${at}: 召唤物不带 role`);
   // 2.0：lines = { common: string[2~3], onSynergy: string }
   const L = u.lines;
@@ -154,8 +163,9 @@ for (const u of units) {
   else if (len(a.desc) > 24) err(`${at}: desc 超 24 字（${len(a.desc)}）「${a.desc}」`);
   if (a.filter !== undefined) {
     const f = a.filter;
-    for (const k of Object.keys(f)) if (!['faction', 'minTier', 'maxTier'].includes(k)) err(`${at}: filter 字段 ${k} 非法`);
+    for (const k of Object.keys(f)) if (!['faction', 'role', 'minTier', 'maxTier'].includes(k)) err(`${at}: filter 字段 ${k} 非法`);
     if (f.faction !== undefined && !FACTIONS.includes(f.faction)) err(`${at}: filter.faction 非法`);
+    if (f.role !== undefined && !ROLES.includes(f.role)) err(`${at}: filter.role 非法`);
     for (const k of ['minTier', 'maxTier']) if (f[k] !== undefined && !(Number.isInteger(f[k]) && f[k] >= 1 && f[k] <= 6)) err(`${at}: filter.${k} 应为 1~6`);
   }
   if (a.consume !== undefined && a.effect !== 'copyStats') err(`${at}: consume 只配 copyStats`);
@@ -186,16 +196,20 @@ for (const u of units) {
   if (!perLv && /每级/.test(a.desc)) err(`${at}: 不缩放但 desc 写了「每级」`);
 }
 for (const f of FACTIONS) if (facCount[f] < 7 || facCount[f] > 9) err(`阵营 ${f} 有 ${facCount[f]} 个，应 7~9`);
+// DESIGN 16：每个关键词 5~6 个单位，T1~T2 至少 2 个，跨阵营（≥2 个阵营）
 for (const r of ROLES) {
-  const n = Object.values(roleFac[r]).reduce((x, y) => x + y, 0);
-  if (n < 7 || n > 9) err(`职业 ${r} 有 ${n} 个，应 7~9`);
+  const n = roleTier[r].length;
+  if (n < 5 || n > 6) err(`打法 ${r}（${ROLE_NAME[r]}）有 ${n} 个，应 5~6`);
+  const early = roleTier[r].filter((t) => t <= 2).length;
+  if (early < 2) err(`打法 ${r}（${ROLE_NAME[r]}）的 T1~T2 单位只有 ${early} 个，应 ≥2`);
   const facs = FACTIONS.filter((f) => roleFac[r][f] > 0).length;
-  if (facs < 3) err(`职业 ${r} 只覆盖 ${facs} 个阵营，应 ≥3（跨阵营）`);
+  if (facs < 2) err(`打法 ${r}（${ROLE_NAME[r]}）只覆盖 ${facs} 个阵营，应 ≥2（跨阵营）`);
 }
-if (newEffUnits.length < 10) err(`使用 2.0 新效果的商店单位只有 ${newEffUnits.length} 个（≥10）`);
+// 2.1：技能按打法归类后，explode/chain 为主力新效果；steal/revive/doubleStats 只留给头条与装备（引擎保留）
+if (newEffUnits.length < 8) err(`使用 2.0 新效果的商店单位只有 ${newEffUnits.length} 个（≥8）`);
 // 2.0 起技能为流派服务，不再强制每个触发器 ≥2 个单位、每个旧效果都有人用（降为警告）
 for (const t of TRIGGERS) if (trigUse[t].length < 2) warn(`触发器 ${t} 只被 ${trigUse[t].length} 个单位使用：${trigUse[t].join(', ')}`);
-for (const e of NEW_EFFECTS) if (!effUse[e].length) err(`新效果 ${e} 没有单位使用`);
+for (const e of NEW_EFFECTS) if (!effUse[e].length) (['explode', 'chain'].includes(e) ? err : warn)(`新效果 ${e} 没有单位使用（引擎保留）`);
 for (const e of OLD_EFFECTS) if (!effUse[e].length) warn(`效果 ${e} 已没有单位使用（引擎保留）`);
   else if (!effUse[e].some((x) => !x.endsWith('*'))) warn(`效果 ${e} 只有召唤物使用：${effUse[e].join(', ')}`);
 
@@ -294,7 +308,7 @@ for (const a of arenas) {
   for (const k of need) if (a.effect[k] === undefined) err(`${at}: ${a.effect.type} 缺 ${k}`);
   checkFilter(a.effect.filter, at);
   if (['priceMod', 'shopSlots'].includes(a.effect.type) && !['unit', 'equip', 'consumable', 'reroll'].includes(a.effect.kind)) err(`${at}: kind 非法`);
-  if (a.effect.type === 'synergyBonus' && !synKey(a.effect.key)) err(`${at}: synergyBonus.key 应为阵营或职业`);
+  if (a.effect.type === 'synergyBonus' && !synKey(a.effect.key)) err(`${at}: synergyBonus.key 应为阵营或打法关键词`);
   if (a.effect.type === 'economy' && Object.keys(a.effect).length < 2) err(`${at}: economy 至少一个参数`);
 }
 
@@ -306,7 +320,7 @@ const arche = new Set();
 for (const o of opponents) {
   const at = `对手 ${o.id}`;
   if (!o.name || len(o.name) > 10) err(`${at}: name 缺失或超 10 字`);
-  if (!synKey(o.archetype)) err(`${at}: archetype 应为阵营或职业，实际 ${o.archetype}`);
+  if (!synKey(o.archetype)) err(`${at}: archetype 应为阵营或打法关键词，实际 ${o.archetype}`);
   else if (arche.has(o.archetype)) err(`${at}: archetype ${o.archetype} 重复`);
   else arche.add(o.archetype);
   if (!/^(characters\/[a-z_]+\.png|units\/[a-z_]+\.svg)$/.test(o.avatar ?? '')) err(`${at}: avatar 应为 characters/<id>.png 或 units/<id>.svg`);
@@ -314,7 +328,10 @@ for (const o of opponents) {
   for (const k of ['defeated', 'victory']) if (!o.taunt?.[k] || len(o.taunt[k]) > 14) err(`${at}: taunt.${k} 缺失或超 14 字`);
   for (const id of o.core ?? []) if (!byId[id] || byId[id].token) err(`${at}: core 单位 ${id} 不存在`);
 }
-for (const k of [...FACTIONS, ...ROLES]) if (!arche.has(k)) err(`没有对手绑定流派 ${k}`);
+// 2.1：8 个对手 = 4 阵营各 1 + 4 个不同的打法关键词
+for (const k of FACTIONS) if (!arche.has(k)) err(`没有对手绑定阵营 ${k}`);
+const archeRoles = ROLES.filter((k) => arche.has(k));
+if (archeRoles.length !== 4) err(`对手应绑定 4 个不同打法关键词，实际 ${archeRoles.length}：${archeRoles.join(', ')}`);
 
 // ───────── pve（DESIGN 12.7） ─────────
 const pve = load('pve.json');
@@ -358,7 +375,7 @@ const checkEv = (e, at) => {
   if (['addEnemyBoss', 'battleSummon'].includes(e.type) && !byId[e.unitId]) err(`${at}: 单位 ${e.unitId} 不存在`);
   if (['stealEnemy', 'benchEnemy'].includes(e.type) && !/Enemy$/.test(e.target)) err(`${at}: target 应为敌方目标`);
   if (e.type === 'damageOpponent' && !['random', 'leader'].includes(e.target)) err(`${at}: damageOpponent.target 应为 random/leader`);
-  if (e.type === 'synergyBonus' && !synKey(e.key)) err(`${at}: synergyBonus.key 应为阵营或职业`);
+  if (e.type === 'synergyBonus' && !synKey(e.key)) err(`${at}: synergyBonus.key 应为阵营或打法关键词`);
 };
 // 选项/突发：effects 数组优先（按顺序结算），兼容单个 effect
 const evList = (o, at) => {
@@ -441,8 +458,9 @@ for (const u of shop) (tierFac[`T${u.tier}`] ??= Object.fromEntries(FACTIONS.map
 console.log('阵营 × 阶级分布（商店单位）');
 console.table(tierFac);
 console.log('阵营合计', facCount);
-console.log('职业 × 阵营分布（商店单位）');
-console.table(roleFac);
+console.log('打法关键词 × 阵营分布（商店单位）');
+console.table(Object.fromEntries(ROLES.map((r) => [`${r} ${ROLE_NAME[r]}`, { ...roleFac[r], 合计: roleTier[r].length, 阶级: roleTier[r].slice().sort().join('') }])));
+console.log('对手流派', opponents.map((o) => `${o.name}:${o.archetype}`).join('，'));
 console.log(`2.0 新效果单位 ${newEffUnits.length}：${newEffUnits.join(', ')}`);
 console.log('触发器使用（*=召唤物）');
 for (const t of TRIGGERS) console.log(`  ${t.padEnd(15)} ${trigUse[t].join(', ')}`);
