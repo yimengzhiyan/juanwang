@@ -6,11 +6,12 @@ import {
   type RunState, type ShopActionInput, type SynergyState, type TutorialStepId,
 } from '@juanwang/shared';
 import { app, act, go, markSeen, onRun, saveSettings, settings, type Scene } from '../store';
-import { renderSynergy, renderTeam, runSynergies, topbar, updateTopbar } from '../ui/team';
+import { muteButton, renderSynergy, renderTeam, runSynergies, synergyPanel, topbar, updateTopbar } from '../ui/team';
+import { openCodex } from '../ui/codex';
 import { renderShop } from '../ui/shop';
-import { abilityText, esc, FACTION_NAME, FREE_LABEL, ROLE_NAME, SLOT_NAME, SYN_COLOR, synergyDetailHtml, TIER_NAME } from '../ui/cards';
+import { abilityText, esc, FACTION_NAME, FREE_LABEL, ROLE_NAME, SLOT_NAME, TIER_NAME } from '../ui/cards';
 import { attachDrag } from '../ui/drag';
-import { closeAllModals, confirmBox, openModal, showItemDetail, showUnitDetail } from '../ui/modal';
+import { closeAllModals, confirmBox, showItemDetail, showUnitDetail } from '../ui/modal';
 import { toast } from '../ui/toast';
 import { extraBanner, showHeadline } from '../ui/headline';
 import { allowedKinds, stepText, tutorialBubble, type Kind } from '../ui/tutorial';
@@ -45,7 +46,7 @@ let pveShownFor = '';
 export function gameScene(): Scene {
   const data = app.data;
   const el = document.createElement('div');
-  const top = topbar();
+  const top = topbar({ codex: () => { sfx.click(); openCodex(data, app.run); }, muteIn: false });
   const lobby = lobbyView(data, 'strip');
   const s00 = app.run!;
   const pv = !s00.tutorial ? pveForTurn(s00.turn, data) : undefined;
@@ -53,13 +54,16 @@ export function gameScene(): Scene {
   const syn = document.createElement('div');
   syn.className = 'synergy-bar';
   syn.dataset.tut = 'synergy-bar';
+  const panel = synergyPanel();
   const notes = document.createElement('div');
   notes.className = 'notes';
   const teamArea = document.createElement('section');
   teamArea.className = 'team-area';
-  teamArea.innerHTML = `<div class="area-label"><button class="mini-btn home-btn" aria-label="返回首页">${HOME_SVG}</button><span>我的队伍</span><small>← 前排先开火</small><span class="mod-hint"></span><span class="net-tag">离线模式</span></div><div class="team-row"></div><div class="grass"></div>`;
+  teamArea.innerHTML = `<div class="area-label"><button class="mini-btn home-btn" aria-label="返回首页">${HOME_SVG}</button><span>我的队伍</span><small class="front-hint">← 前排先开火</small><span class="notes-slot"></span><span class="mod-hint"></span><span class="net-tag">离线模式</span><button class="mini-btn mute-mini" aria-label="静音"></button></div><div class="team-row"></div><div class="grass"></div>`;
   const teamRow = teamArea.querySelector('.team-row') as HTMLElement;
   const modHint = teamArea.querySelector('.mod-hint') as HTMLElement;
+  teamArea.querySelector('.notes-slot')!.replaceWith(notes);
+  muteButton(teamArea.querySelector('.mute-mini') as HTMLElement);
   const shop = document.createElement('section');
   shop.className = 'shop panel';
   shop.innerHTML = `<div class="shop-head"><span>商店</span><small class="shop-bonus"></small><button class="up-btn" data-kind="upgrade"></button></div><div class="shop-units"></div><div class="shop-items"></div>`;
@@ -79,7 +83,7 @@ export function gameScene(): Scene {
   const bubble = tutorialBubble(data, skipTutorial, finishTutorial);
   el.append(top);
   if (strip) el.append(strip);
-  el.append(lobby.el, syn, notes, teamArea, shop, bubble.el, info, bar);
+  el.append(lobby.el, syn, panel.el, teamArea, shop, bubble.el, info, bar);
   if (s00.tutorial) lobby.el.style.display = 'none';
 
   let sel: Sel = null;
@@ -103,6 +107,7 @@ export function gameScene(): Scene {
     } else updateDock(null);
     const syns = runSynergies(s, data);
     renderSynergy(syn, syns, (st) => openSynergy(st));
+    panel.update(syns);
     detectTierUp(syns);
     renderTeam(teamRow, s, data);
     renderShop(shopUnits, shopItems, s, data);
@@ -151,9 +156,7 @@ export function gameScene(): Scene {
 
   function openSynergy(st: SynergyState): void {
     sfx.click();
-    const body = document.createElement('div');
-    body.innerHTML = synergyDetailHtml(st);
-    openModal({ title: `${st.name}羁绊`, body, cls: 'modal--syn' });
+    panel.open(st.key);
   }
 
   /** 达成新档：徽章弹跳 + 短横幅 */
@@ -172,27 +175,11 @@ export function gameScene(): Scene {
             chip.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
           }
         }
-        const st = ups[0];
-        tierBanner(`${st.name} ×${st.count}：${st.descs[st.tier - 1] ?? '羁绊点亮！'}`, SYN_COLOR[st.key], st.tier);
+        panel.flash(ups.map((x) => x.key));
       }
     }
     prevTiers = now;
   }
-  function tierBanner(text: string, color: string, tier: number): void {
-    const b = document.createElement('div');
-    b.className = `tier-banner tier-banner--${tier}`;
-    b.style.setProperty('--sc', color);
-    b.innerHTML = `<img src="${ui(`tier_${Math.min(3, tier)}`)}" alt=""><span>${esc(text)}</span>`;
-    el.appendChild(b);
-    const r = syn.getBoundingClientRect();
-    const [, ly] = toShell(0, r.bottom);
-    b.style.top = `${ly + 2}px`;
-    gsap
-      .timeline({ onComplete: () => b.remove() })
-      .fromTo(b, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.2, ease: 'back.out(2.5)' })
-      .to(b, { opacity: 0, y: -8, duration: 0.2 }, '+=1.6');
-  }
-
   /** 下回合预告：头条 / PVE / 解锁阶级 / 扣血加码 */
   function renderNext(s: RunState): void {
     const next = s.turn + 1;
@@ -207,11 +194,12 @@ export function gameScene(): Scene {
       parts.splice(2);
     }
     notes.style.display = parts.length ? '' : 'none';
+    (teamArea.querySelector('.front-hint') as HTMLElement).style.display = parts.length ? 'none' : '';
     if (!parts.length) return;
     const head = `下回合：${parts.join(' · ')}`;
     if (notes.dataset.text === head) return;
     notes.dataset.text = head;
-    notes.innerHTML = `<span class="next-tip"><i>NEXT</i>${esc(head)}</span>`;
+    notes.innerHTML = `<span class="next-tip"><i>NEXT</i>${esc(head.replace(/^下回合：/, ''))}</span>`;
   }
 
   /** 选中商店卡时，在卡片正下方弹出大号操作按钮 */
@@ -664,7 +652,8 @@ export function gameScene(): Scene {
   // 空槽点击 / 点空白取消
   el.addEventListener('click', (e) => {
     const t = e.target as HTMLElement;
-    if (t.closest('[data-src]') || t.closest('button') || t.closest('.infobar') || t.closest('.tut') || t.closest('.extra') || t.closest('.lobby')) return;
+    if (panel.isOpen() && !t.closest('.syn-panel') && !t.closest('.synergy-bar')) panel.close();
+    if (t.closest('[data-src]') || t.closest('button') || t.closest('.infobar') || t.closest('.syn-panel') || t.closest('.tut') || t.closest('.extra') || t.closest('.lobby')) return;
     const slot = t.closest('.tslot') as HTMLElement | null;
     if (slot && can('team')) {
       onTapTeam(Number(slot.dataset.index));
@@ -945,9 +934,8 @@ export function gameScene(): Scene {
     ex.classList.add('extra--float');
     pendingExtra.s = null;
     el.appendChild(ex);
-    gsap.fromTo(ex, { y: -60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: 'back.out(2)', delay: s0.phase === 'headline' ? 0 : 0.2 });
-    gsap.to(ex, { y: -60, opacity: 0, duration: 0.3, delay: 5, onComplete: () => ex.remove() });
-    ex.onclick = () => ex.remove();
+    gsap.fromTo(ex, { y: -60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35, ease: 'back.out(2)', delay: 0.1 });
+    gsap.to(ex, { y: -60, opacity: 0, duration: 0.3, delay: 2.5, onComplete: () => ex.remove() });
   }
   maybePve();
   if (s0.error) toast(s0.error);

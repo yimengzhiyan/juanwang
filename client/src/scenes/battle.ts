@@ -8,7 +8,7 @@ import {
 } from '@juanwang/shared';
 import { app, markSeen, setRun, settings, type Scene } from '../store';
 import { setHpChip, topbar, updateTopbar } from '../ui/team';
-import { esc, plain, setCardStats, setShield, skillName, SYN_COLOR, SYN_DARK, synIcon, unitCard } from '../ui/cards';
+import { esc, plain, setCardStats, setShield, skillName, skillShort, SYN_COLOR, SYN_DARK, synIcon, tierShield, unitCard } from '../ui/cards';
 import { showUnitDetail } from '../ui/modal';
 import { lobbyView, updateDock } from '../ui/lobby';
 import { pveStrip } from '../ui/pve';
@@ -60,6 +60,8 @@ export function battleScene(): Scene {
   arena.className = 'arena';
   arena.innerHTML = `
     <div class="side-label side-label--enemy"><span class="opp-name">匹配对手中…</span></div>
+    <div class="side-syn side-syn--enemy"></div>
+    <div class="side-syn side-syn--me"></div>
     <div class="field"><div class="ring-line"></div></div>
     <div class="vs"><span class="vs-l">V</span><span class="vs-r">S</span></div>
     <div class="side-label side-label--me"><span>${esc(settings.name)} 的队伍</span></div>
@@ -72,14 +74,8 @@ export function battleScene(): Scene {
   const oppName = arena.querySelector('.opp-name') as HTMLElement;
   const log = document.createElement('div');
   log.className = 'blog';
-  log.innerHTML = '<div class="blog-lines"></div><button class="blog-toggle" aria-label="展开战斗日志">展开</button>';
+  log.innerHTML = '<div class="blog-head">战斗日志</div><div class="blog-lines"></div>';
   const logLines = log.querySelector('.blog-lines') as HTMLElement;
-  const logToggle = log.querySelector('.blog-toggle') as HTMLElement;
-  log.onclick = () => {
-    const open = log.classList.toggle('is-open');
-    logToggle.textContent = open ? '收起' : '展开';
-    if (!open) logLines.scrollTop = 0;
-  };
   el.append(top);
   if (pv) el.append(pveStrip(pv));
   el.append(lobby.el, arena, log);
@@ -141,20 +137,35 @@ export function battleScene(): Scene {
   });
 
   // ───────────── 布局 ─────────────
-  const ROW_GAP = 1.5;
+  // 自上而下：敌方名牌 + 羁绊（HEAD）→ 敌方一排 → 中间带（大字技能/横幅/VS，MID）→ 我方一排 → 我方名牌 + 羁绊（FOOT）；
+  // 擂台高度由 JS 算好，下方剩余空间全部给常显战斗日志。
+  const HEAD = 66;
+  const FOOT = 72;
+  const MID_MIN = 100;
+  const MID_MAX = 124;
+  const LOG_MIN = 80;
+  const LOG_MAX = 300;
   interface Geo { w: number; h: number; gap: number; x: (pos: number) => number; y: number; mid: number }
-  function metrics(): { W: number; w: number; h: number; gap: number; yEnemy: number; yMe: number; mid: number } {
-    const W = field.clientWidth;
-    const H = field.clientHeight;
+  let geo = { W: 0, w: 0, h: 0, gap: 6, yEnemy: 0, yMe: 0, mid: 0, n: 0 };
+  function sizeArena(): void {
+    const W = arena.clientWidth;
     const n = Math.max(5, order.me.length, order.enemy.length);
-    const gap = 6;
+    const gap = n > 5 ? 4 : 6;
     const pad = 8;
-    let w = Math.min(84, (W - pad * 2 - gap * (n - 1)) / n);
-    const maxH = (H - 96) / (2 + ROW_GAP);
-    if ((w * 104) / 84 > maxH) w = (maxH * 84) / 104;
-    const h = (w * 104) / 84;
-    const mid = Math.round(H * 0.5);
-    return { W, w, h, gap, mid, yEnemy: mid - (ROW_GAP / 2) * h - h, yMe: mid + (ROW_GAP / 2) * h };
+    const avail = el.clientHeight - arena.offsetTop - 8;
+    let w = Math.min(W > 440 ? 80 : 72, (W - pad * 2 - gap * (n - 1)) / n);
+    w = Math.max(34, Math.min(w, (avail - LOG_MIN - HEAD - FOOT - MID_MIN) / 3));
+    const h = w * 1.5;
+    const cmin = HEAD + FOOT + MID_MIN + 2 * h;
+    const logH = Math.max(LOG_MIN, Math.min(LOG_MAX, avail - cmin));
+    const mid = MID_MIN + Math.max(0, Math.min(MID_MAX - MID_MIN, avail - logH - cmin));
+    arena.style.height = `${Math.round(HEAD + FOOT + mid + 2 * h)}px`;
+    geo = { W, w, h, gap, n, yEnemy: HEAD, yMe: HEAD + h + mid, mid: Math.round(HEAD + h + mid / 2) };
+  }
+  function metrics(): typeof geo {
+    const n = Math.max(5, order.me.length, order.enemy.length);
+    if (!geo.W || n !== geo.n || arena.clientWidth !== geo.W) sizeArena();
+    return geo;
   }
   function geom(side: Side): Geo {
     const m = metrics();
@@ -164,18 +175,33 @@ export function battleScene(): Scene {
   }
   const meLabel = arena.querySelector('.side-label--me') as HTMLElement;
   const enemyLabel = arena.querySelector('.side-label--enemy') as HTMLElement;
+  const meSyn = arena.querySelector('.side-syn--me') as HTMLElement;
+  const enemySyn = arena.querySelector('.side-syn--enemy') as HTMLElement;
   const ringLine = field.querySelector('.ring-line') as HTMLElement;
   let bigWordTop = 0;
   function placeChrome(): void {
     const m = metrics();
-    const t = field.offsetTop;
-    enemyLabel.style.top = `${Math.max(2, t + m.yEnemy - 40)}px`;
-    meLabel.style.top = `${t + m.yMe + m.h + 14}px`;
+    enemyLabel.style.top = '4px';
+    enemySyn.style.top = '36px';
+    meLabel.style.top = `${m.yMe + m.h + 14}px`;
+    meSyn.style.top = `${m.yMe + m.h + 46}px`;
     ringLine.style.top = `${m.mid}px`;
-    vs.style.top = `${t + m.mid}px`;
-    bannerSlot.style.top = `${t + m.mid}px`;
-    bigSlot.style.top = `${t + m.mid}px`;
-    bigWordTop = t + m.mid;
+    vs.style.top = `${m.mid}px`;
+    bannerSlot.style.top = `${m.mid}px`;
+    bigSlot.style.top = `${m.mid}px`;
+    bigWordTop = m.mid;
+  }
+  /** 羁绊点亮时在该方名牌下加一枚小徽章 */
+  function addSideSyn(side: Side, key: string, name: string, count: number, tier: number): void {
+    const row = side === 'me' ? meSyn : enemySyn;
+    row.querySelector(`[data-key="${key}"]`)?.remove();
+    const c = document.createElement('span');
+    c.className = 'ss-chip';
+    c.dataset.key = key;
+    c.style.setProperty('--sc', SYN_COLOR[key] ?? '#9B6BFF');
+    c.innerHTML = `<img src="${synIcon(key)}" alt="">${esc(name)}×${count}${tierShield(tier)}`;
+    row.appendChild(c);
+    if (!skipping) gsap.fromTo(c, { scale: 0 }, { scale: 1, duration: 0.25, ease: 'back.out(3)' });
   }
   let lastW = 0;
   function layout(side: Side, dur = 0.25): void {
@@ -196,6 +222,7 @@ export function battleScene(): Scene {
     });
   }
   const onResize = (): void => {
+    geo.W = 0;
     layout('me', 0);
     layout('enemy', 0);
   };
@@ -246,7 +273,7 @@ export function battleScene(): Scene {
   function say(u: BU, line: string): void {
     const b = u.el.querySelector('.say-bubble') as HTMLElement;
     b.textContent = line;
-    b.classList.toggle('below', u.side === 'me');
+    b.classList.toggle('below', u.side === 'enemy');
     const W = field.clientWidth;
     const ux = Number(gsap.getProperty(u.el, 'x')) || 0;
     const uw = u.el.offsetWidth;
@@ -268,7 +295,7 @@ export function battleScene(): Scene {
     if (f) gsap.fromTo(f, { opacity: 0.6 }, { opacity: 0, duration: 0.16 });
     if (!reducedMotion()) gsap.timeline().to(u.card, { rotation: 5, duration: 0.04 }).to(u.card, { rotation: -5, duration: 0.04 }).to(u.card, { rotation: 3, duration: 0.04 }).to(u.card, { rotation: 0, duration: 0.04 });
   }
-  function fl(u: BU, text: string, color: string, dy = -10, size = 24): void {
+  function fl(u: BU, text: string, color: string, dy = -10, size = 28): void {
     const [x, y] = center(u.card);
     floatText(x, y + dy, text, color, size);
   }
@@ -301,7 +328,7 @@ export function battleScene(): Scene {
       const b = document.createElement('div');
       b.className = 'big-skill';
       b.style.setProperty('--sc', color);
-      b.innerHTML = `${def ? `<span class="bs-ava"><img class="${isPhotoAvatar(def) ? 'is-photo' : ''}" src="${avatarUrl(def)}" alt=""></span>` : ''}<span class="bs-text"><b>${esc(name)}</b>${def ? `<small>${esc(def.name)}</small>` : ''}</span>`;
+      b.innerHTML = `${def ? `<span class="bs-ava"><img class="${isPhotoAvatar(def) ? 'is-photo' : ''}" src="${avatarUrl(def)}" alt=""></span>` : ''}<span class="bs-text"><b>${esc(name)}</b>${def ? `<small>${esc(def.name)}<em>${esc(skillShort(def))}</em></small>` : ''}</span>`;
       bigSlot.innerHTML = '';
       bigSlot.appendChild(b);
       sfx.bigSkill();
@@ -309,7 +336,7 @@ export function battleScene(): Scene {
       gsap
         .timeline({ onComplete: () => b.remove() })
         .fromTo(b, { scale: 0, opacity: 1 }, { scale: 1, duration: 0.22, ease: 'back.out(2)' })
-        .to(b, { y: -36, opacity: 0, duration: 0.25, ease: 'power1.in' }, '+=0.35');
+        .to(b, { y: -24, opacity: 0, duration: 0.25, ease: 'power1.in' }, '+=0.5');
       setTimeScale(curSpeed * 0.5);
       await wait(0.3);
       if (!skipping) setTimeScale(curSpeed);
@@ -381,6 +408,7 @@ export function battleScene(): Scene {
           const lu = U(ev.line.unit);
           if (lu && !fast) say(lu, ev.line.line);
         }
+        addSideSyn(ev.side, ev.key, ev.name, ev.count, ev.tier);
         if (fast) return;
         const who = ev.side === 'me' ? '' : '敌方 ';
         banner(`${who}${ev.text}`, SYN_COLOR[ev.key] ?? '#9B6BFF', SYN_DARK[ev.key] ?? '#7A4FE0', ev.tier, ev.side === 'me' ? 0.35 : 0.2);
@@ -482,12 +510,12 @@ export function battleScene(): Scene {
             const src = ev.source ? U(ev.source) : undefined;
             sfx.reflect();
             if (src) flyNumber(src, u, `-${ev.amount}`, '#FF8C42');
-            else fl(u, `-${ev.amount}`, '#FF8C42', -14, 26);
+            else fl(u, `-${ev.amount}`, '#FF8C42', -14, 34);
             hitFlash(u);
             await wait(0.18);
             return;
           }
-          const size = ev.kind === 'splash' ? 20 : ev.kind === 'explode' ? 24 : 28;
+          const size = ev.kind === 'splash' ? 28 : ev.kind === 'explode' ? 32 : 40;
           fl(u, `-${ev.amount}`, '#F25757', -14, size);
           hitFlash(u);
           if (ev.kind === 'ability') sfx.hit();
@@ -755,7 +783,7 @@ export function battleScene(): Scene {
     n.className = 'float-text';
     n.textContent = text;
     n.style.color = color;
-    n.style.fontSize = '26px';
+    n.style.fontSize = '34px';
     n.style.left = `${fx}px`;
     n.style.top = `${fy}px`;
     getFxLayer().appendChild(n);

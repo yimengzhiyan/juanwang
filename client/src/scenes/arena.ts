@@ -3,7 +3,7 @@ import gsap from 'gsap';
 import { DEFAULT_ARENAS, type ArenaDef } from '@juanwang/shared';
 import { app, act, go, type Scene } from '../store';
 import { artUrl, assetUrl, hasAsset } from '../assets';
-import { esc, synIcon, synName } from '../ui/cards';
+import { archetypeKey, esc, SYN_COLOR, synIcon, synName } from '../ui/cards';
 import { toast } from '../ui/toast';
 import { sfx } from '../fx/sound';
 import { reducedMotion } from '../fx/anims';
@@ -50,8 +50,11 @@ export function arenaScene(): Scene {
       <div class="ar-sub">整局生效的全局规则，会推你走某条流派</div>
     </div>
     <div class="ar-cards"></div>
-    <div class="ar-opps"><small>本局 7 名对手</small><div class="ar-opp-list">${s.opponents
-      .map((o) => `<span class="lb-ava sm" title="${esc(o.name)}">${o.avatar ? `<img src="${artUrl(o.avatar)}" alt="">` : esc(Array.from(o.name)[0] ?? '?')}</span>`)
+    <div class="ar-opps"><small>本局 ${s.opponents.length} 名对手</small><div class="ar-opp-list">${s.opponents
+      .map((o) => {
+        const k = archetypeKey(o.archetype);
+        return `<div class="ar-opp"><span class="lb-ava">${o.avatar ? `<img src="${artUrl(o.avatar)}" alt="">` : esc(Array.from(o.name)[0] ?? '?')}</span><b class="ar-opp-name">${esc(o.name)}</b><span class="ar-opp-info">${k ? `<em style="--sc:${SYN_COLOR[k]}"><img src="${synIcon(k)}" alt="">${esc(synName(k))}流</em>` : '<em>杂牌军</em>'}</span></div>`;
+      })
       .join('')}</div></div>
     <button class="btn btn--go btn--xl ar-go" disabled>就它了</button>`;
   const cards = el.querySelector('.ar-cards') as HTMLElement;

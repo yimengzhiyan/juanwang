@@ -78,7 +78,7 @@ export function showResult(host: HTMLElement, c: ResultCtx): void {
           .slice(0, 5)
           .map((x) => {
             const d = data.unitsById[x.defId];
-            return `<div class="sum-bar"><span class="mini-ava tier-${d?.tier ?? 1}">${d ? `<img class="${isPhotoAvatar(d) ? 'is-photo' : ''}" src="${avatarUrl(d)}" alt="">` : ''}</span><span class="sum-bar-track"><i style="--w:${(x.d / maxD) * 100}%"></i></span><b>${x.d}</b></div>`;
+            return `<div class="sum-bar"><span class="mini-ava tier-${d?.tier ?? 1}">${d ? `<img class="${isPhotoAvatar(d) ? 'is-photo' : ''}" src="${avatarUrl(d)}" alt="">` : ''}</span><span class="sum-bar-name">${x.level > 1 ? `<small>Lv${x.level}</small>` : ''}${esc(d?.name ?? '?')}</span><span class="sum-bar-track"><i style="--w:${(x.d / maxD) * 100}%"></i></span><b>${x.d}</b></div>`;
           })
           .join('')}</div>` : ''}
         <div class="sum-syn"></div>

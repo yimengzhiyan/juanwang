@@ -57,25 +57,82 @@ export interface CardOpts {
   synTier?: number;
   /** 不显示装备槽（图鉴等） */
   noEquips?: boolean;
+  /** tall = 竖卡（队伍/战斗/默认）；big = 商店/图鉴大卡（技能名 + 描述直接可见） */
+  variant?: 'tall' | 'big';
+  /** big 卡显示完整技能描述（图鉴） */
+  full?: boolean;
 }
+
+/** 卡面技能名（数据 ability.name，缺省按描述/效果推断） */
+export function skillTitle(def: UnitDef): string {
+  return def.ability?.name?.trim() || skillName(def);
+}
+/** 卡面短描述（数据 ability.shortDesc，缺省从 desc 截取前 10 字） */
+export function skillShort(def: UnitDef): string {
+  const a = def.ability;
+  if (!a) return '纯靠身板';
+  if (a.shortDesc?.trim()) return a.shortDesc.trim();
+  let d = plain(a.desc ?? '');
+  const m = /^([^：:]{2,8})[：:](.+)$/.exec(d);
+  if (m && (m[1] === a.name || m[1] === skillName(def))) d = m[2].trim();
+  const arr = Array.from(d);
+  return arr.length > 10 ? `${arr.slice(0, 10).join('')}…` : d;
+}
+/** 装备短描述 */
+export function equipShort(def: EquipDef, gold = false): string {
+  const s = gold ? (def.goldShortDesc ?? def.shortDesc) : def.shortDesc;
+  if (s?.trim()) return s.trim();
+  const d = (gold ? def.goldDesc : def.desc).replace(/^金[：:]/, '');
+  const i = d.search(/[：:]/);
+  return i > 0 && i < 8 ? d.slice(i + 1).trim() : d;
+}
+/** 消耗品短描述（"续命一杯：本回合 3 次免费刷新" → 冒号后半段） */
+export function consShort(def: ConsumableDef): string {
+  const i = def.desc.search(/[：:]/);
+  return i > 0 ? def.desc.slice(i + 1).trim() : def.desc;
+}
+
+const STARS = '<div class="uc-stars"><i></i><i></i><i></i><b class="uc-xp"><s></s></b></div>';
 
 export function unitCard(def: UnitDef, st: CardStats, opts: CardOpts = {}): HTMLElement {
   const el = document.createElement('div');
-  el.className = `ucard tier-${def.tier} fac-${def.faction}${opts.enemy ? ' is-enemy' : ''}${def.token ? ' is-token' : ''}${opts.noEquips ? ' no-eq' : ''}`;
+  const big = opts.variant === 'big';
+  el.className = `ucard ${big ? 'ucard--big' : 'ucard--tall'} tier-${def.tier} fac-${def.faction}${opts.enemy ? ' is-enemy' : ''}${def.token ? ' is-token' : ''}${opts.noEquips || big ? ' no-eq' : ''}${opts.full ? ' is-full' : ''}`;
   el.dataset.def = def.id;
   if (opts.uid) el.dataset.uid = opts.uid;
   if (opts.synTier) el.dataset.syn = String(opts.synTier);
   el.style.setProperty('--fc', SYN_COLOR[def.faction]);
   const photo = isPhotoAvatar(def);
-  el.innerHTML = `
-    <div class="uc-stars"><i></i><i></i><i></i><b class="uc-xp"><s></s></b></div>
-    ${def.role ? `<img class="uc-role" src="${ui(`role_${def.role}`)}" alt="${ROLE_NAME[def.role]}" draggable="false">` : ''}
-    <img class="uc-fac" src="${ui(`faction_${def.faction}`)}" alt="${FACTION_NAME[def.faction]}" draggable="false">
-    <div class="uc-ava"><img class="${photo ? 'is-photo' : ''}" src="${avatarUrl(def)}" alt="" draggable="false"><span class="uc-flash"></span></div>
-    <div class="uc-name" style="--nl:${nameLen(def.name)}">${esc(def.name)}</div>
-    ${opts.noEquips ? '' : `<div class="uc-eqs">${EQUIP_SLOTS.map((s) => `<i class="uc-eq" data-slot="${s}"></i>`).join('')}</div>`}
-    <div class="uc-atk"><span></span></div>
-    <div class="uc-hp"><span></span><em class="uc-shield"></em></div>`;
+  const ava = `<div class="uc-ava"><img class="${photo ? 'is-photo' : ''}" src="${avatarUrl(def)}" alt="" draggable="false"><span class="uc-flash"></span></div>`;
+  const atkHp = '<div class="uc-atk"><span></span></div><div class="uc-hp"><span></span><em class="uc-shield"></em></div>';
+  if (big) {
+    const nm = def.ability?.name ?? '';
+    const fullText = abilityText(def);
+    const desc = opts.full ? (nm && /^[：:]/.test(fullText.slice(nm.length)) && fullText.startsWith(nm) ? fullText.slice(nm.length + 1).trim() : fullText) : skillShort(def);
+    el.innerHTML = `
+      <div class="ub-top">
+        <div class="ub-ava">${STARS}${ava}${atkHp}</div>
+        <div class="ub-meta">
+          <div class="uc-name">${esc(def.name)}</div>
+          <div class="ub-tags">
+            <span class="ub-tag ub-tag--fac"><img class="uc-fac" src="${ui(`faction_${def.faction}`)}" alt="" draggable="false">${FACTION_NAME[def.faction]}</span>
+            ${def.role ? `<span class="ub-tag"><img class="uc-role" src="${ui(`role_${def.role}`)}" alt="" draggable="false">${ROLE_NAME[def.role]}</span>` : ''}
+            ${opts.full ? `<span class="ub-tag ub-tag--tier">${def.token ? '召唤物' : TIER_NAME[def.tier]}</span>` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="ub-skill">${def.ability ? `<b>${esc(skillTitle(def))}</b>` : '<b>无技能</b>'}<span>${esc(desc)}</span></div>`;
+  } else {
+    el.innerHTML = `
+      ${STARS}
+      ${def.role ? `<img class="uc-role" src="${ui(`role_${def.role}`)}" alt="${ROLE_NAME[def.role]}" draggable="false">` : ''}
+      <img class="uc-fac" src="${ui(`faction_${def.faction}`)}" alt="${FACTION_NAME[def.faction]}" draggable="false">
+      ${ava}
+      <div class="uc-name" style="--nl:${nameLen(def.name)}">${esc(def.name)}</div>
+      ${def.ability ? `<div class="uc-skill">${esc(skillTitle(def))}</div>` : ''}
+      ${opts.noEquips ? '' : `<div class="uc-eqs">${EQUIP_SLOTS.map((s) => `<i class="uc-eq" data-slot="${s}"></i>`).join('')}</div>`}
+      ${atkHp}`;
+  }
   setCardStats(el, { ...st, equips: st.equips ?? {} });
   return el;
 }
@@ -132,7 +189,7 @@ export function equipCard(def: EquipDef, gold = false): HTMLElement {
   const el = document.createElement('div');
   el.className = `icard ecard slot-${def.slot}${gold ? ' is-gold' : ''}`;
   el.dataset.equip = def.id;
-  el.innerHTML = `<img class="ic-img" src="${assetUrl(def.icon)}" alt="" draggable="false"><div class="ic-name">${gold ? '金·' : ''}${esc(def.name)}</div><b class="ic-slot"><img src="${ui(`slot_${def.slot}`)}" alt="">${SLOT_NAME[def.slot]}</b>`;
+  el.innerHTML = `<img class="ic-img" src="${assetUrl(def.icon)}" alt="" draggable="false"><div class="ic-name">${gold ? '金·' : ''}${esc(def.name)}</div><div class="ic-desc">${esc(equipShort(def, gold))}</div><b class="ic-slot"><img src="${ui(`slot_${def.slot}`)}" alt="">${SLOT_NAME[def.slot]}</b>`;
   return el;
 }
 
@@ -141,7 +198,7 @@ export function consumableCard(def: ConsumableDef): HTMLElement {
   const el = document.createElement('div');
   el.className = 'icard ccard';
   el.dataset.cons = def.id;
-  el.innerHTML = `<img class="ic-img" src="${assetUrl(def.icon)}" alt="" draggable="false"><div class="ic-name">${esc(def.name)}</div><b class="ic-team">${def.targetKind === 'unit' ? '选单位' : '即用'}</b>`;
+  el.innerHTML = `<img class="ic-img" src="${assetUrl(def.icon)}" alt="" draggable="false"><div class="ic-name">${esc(def.name)}</div><div class="ic-desc">${esc(consShort(def))}</div><b class="ic-team">${def.targetKind === 'unit' ? '选单位' : '即用'}</b>`;
   return el;
 }
 
@@ -171,6 +228,7 @@ const EFFECT_NAME: Record<string, string> = {
 };
 /** 大字技能名：描述里"名字：效果"的前半段（≤8 字），否则按效果类型 */
 export function skillName(def: UnitDef | undefined, effect?: string): string {
+  if (def?.ability?.name?.trim()) return def.ability.name.trim();
   const d = def?.ability?.desc ?? '';
   const m = /^([^：:，,（(]{2,8})[：:]/.exec(d);
   if (m && !/^(开战|阵亡|受伤|击杀|购买|出售|进化|回合|友军|装上|攻击|被|敌方|每|召唤)/.test(m[1])) return m[1];

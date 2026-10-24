@@ -19,7 +19,8 @@ export function renderShop(unitsEl: HTMLElement, itemsEl: HTMLElement, s: RunSta
       const def = data.unitsById[slot.defId];
       if (!def) return;
       nUnits++;
-      const c = unitCard(def, { atk: def.atk, hp: def.hp, level: 1 });
+      wrap.classList.add('sslot--unit');
+      const c = unitCard(def, { atk: def.atk, hp: def.hp, level: 1 }, { variant: 'big' });
       c.dataset.src = `shop:${i}`;
       c.dataset.tut = 'shop-unit';
       wrap.appendChild(c);

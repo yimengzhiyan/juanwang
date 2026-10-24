@@ -1,54 +1,98 @@
-// 图鉴：单位（按阵营/职业筛选，阶级分组，见过的点亮）/ 装备 / 赛场 三个页签。
-import { EQUIP_SLOTS, FACTIONS, ROLES, type GameData } from '@juanwang/shared';
+// 图鉴：4 阵营页签（顶部 2/3/5 档效果 + 该阵营全部单位大卡）/ 职业 / 装备 / 赛场。对局中打开时标出当前羁绊人数。
+import {
+  EQUIP_SLOTS, FACTIONS, FACTION_THRESHOLDS, ROLES, ROLE_THRESHOLDS, SYNERGY_DESCS, computeSynergies, stateBonus,
+  type GameData, type RunState, type SynergyKey, type UnitDef,
+} from '@juanwang/shared';
 import { settings } from '../store';
-import { assetUrl } from '../assets';
+import { assetUrl, avatarUrl, isPhotoAvatar } from '../assets';
 import { openModal, showItemDetail, showUnitDetail } from './modal';
-import { esc, SLOT_NAME, synIcon, synName, unitCard } from './cards';
+import { esc, equipShort, SLOT_NAME, SYN_COLOR, synIcon, synName, tierShield, unitCard } from './cards';
 import { arenaArt, arenaHints, arenaText } from '../scenes/arena';
 
-type Tab = 'units' | 'equips' | 'arenas';
+type Tab = 'open' | 'closed' | 'compute' | 'folk' | 'roles' | 'equips' | 'arenas';
 
-export function openCodex(data: GameData): void {
+export function openCodex(data: GameData, run?: RunState | null): void {
   const body = document.createElement('div');
   body.className = 'codex';
   const tabs = document.createElement('div');
-  tabs.className = 'tabs';
-  const filters = document.createElement('div');
-  filters.className = 'codex-filters';
+  tabs.className = 'tabs codex-tabs';
   const list = document.createElement('div');
   list.className = 'codex-list';
-  body.append(tabs, filters, list);
-  let tab: Tab = 'units';
-  let filter: string | null = null;
+  body.append(tabs, list);
+  const counts = new Map<string, number>();
+  if (run) for (const st of computeSynergies(run.team, data, stateBonus(run, data))) counts.set(st.key, st.count);
+  let tab: Tab = 'open';
+  if (run) {
+    const best = FACTIONS.map((f) => [f, counts.get(f) ?? 0] as const).sort((a, b) => b[1] - a[1])[0];
+    if (best && best[1] > 0) tab = best[0];
+  }
 
-  const renderUnits = (): void => {
-    const pool = data.units.filter((u) => !filter || u.faction === filter || u.role === filter);
-    const real = data.units.filter((u) => !u.token);
-    const seen = real.filter((u) => settings.seen.has(u.id)).length;
-    list.innerHTML = `<div class="codex-head">已收集 ${seen} / ${real.length}${filter ? ` · 筛选：${esc(synName(filter))}` : ''}</div>`;
-    const groups: [string, typeof data.units][] = [];
-    for (let t = 1; t <= 6; t++) groups.push([`T${t}`, pool.filter((u) => u.tier === t && !u.token)]);
-    if (!filter) groups.push(['召唤物 / 怪物', pool.filter((u) => u.token)]);
-    for (const [name, units] of groups) {
+  /** 某条羁绊的档位说明 */
+  const tiersHtml = (key: SynergyKey): string => {
+    const th: readonly number[] = (FACTIONS as readonly string[]).includes(key) ? FACTION_THRESHOLDS : ROLE_THRESHOLDS;
+    const n = counts.get(key) ?? 0;
+    const descs = SYNERGY_DESCS[key] ?? [];
+    return `<div class="cx-syn" style="--sc:${SYN_COLOR[key]}">
+      <div class="cx-syn-head"><img src="${synIcon(key)}" alt=""><b>${esc(synName(key))}</b>${run ? `<span>当前 ${n} 个</span>` : ''}</div>
+      <ul>${th.map((t, i) => `<li class="${run && n >= t ? 'on' : ''}">${tierShield(i + 1, 'tier-shield sm')}<b>${t} 个</b><span>${esc(descs[i] ?? '')}</span></li>`).join('')}</ul>
+    </div>`;
+  };
+
+  const unitGrid = (units: UnitDef[]): HTMLElement => {
+    const grid = document.createElement('div');
+    grid.className = 'codex-grid';
+    for (const def of units) {
+      const known = settings.seen.has(def.id);
+      const cell = document.createElement('button');
+      cell.className = `codex-cell${known ? '' : ' is-unknown'}`;
+      cell.appendChild(unitCard(def, { atk: def.atk, hp: def.hp, level: 1 }, { variant: 'big', full: true }));
+      if (!known) cell.insertAdjacentHTML('beforeend', '<span class="codex-new">未遇到</span>');
+      cell.onclick = () => showUnitDetail(data, def.id);
+      grid.appendChild(cell);
+    }
+    return grid;
+  };
+
+  const renderFaction = (f: SynergyKey): void => {
+    list.innerHTML = tiersHtml(f);
+    const pool = data.units.filter((u) => u.faction === f);
+    for (let t = 1; t <= 6; t++) {
+      const units = pool.filter((u) => u.tier === t && !u.token);
       if (!units.length) continue;
       const sec = document.createElement('section');
       sec.className = 'codex-sec';
-      sec.innerHTML = `<h3 class="codex-tier">${name}</h3>`;
-      const grid = document.createElement('div');
-      grid.className = 'codex-grid';
-      for (const def of units) {
-        const known = settings.seen.has(def.id);
-        const cell = document.createElement('button');
-        cell.className = `codex-cell${known ? '' : ' is-unknown'}`;
-        cell.appendChild(unitCard(def, { atk: def.atk, hp: def.hp, level: 1 }, { noEquips: true }));
-        if (!known) cell.insertAdjacentHTML('beforeend', '<span class="codex-q">?</span>');
-        cell.onclick = () => showUnitDetail(data, def.id);
-        grid.appendChild(cell);
-      }
-      sec.appendChild(grid);
+      sec.innerHTML = `<h3 class="codex-tier">T${t}</h3>`;
+      sec.appendChild(unitGrid(units));
       list.appendChild(sec);
     }
-    if (!list.querySelector('.codex-sec')) list.insertAdjacentHTML('beforeend', '<div class="lb-empty">这条流派线还没有单位</div>');
+    const tokens = pool.filter((u) => u.token);
+    if (tokens.length) {
+      const sec = document.createElement('section');
+      sec.className = 'codex-sec';
+      sec.innerHTML = '<h3 class="codex-tier">召唤物 / 怪物</h3>';
+      sec.appendChild(unitGrid(tokens));
+      list.appendChild(sec);
+    }
+  };
+
+  const renderRoles = (): void => {
+    list.innerHTML = '';
+    for (const r of ROLES) {
+      const sec = document.createElement('section');
+      sec.className = 'codex-sec';
+      sec.innerHTML = tiersHtml(r);
+      const row = document.createElement('div');
+      row.className = 'cx-role-units';
+      for (const d of data.units.filter((u) => u.role === r && !u.token).sort((a, b) => a.tier - b.tier)) {
+        const b = document.createElement('button');
+        b.className = 'cx-ru';
+        b.innerHTML = `<span class="mini-ava tier-${d.tier}"><img class="${isPhotoAvatar(d) ? 'is-photo' : ''}" src="${avatarUrl(d)}" alt=""></span><span><b>${esc(d.name)}</b><small>T${d.tier} · ${esc(synName(d.faction))}</small></span>`;
+        b.onclick = () => showUnitDetail(data, d.id);
+        row.appendChild(b);
+      }
+      sec.appendChild(row);
+      list.appendChild(sec);
+    }
   };
 
   const renderEquips = (): void => {
@@ -60,7 +104,7 @@ export function openCodex(data: GameData): void {
       for (const d of data.equips.filter((e) => e.slot === slot)) {
         const row = document.createElement('button');
         row.className = 'codex-eq';
-        row.innerHTML = `<img src="${assetUrl(d.icon)}" alt=""><div><b>${esc(d.name)}</b><span>${esc(d.desc)}</span><em>${esc(d.goldDesc)}</em></div><small>${d.price} 算力</small>`;
+        row.innerHTML = `<img src="${assetUrl(d.icon)}" alt=""><div><b>${esc(d.name)} <i>${esc(equipShort(d))}</i></b><span>${esc(d.desc)}</span><em>${esc(d.goldDesc)}</em></div><small>${d.price} 算力</small>`;
         row.onclick = () => showItemDetail(data, 'equip', d.id);
         sec.appendChild(row);
       }
@@ -96,43 +140,33 @@ export function openCodex(data: GameData): void {
     list.appendChild(grid);
   };
 
-  const renderFilters = (): void => {
-    filters.innerHTML = '';
-    filters.style.display = tab === 'units' ? '' : 'none';
-    if (tab !== 'units') return;
-    const mk = (key: string | null, label: string, icon?: string): void => {
-      const b = document.createElement('button');
-      b.className = `cf${filter === key ? ' on' : ''}`;
-      b.innerHTML = `${icon ? `<img src="${icon}" alt="">` : ''}${esc(label)}`;
-      b.onclick = () => {
-        filter = key;
-        render();
-      };
-      filters.appendChild(b);
-    };
-    mk(null, '全部');
-    for (const k of [...FACTIONS, ...ROLES]) mk(k, synName(k), synIcon(k));
-  };
-
   const render = (): void => {
     tabs.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
-    renderFilters();
-    if (tab === 'units') renderUnits();
+    if (tab === 'roles') renderRoles();
     else if (tab === 'equips') renderEquips();
-    else renderArenas();
+    else if (tab === 'arenas') renderArenas();
+    else renderFaction(tab);
     list.scrollTop = 0;
   };
-  for (const [t, name] of [['units', '单位'], ['equips', '装备'], ['arenas', '赛场']] as [Tab, string][]) {
+  const defs: [Tab, string, string | null][] = [
+    ...FACTIONS.map((f) => [f, synName(f), synIcon(f)] as [Tab, string, string]),
+    ['roles', '职业', null],
+    ['equips', '装备', null],
+    ['arenas', '赛场', null],
+  ];
+  for (const [t, name, icon] of defs) {
     const b = document.createElement('button');
     b.className = 'tab';
     b.dataset.tab = t;
-    b.textContent = name;
+    b.innerHTML = `${icon ? `<img src="${icon}" alt="">` : ''}${esc(name)}`;
     b.onclick = () => {
       tab = t;
       render();
     };
     tabs.appendChild(b);
   }
+  const real = data.units.filter((u) => !u.token);
+  const seen = real.filter((u) => settings.seen.has(u.id)).length;
   render();
-  openModal({ title: '图鉴', body, cls: 'modal--tall' });
+  openModal({ title: `图鉴 ${seen}/${real.length}`, body, cls: 'modal--tall modal--codex' });
 }
