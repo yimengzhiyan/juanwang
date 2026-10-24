@@ -3,9 +3,9 @@
 
 export type Faction = 'open' | 'closed' | 'compute' | 'folk';
 export const FACTIONS: readonly Faction[] = ['open', 'closed', 'compute', 'folk'];
-/** 职业（DESIGN 12.2），单位可以没有职业 */
-export type Role = 'researcher' | 'trader' | 'idol' | 'engineer';
-export const ROLES: readonly Role[] = ['researcher', 'trader', 'idol', 'engineer'];
+/** 打法关键词（DESIGN 16，字段名沿用 role）：多刀 / 护盾 / 召唤 / 自爆 / 成长 / 经济。每个商店单位恰好 1 个 */
+export type Role = 'multi' | 'shield' | 'summon' | 'explode' | 'growth' | 'economy';
+export const ROLES: readonly Role[] = ['multi', 'shield', 'summon', 'explode', 'growth', 'economy'];
 export type Tier = 1 | 2 | 3 | 4 | 5 | 6;
 export type Level = 1 | 2 | 3;
 export type Side = 'me' | 'enemy';
@@ -76,7 +76,7 @@ export interface Ability {
   unitId?: string;
   /** summon 召唤几个，缺省 1 */
   count?: number;
-  /** 目标筛选：阵营 / 职业 / 阶级范围 */
+  /** 目标筛选：阵营 / 关键词 / 阶级范围 */
   filter?: TargetFilter;
   /** copyStats：复制后吞并目标（目标移除），属性 = 两者较高值 + amount（缺省 0，按等级缩放） */
   consume?: boolean;
@@ -101,7 +101,7 @@ export interface UnitDef {
   name: string;
   tier: Tier;
   faction: Faction;
-  /** 职业（0~1 个） */
+  /** 打法关键词（商店单位恰好 1 个；召唤物 / PVE 怪物可省略） */
   role?: Role;
   atk: number;
   hp: number;
@@ -212,7 +212,7 @@ export interface ConsumableDef {
 export interface ArenaRules {
   /** 全体单位价格修正 */
   unitPriceMod?: number;
-  /** 某阵营 / 职业单位价格修正 */
+  /** 某阵营 / 关键词单位价格修正 */
   factionPriceMod?: { faction: Faction; amount: number };
   rolePriceMod?: { role: Role; amount: number };
   /** 装备价格修正 */
@@ -231,7 +231,7 @@ export interface ArenaRules {
   battleBuff?: { atk: number; hp: number };
   /** 召唤物（战斗与商店）+atk/+hp */
   summonBuff?: { atk: number; hp: number };
-  /** 羁绊人数加成（如偶像 +1），商店与战斗都算 */
+  /** 羁绊人数加成（如召唤 +1），商店与战斗都算 */
   synergyBonus?: { key: SynergyKey; amount: number }[];
   /** 开战时（双方）满足筛选的单位获得护盾 */
   startShield?: { amount: number; filter?: TargetFilter };
@@ -249,7 +249,7 @@ export interface ArenaDef {
 
 // ───────────────────────── 8 人房对手 / PVE ─────────────────────────
 
-/** 流派：一条阵营线和/或一条职业线 */
+/** 流派：一条阵营线和/或一条关键词线 */
 export interface Archetype {
   faction?: Faction;
   role?: Role;
@@ -440,13 +440,13 @@ export type SynergyKey = Faction | Role;
 export interface SynergyState {
   kind: SynergyKind;
   key: SynergyKey;
-  /** 中文名：开源 / 研究员 … */
+  /** 中文名：开源 / 多刀 … */
   name: string;
   /** 按单位个数统计（同名的不同单位各算 1，等级不计） */
   count: number;
-  /** 0 = 未激活；阵营 1~3（2/3/5 个），职业 1~2（2/4 个） */
+  /** 0 = 未激活；阵营 1~3（2/3/5 个），关键词 1~2（2/4 个） */
   tier: number;
-  /** 各档门槛：阵营 [2,3,5]，职业 [2,4] */
+  /** 各档门槛：阵营 [2,3,5]，关键词 [2,4] */
   thresholds: number[];
   /** 下一档还差的个数（满档为 undefined） */
   next?: number;
@@ -500,7 +500,7 @@ export interface Modifiers {
   rerollFree: boolean;
   /** 剩余免费刷新次数（优先于花算力） */
   freeRerolls: number;
-  /** 本回合已刷新次数（工程师 ×4 首刷免费、1 号位光环上限用） */
+  /** 本回合已刷新次数（1 号位光环上限用） */
   rerollsThisTurn: number;
   /** 本回合战斗敌方全队攻击 -n */
   enemyAtkDebuff: number;
@@ -548,6 +548,8 @@ export interface BotMemo {
   bonusGold: number;
   /** 冻结的商店槽（跨回合保留） */
   frozen: ShopSlot[];
+  /** 经济 ×4 的花费进度（见 RunState.economySpent） */
+  economySpent?: number;
 }
 
 export interface Opponent {
@@ -567,9 +569,21 @@ export interface Opponent {
   /** 淘汰回合与名次 */
   eliminatedTurn?: number;
   place?: number;
-  /** 最近一场的结果（侧栏显示） */
-  lastResult?: 'win' | 'loss' | 'draw' | 'pve';
+  /** 上一轮战斗用的完整阵容（单位、等级、属性、装备；前排在前）。与你交战时 = 你看到的阵容（AI 已按难度缩放），否则 = 它的真实阵容 */
+  lastTeam: UnitInst[];
+  /** lastTeam 的已激活羁绊（tier > 0，含赛场人数加成） */
+  lastSynergies: SynergyState[];
+  /** 上一轮结果：vsId = 'me'（你）/ 对手 id / PVE id；hpDelta = 本轮热度变化（≤ 0） */
+  lastResult?: OpponentResult;
+  /** 热度曲线：[0] = 开局 20，之后每回合结算后追加一次（淘汰那回合记 0，之后不再追加） */
+  hpHistory: number[];
   bot: BotMemo;
+}
+
+export interface OpponentResult {
+  outcome: 'win' | 'lose' | 'draw';
+  vsId: string;
+  hpDelta: number;
 }
 
 /** 本回合的对局安排（endShop 时确定） */
@@ -683,6 +697,8 @@ export interface RunState {
   seenSurprises: string[];
   tutorial?: TutorialProgress;
   lastLevelUp?: { uid: string; level: Level };
+  /** 经济 ×4：累计花费进度（0~5，每满 6 算力随机一名经济单位永久 +1/+1）；只在 ×4 激活时累计，跨回合保留 */
+  economySpent?: number;
 }
 
 export type ShopActionInput =
@@ -741,13 +757,14 @@ export type BattleEvent =
   | { type: 'arena'; arena: string; name: string; text: string }
   /** 羁绊档位横幅：tier = 1~3；line = 该线单位的 onSynergy 台词 */
   | { type: 'synergyTier'; side: Side; kind: SynergyKind; key: SynergyKey; name: string; count: number; tier: number; line?: { unit: UnitRef; line: string }; text: string }
-  /** repeat = 第几次触发（研究员 ×4 / 微调的额外触发从 2 开始） */
+  /** repeat = 第几次触发（微调的额外触发从 2 开始） */
   | { type: 'ability'; unit: UnitRef; trigger: Trigger | 'synergy'; effect: Effect; targets: UnitRef[]; repeat: number; text: string }
   /** 一次攻击（交替开火）：action = 第几次行动，hit/hits = 本次行动的第几段/共几段 */
   | { type: 'attack'; action: number; unit: UnitRef & { atk: number }; target: UnitRef; hit: number; hits: number; text: string }
   | { type: 'damage'; unit: UnitRef; source?: UnitRef; amount: number; blocked: number; hp: number; shield: number; kind: DamageKind; immune?: boolean; shieldBroken?: boolean; text: string }
   | { type: 'heal'; unit: UnitRef; source?: UnitRef; amount: number; hp: number; text: string }
-  | { type: 'buff'; unit: UnitRef; source?: UnitRef; atk: number; hp: number; newAtk: number; newHp: number; permanent: boolean; text: string }
+  /** permanent = 赛后写回队伍（客户端播金色"永久 +N"浮字）；synergy = 由哪条羁绊触发（关键词 ×4 的永久成长、成长 ×2 额外加成等） */
+  | { type: 'buff'; unit: UnitRef; source?: UnitRef; atk: number; hp: number; newAtk: number; newHp: number; permanent: boolean; synergy?: SynergyKey; text: string }
   | { type: 'shield'; unit: UnitRef; source?: UnitRef; amount: number; total: number; text: string }
   /** consumed = 被友军吞并；benched = 被头条请下场（不算阵亡、不触发技能） */
   | { type: 'faint'; unit: UnitRef; killer?: UnitRef; consumed?: boolean; benched?: boolean; text: string }

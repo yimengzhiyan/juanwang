@@ -1,13 +1,13 @@
-// 难度模拟（2.0）：机器人水平的玩家（botPlayTurn，按 8 条流派轮流）在 8 人房打 N 局，统计名次 / 吃鸡率 / 结束回合。
+// 难度模拟（2.0）：机器人水平的玩家（botPlayTurn，按 10 条流派线轮流）在 8 人房打 N 局，统计名次 / 吃鸡率 / 结束回合。
 // 用法：npx tsx scripts/sim-difficulty.ts [局数=500]；可用 DIFF='{"maxScale":0.9}' 临时覆盖 DIFFICULTY。
-import { DIFFICULTY, botPlayTurn, newRun, runTurnOffline, shopAction, type Archetype, type RunState } from '../shared/src/index';
+import { DIFFICULTY, FACTIONS, ROLES, botPlayTurn, newRun, runTurnOffline, shopAction, type Archetype, type RunState } from '../shared/src/index';
 import { loadData } from './load-data';
 
-const data = loadData();
+const data = loadData(process.env.DATA_DIR); // DATA_DIR=... 可指向另一份内容数据做对比
 const N = Number(process.argv[2] ?? 500);
 Object.assign(DIFFICULTY, JSON.parse(process.env.DIFF ?? '{}'));
 console.log('DIFFICULTY', JSON.stringify(DIFFICULTY));
-const ARCHES: Archetype[] = [{ faction: 'open' }, { faction: 'closed' }, { faction: 'compute' }, { faction: 'folk' }, { role: 'researcher' }, { role: 'trader' }, { role: 'idol' }, { role: 'engineer' }];
+const ARCHES: Archetype[] = [...FACTIONS.map((faction) => ({ faction })), ...ROLES.map((role) => ({ role }))];
 
 const lens: number[] = [];
 const ranks: number[] = [];

@@ -1,12 +1,12 @@
 // 8 人房淘汰赛（DESIGN 12.5）：你 + 7 名对手，每人 20 热度。每回合你随机对一名存活对手，其余对手两两互打（引擎模拟）。
 import { Rng } from '../rng';
 import { clone } from '../clone';
-import type { Archetype, GameData, Opponent, OpponentPreset, RunState, Side, UnitInst } from '../types';
+import type { Archetype, GameData, Opponent, OpponentPreset, OpponentResult, RunState, Side, SynergyState, UnitInst } from '../types';
 import { START_HP, log, emitEvent, type Ctx } from './shop';
 import { advanceBot, newBotMemo, profileOf, scaleTeam, type BotProfile } from './bot';
 import { opponentScale } from './difficulty';
 import { simulateBattle } from './battle';
-import { computeSynergies, dominantSynergy, isFaction, isRole } from './synergy';
+import { computeSynergies, dominantSynergy, isFaction, isRole, stateBonus } from './synergy';
 import { pveForTurn, pveTeam } from './pve';
 import { tutorialEnemy } from '../tutorial';
 
@@ -32,7 +32,8 @@ export function createOpponents(seed: string, data: GameData): Opponent[] {
     const id = `${p?.id ?? 'opp'}${loop ? `_${loop + 1}` : ''}`;
     out.push({
       id, name: `${p?.name ?? `对手 ${i + 1}`}${loop ? ` ${loop + 1}` : ''}`, avatar: p?.avatar ?? 'units/botnet.svg', archetype: p?.archetype ?? {},
-      ...(p ? { presetId: p.id } : {}), hp: START_HP, alive: true, team: [], isHuman: false, bot: newBotMemo(`${seed}:opp:${id}`),
+      ...(p ? { presetId: p.id } : {}), hp: START_HP, alive: true, team: [], isHuman: false,
+      lastTeam: [], lastSynergies: [], hpHistory: [START_HP], bot: newBotMemo(`${seed}:opp:${id}`),
     });
   }
   return out;
@@ -52,6 +53,27 @@ export function advanceOpponents(s: RunState, data: GameData): void {
     o.team = r.team;
     o.bot = r.memo;
   }
+}
+
+/** 对手阵容的已激活羁绊（含赛场人数加成；头条只作用于玩家，不计） */
+export function opponentSynergies(team: UnitInst[], s: Pick<RunState, 'arena'>, data: GameData): SynergyState[] {
+  return computeSynergies(team, data, stateBonus({ arena: s.arena }, data)).filter((x) => x.tier > 0);
+}
+
+/** 旧存档补齐 2.1 的对手字段（lastTeam / lastSynergies / hpHistory；旧的字符串 lastResult 丢弃） */
+export function normalizeOpponent(o: Opponent): void {
+  o.lastTeam ??= [];
+  o.lastSynergies ??= [];
+  o.hpHistory ??= [START_HP];
+  if (typeof o.lastResult !== 'object') delete o.lastResult;
+}
+
+/** 记下一名对手本轮的战斗：阵容快照、羁绊、结果 */
+export function recordFight(o: Opponent, team: UnitInst[], s: Pick<RunState, 'arena'>, data: GameData, result: OpponentResult): void {
+  normalizeOpponent(o);
+  o.lastTeam = clone(team).map((u) => ({ ...u, equips: u.equips ?? {} }));
+  o.lastSynergies = opponentSynergies(o.lastTeam, s, data);
+  o.lastResult = result;
 }
 
 /** 从阵容判定流派（真人快照用） */
@@ -113,6 +135,9 @@ export function injectHumanOpponents(state: RunState, snapshots: HumanSnapshot[]
     o.name = snap.name;
     if (snap.avatar) o.avatar = snap.avatar;
     o.team = clone(snap.team).map((u) => ({ ...u, equips: u.equips ?? {} }));
+    normalizeOpponent(o);
+    o.lastTeam = clone(o.team);
+    o.lastSynergies = opponentSynergies(o.lastTeam, s, data);
     o.archetype = archetypeOfTeam(o.team, data);
     delete o.presetId;
     if (s.matchup?.kind === 'pvp' && s.matchup.opponentId === o.id && !s.tutorial) {
@@ -143,7 +168,7 @@ export function resolveOtherMatches(ctx: Ctx, excludeId: string | undefined, pve
     if (!pv) return;
     for (const o of s.opponents.filter((x) => x.alive)) {
       const r = simulateBattle(o.team, pveTeam(pv, data), data, `${seed}:pve:${o.id}`, { arena: s.arena });
-      o.lastResult = 'pve';
+      recordFight(o, o.team, s, data, { outcome: r.winner === 'me' ? 'win' : r.winner === 'enemy' ? 'lose' : 'draw', vsId: pv.id, hpDelta: 0 });
       if (r.winner === 'me') {
         const gold = pv.rewards.pool.find((x) => x.type === 'gold');
         o.bot.bonusGold += gold && gold.type === 'gold' ? gold.amount : 6;
@@ -166,20 +191,13 @@ export function resolveOtherMatches(ctx: Ctx, excludeId: string | undefined, pve
     const first: Side = rng.chance(0.5) ? 'me' : 'enemy';
     const r = simulateBattle(a.team, b.team, data, `${seed}:${a.id}:${b.id}`, { arena: s.arena, first });
     const loss = hpLossFor(s.turn, r.survivors);
-    if (r.winner === 'me') {
-      a.lastResult = 'win';
-      if (!ghost) {
-        b.lastResult = 'loss';
-        hit(ctx, b, loss, a.id);
-      }
-    } else if (r.winner === 'enemy') {
-      a.lastResult = 'loss';
-      hit(ctx, a, loss, b.id);
-      if (!ghost) b.lastResult = 'win';
-    } else {
-      a.lastResult = 'draw';
-      if (!ghost) b.lastResult = 'draw';
-    }
+    const aOut: OpponentResult['outcome'] = r.winner === 'me' ? 'win' : r.winner === 'enemy' ? 'lose' : 'draw';
+    const bOut: OpponentResult['outcome'] = r.winner === 'me' ? 'lose' : r.winner === 'enemy' ? 'win' : 'draw';
+    // 先记阵容（b 的 team 不会被修改），再扣血
+    recordFight(a, a.team, s, data, { outcome: aOut, vsId: b.id, hpDelta: aOut === 'lose' ? -loss : 0 });
+    if (!ghost) recordFight(b, b.team, s, data, { outcome: bOut, vsId: a.id, hpDelta: bOut === 'lose' ? -loss : 0 });
+    if (aOut === 'lose') hit(ctx, a, loss, b.id);
+    if (!ghost && bOut === 'lose') hit(ctx, b, loss, a.id);
   }
 }
 

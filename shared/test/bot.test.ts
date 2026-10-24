@@ -27,8 +27,8 @@ describe('generateArchetypeTeam', () => {
       expect(hit / tot, f).toBeGreaterThanOrEqual(0.5);
     }
   });
-  it('职业流派也偏向该职业（占比明显高于随机）', () => {
-    for (const r of ROLES) {
+  it('关键词流派也偏向该关键词（占比明显高于随机；只测 fixtures 里 ≥4 个单位的关键词）', () => {
+    for (const r of ROLES.filter((k) => data.units.filter((u) => !u.token && u.role === k).length >= 4)) {
       let hit = 0;
       let tot = 0;
       for (let i = 0; i < 20; i++) {
@@ -66,7 +66,7 @@ describe('generateArchetypeTeam', () => {
   });
   it('足够快：回合 20 的机器人 < 60ms', () => {
     const t0 = performance.now();
-    for (let i = 0; i < 5; i++) generateArchetypeTeam({ role: 'trader' }, 20, `f${i}`, data);
+    for (let i = 0; i < 5; i++) generateArchetypeTeam({ role: 'economy' }, 20, `f${i}`, data);
     expect((performance.now() - t0) / 5).toBeLessThan(60);
   });
   it('botPlayTurn：替玩家按流派购物（纯函数）', () => {

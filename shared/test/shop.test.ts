@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { data, mk, of, setTeam, start } from './helpers';
 import { newRun, shopAction } from '../src/engine/run';
 import { simulateBattle } from '../src/engine/battle';
-import { MAX_SHOP_LEVEL, UPGRADE_PRICE, makeCtx, maxTierForTurn, rollUnitDef, shopMaxTier, tierWeights, turnIncome } from '../src/engine/shop';
+import { MAX_SHOP_LEVEL, OWNED_UNIT_WEIGHT, UPGRADE_PRICE, makeCtx, maxTierForTurn, rollUnitDef, shopMaxTier, tierWeights, turnIncome, unitRollWeights } from '../src/engine/shop';
 import { baseGoldForTurn } from '../src/engine/shop';
 const G1 = baseGoldForTurn(1);
 import type { RunState, ShopSlot } from '../src/types';
@@ -76,12 +76,29 @@ describe('购买 / 出售 / 刷新 / 冻结 / 交换', () => {
 describe('阶级解锁 / 升级商店', () => {
   it('按回合：T1@1 T2@3 T3@5 T4@7 T5@9 T6@11，最高阶权重最高', () => {
     expect([1, 3, 5, 7, 9, 11, 20].map(maxTierForTurn)).toEqual([1, 2, 3, 4, 5, 6, 6]);
+    expect(tierWeights(1)).toEqual([3]);
     expect(tierWeights(3)).toEqual([1, 2, 3]);
+    expect(tierWeights(6)).toEqual([1, 1, 1, 1, 2, 3]);
     const ctx = makeCtx({ ...start('t'), turn: 5 }, data);
     const cnt = [0, 0, 0, 0];
-    for (let i = 0; i < 600; i++) cnt[data.unitsById[rollUnitDef(ctx)!].tier]++;
-    expect(cnt[3]).toBeGreaterThan(cnt[1]);
-    expect(cnt[1] + cnt[2] + cnt[3]).toBe(600);
+    for (let i = 0; i < 1200; i++) cnt[data.unitsById[rollUnitDef(ctx)!].tier]++;
+    expect(cnt[3]).toBeGreaterThan(cnt[2]);
+    expect(cnt[2]).toBeGreaterThan(cnt[1]);
+    expect(cnt[1] + cnt[2] + cnt[3]).toBe(1200);
+  });
+  it(`已在队伍中的单位权重 ×${OWNED_UNIT_WEIGHT}（DESIGN 17）`, () => {
+    const w = unitRollWeights(data, 1, ['crawler']);
+    const t1 = data.shopUnitsByTier[1];
+    expect(w.find((x) => x.id === 'crawler')!.weight).toBeCloseTo((3 / t1.length) * OWNED_UNIT_WEIGHT);
+    expect(w.find((x) => x.id === 'labeler')!.weight).toBeCloseTo(3 / t1.length);
+    const base = setTeam(start('own'), [mk('crawler')]);
+    const ctx = makeCtx(base, data);
+    let hit = 0;
+    const N = 3000;
+    for (let i = 0; i < N; i++) if (rollUnitDef(ctx) === 'crawler') hit++;
+    const p = OWNED_UNIT_WEIGHT / (t1.length - 1 + OWNED_UNIT_WEIGHT);
+    expect(hit / N).toBeGreaterThan(p - 0.04);
+    expect(hit / N).toBeLessThan(p + 0.04);
   });
   it(`upgradeShop：${UPGRADE_PRICE} 算力提前解锁下一阶并重抽单位格；每局最多 ${MAX_SHOP_LEVEL} 次；阶级 = max(按回合, 升级)`, () => {
     let s = ok(start('u'), { type: 'freeze', slot: 4 });
@@ -151,14 +168,14 @@ describe('赛场规则（10 张，各一条）', () => {
     const r = simulateBattle([mk('botnet'), mk('labeler')], [mk('token_gpu')], data, 's', { arena: 'folk_era' });
     expect(of(r, 'summon')[0].unit).toMatchObject({ defId: 'token_shuijun', atk: 2, hp: 2 });
   });
-  it('研究院：研究员 -1 价', () => {
-    const s = at('institute');
-    expect(price(s, 'claude_chan')).toBe(2);
+  it('成长营：成长单位 -1 价', () => {
+    const s = at('growth_camp');
+    expect(price(s, 'labeler')).toBe(2);
     expect(price(s, 'wrapper')).toBe(3);
   });
-  it('春晚舞台：偶像羁绊人数 +1', () => {
-    const r = simulateBattle([mk('qwen_chan')], [mk('token_gpu')], data, 's', { arena: 'spring_gala' });
-    expect(of(r, 'synergyTier').find((e) => e.key === 'idol')).toMatchObject({ count: 2, tier: 1 });
+  it('召唤祭：召唤羁绊人数 +1', () => {
+    const r = simulateBattle([mk('hf')], [mk('token_gpu')], data, 's', { arena: 'summon_fest' });
+    expect(of(r, 'synergyTier').find((e) => e.key === 'summon')).toMatchObject({ count: 2, tier: 1 });
   });
   it('安全法案：开战时闭源单位各得 2 护盾', () => {
     const r = simulateBattle([mk('wrapper'), mk('crawler')], [mk('kimi')], data, 's', { arena: 'safety_act' });

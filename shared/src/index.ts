@@ -6,13 +6,13 @@ export { validateData, indexData, parseTarget, DataError, scaleEquipEffect, addE
 export { DEFAULT_EQUIPS, DEFAULT_CONSUMABLES, DEFAULT_ARENAS, DEFAULT_OPPONENTS, DEFAULT_PVE, DEFAULT_PVE_POOL } from './defaults';
 export { newRun, shopAction, ARENA_CHOICES, type NewRunOpts } from './engine/run';
 export {
-  maxTierForTurn, shopMaxTier, tierWeights, levelForXp, xpForLevel, isHeadlineTurn, currentUnitSlots, shopSlotCounts, rerollCost, canUpgradeShop,
-  canMerge, abilityAmount, abilityBuff, matchesFilter, turnIncome, arenaRules, inventoryOf, INVENTORY_FULL, INVENTORY_FULL_REPLACE,
+  maxTierForTurn, shopMaxTier, tierWeights, unitRollWeights, OWNED_UNIT_WEIGHT, SHOP_ROLL, levelForXp, xpForLevel, isHeadlineTurn, currentUnitSlots, shopSlotCounts, rerollCost, canUpgradeShop,
+  canMerge, permGrow, spendGold, adjacentUnits, abilityAmount, abilityBuff, matchesFilter, turnIncome, arenaRules, inventoryOf, INVENTORY_FULL, INVENTORY_FULL_REPLACE,
   TEAM_SIZE, START_HP, MAX_TURNS, BASE_GOLD, baseGoldForTurn, UNIT_PRICE, REROLL_PRICE, UPGRADE_PRICE, MAX_SHOP_LEVEL, SHOP_UNIT_SLOTS, SHOP_EQUIP_SLOTS, SHOP_CONSUMABLE_SLOTS,
 } from './engine/shop';
 export {
   computeSynergies, activeSynergies, dominantSynergy, teamTiers, tierForCount, stateBonus, synergiesFromDefs,
-  SYNERGY_NAME, SYNERGY_DESCS, SYNERGY_SHOUT, FACTION_THRESHOLDS, ROLE_THRESHOLDS, type SynergyBonus, type TierMap,
+  SYNERGY_NAME, SYNERGY_DESCS, SYNERGY_SHOUT, FACTION_THRESHOLDS, ROLE_THRESHOLDS, ROLE_META, SYNERGY_TUNING, type RoleMeta, type SynergyBonus, type TierMap,
 } from './engine/synergy';
 export { effectiveStats, equipTotals, equipEntries, equipCount, equipRefund, equipEffectOf, canAttach, attachOutcome, equipInstRefund, INVENTORY_SIZE } from './engine/equip';
 export { simulateBattle, MAX_ACTIONS, MAX_FIELD } from './engine/battle';

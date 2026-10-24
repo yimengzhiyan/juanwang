@@ -46,20 +46,20 @@ export const DEFAULT_EQUIPS: EquipDef[] = [
 
 export const DEFAULT_CONSUMABLES: ConsumableDef[] = [
   { id: 'coffee', name: '咖啡', desc: '本回合免费刷新 ×3', price: 1, targetKind: 'team', effect: { type: 'freeRerolls', amount: 3 }, icon: 'items/coffee.svg' },
-  { id: 'press', name: '新闻稿', desc: '随机一个单位 +1 等级', price: 3, targetKind: 'team', effect: { type: 'levelUpRandom' }, icon: 'items/press.svg' },
+  { id: 'press', name: '新闻稿', desc: '随机一个单位 +1 等级', price: 2, targetKind: 'team', effect: { type: 'levelUpRandom' }, icon: 'items/press.svg' },
   { id: 'pivot', name: '转型', desc: '选一个单位变成同阶随机单位（保留额外属性与装备）', price: 1, targetKind: 'unit', effect: { type: 'transform' }, icon: 'items/pivot.svg' },
 ];
 
 export const DEFAULT_ARENAS: ArenaDef[] = [
   { id: 'open_summit', name: '开源大会', desc: '开源单位价格 -1', hint: 'open', rules: { factionPriceMod: { faction: 'open', amount: -1 } } },
   { id: 'gpu_drought', name: 'GPU 荒', desc: '战斗开始时双方全体 +1 攻 -1 血', hint: 'compute', rules: { battleBuff: { atk: 1, hp: -1 } } },
-  { id: 'funding_winter', name: '融资寒冬', desc: '每回合 +2 算力，商店少 1 格', hint: 'trader', rules: { goldPerTurn: 2, unitSlotsMod: -1 } },
-  { id: 'reroll_party', name: '刷新狂欢', desc: '刷新免费，购买单位与装备 +1 价', hint: 'engineer', rules: { rerollFree: true, unitPriceMod: 1, equipPriceMod: 1 } },
+  { id: 'funding_winter', name: '融资寒冬', desc: '每回合 +2 算力，商店少 1 格', hint: 'economy', rules: { goldPerTurn: 2, unitSlotsMod: -1 } },
+  { id: 'reroll_party', name: '刷新狂欢', desc: '刷新免费，购买单位与装备 +1 价', hint: 'growth', rules: { rerollFree: true, unitPriceMod: 1, equipPriceMod: 1 } },
   { id: 'seat_one_aura', name: '1 号位光环', desc: '每次刷新，最前排单位永久 +1/+1（每回合最多 5 次）', hint: 'closed', rules: { rerollFrontBuff: { atk: 1, hp: 1 }, rerollFrontCap: 5 } },
   { id: 'equip_expo', name: '装备展', desc: '商店多 1 个装备格', hint: 'compute', rules: { equipSlotsMod: 1 } },
   { id: 'folk_era', name: '人海时代', desc: '召唤物 +1/+1', hint: 'folk', rules: { summonBuff: { atk: 1, hp: 1 } } },
-  { id: 'institute', name: '研究院', desc: '研究员价格 -1', hint: 'researcher', rules: { rolePriceMod: { role: 'researcher', amount: -1 } } },
-  { id: 'spring_gala', name: '春晚舞台', desc: '偶像羁绊人数 +1', hint: 'idol', rules: { synergyBonus: [{ key: 'idol', amount: 1 }] } },
+  { id: 'growth_camp', name: '成长营', desc: '成长单位价格 -1', hint: 'growth', rules: { rolePriceMod: { role: 'growth', amount: -1 } } },
+  { id: 'summon_fest', name: '召唤祭', desc: '召唤羁绊人数 +1', hint: 'summon', rules: { synergyBonus: [{ key: 'summon', amount: 1 }] } },
   { id: 'safety_act', name: '安全法案', desc: '开战时闭源单位各得 2 护盾', hint: 'closed', rules: { startShield: { amount: 2, filter: { faction: 'closed' } } } },
 ];
 
@@ -68,10 +68,10 @@ export const DEFAULT_OPPONENTS: OpponentPreset[] = [
   { id: 'opp_zuck', name: '小扎的羊驼农场', avatar: 'characters/zuck.png', archetype: { faction: 'open' }, equips: ['dataset', 'rlhf'], desc: '人人为我' },
   { id: 'opp_botnet', name: '水军总部', avatar: 'units/botnet.svg', archetype: { faction: 'folk' }, equips: ['jumpbox', 'dataset'], desc: '人海战术' },
   { id: 'opp_dario', name: '达里奥的安全护栏', avatar: 'characters/dario.png', archetype: { faction: 'closed' }, equips: ['firewall', 'alignment'], desc: '铜墙铁壁' },
-  { id: 'opp_ilya', name: '伊利亚的研究院', avatar: 'characters/ilya.png', archetype: { role: 'researcher' }, equips: ['finetune', 'distill'], desc: '技能双发' },
-  { id: 'opp_altman', name: '奥特曼的融资局', avatar: 'characters/altman.png', archetype: { role: 'trader' }, equips: ['funding_round', 'gpu_h100'], desc: '钱生钱' },
-  { id: 'opp_idol', name: '模型娘偶像团', avatar: 'characters/gpt_chan.png', archetype: { role: 'idol' }, equips: ['trending', 'dataset'], desc: '应援不停' },
-  { id: 'opp_vibe', name: 'Vibe Coder 夜班组', avatar: 'units/vibe_coder.svg', archetype: { role: 'engineer' }, equips: ['rlhf', 'launch_event'], desc: '进化狂魔' },
+  { id: 'opp_ilya', name: '伊利亚的炼丹炉', avatar: 'characters/ilya.png', archetype: { role: 'growth' }, equips: ['rlhf', 'dataset'], desc: '越练越强' },
+  { id: 'opp_altman', name: '奥特曼的融资局', avatar: 'characters/altman.png', archetype: { role: 'economy' }, equips: ['funding_round', 'gpu_h100'], desc: '钱生钱' },
+  { id: 'opp_idol', name: '模型娘连击团', avatar: 'characters/gpt_chan.png', archetype: { role: 'multi' }, equips: ['launch_event', 'gpu_h100'], desc: '一回合砍三刀' },
+  { id: 'opp_vibe', name: 'Vibe Coder 夜班组', avatar: 'units/vibe_coder.svg', archetype: { role: 'summon' }, equips: ['dataset', 'jumpbox'], desc: '摇人' },
 ];
 
 export const DEFAULT_PVE_POOL: PveRewardSpec[] = [

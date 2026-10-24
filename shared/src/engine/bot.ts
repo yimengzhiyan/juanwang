@@ -1,7 +1,7 @@
 // 机器人：按流派偏好贪心购物（同一套商店逻辑），生成 AI 对手队伍；也可以替玩家自动购物（模拟/测试/托管）。
 import { Rng } from '../rng';
 import { clone } from '../clone';
-import { type Archetype, type BotMemo, type GameData, type OpponentPreset, type RunState, type UnitDef, type UnitInst } from '../types';
+import { type Archetype, type BotMemo, type GameData, type OpponentPreset, type RunState, type SynergyKey, type UnitDef, type UnitInst } from '../types';
 import {
   MAX_SHOP_LEVEL, TEAM_SIZE, UPGRADE_PRICE, applyAction, beginTurn, clearBattleTemps, emptyModifiers, makeCtx, shopMaxTier, teamUnits,
   START_HP, type Ctx,
@@ -21,6 +21,18 @@ export interface BotProfile {
 export function profileOf(p: OpponentPreset | Archetype): BotProfile {
   if ('archetype' in p) return { archetype: p.archetype, core: p.core, equips: p.equips };
   return { archetype: p };
+}
+
+/** 没写偏好装备时按流派线的缺省偏好（关键词优先于阵营） */
+export const ARCHETYPE_EQUIPS: Record<SynergyKey, string[]> = {
+  open: ['dataset', 'rlhf'], closed: ['firewall', 'alignment'], compute: ['gpu_h100', 'quantize', 'launch_event'], folk: ['jumpbox', 'dataset'],
+  multi: ['launch_event', 'gpu_h100', 'quantize'], shield: ['firewall', 'alignment', 'dataset'], summon: ['dataset', 'jumpbox'],
+  explode: ['quantize', 'gpu_h100'], growth: ['rlhf', 'dataset'], economy: ['funding_round', 'rlhf'],
+};
+function preferredEquips(prof: BotProfile): string[] {
+  if (prof.equips?.length) return prof.equips;
+  const a = prof.archetype;
+  return [...(a.role ? ARCHETYPE_EQUIPS[a.role] : []), ...(a.faction ? ARCHETYPE_EQUIPS[a.faction] : [])];
 }
 
 const matches = (d: UnitDef | undefined, a: Archetype): boolean => !!d && ((!!a.faction && d.faction === a.faction) || (!!a.role && d.role === a.role));
@@ -59,7 +71,8 @@ function tryEquip(ctx: Ctx, prof: BotProfile): boolean {
   const slots = s.shop.map((sl, i) => ({ sl, i })).filter((x) => x.sl.kind === 'equip' && x.sl.price <= s.gold);
   if (!slots.length || !teamUnits(s).length) return false;
   // 偏好装备、金色、便宜的先
-  slots.sort((a, b) => (prof.equips?.includes(b.sl.defId) ? 1 : 0) - (prof.equips?.includes(a.sl.defId) ? 1 : 0) || (b.sl.gold ? 1 : 0) - (a.sl.gold ? 1 : 0) || a.sl.price - b.sl.price);
+  const pref = preferredEquips(prof);
+  slots.sort((a, b) => (pref.includes(b.sl.defId) ? 1 : 0) - (pref.includes(a.sl.defId) ? 1 : 0) || (b.sl.gold ? 1 : 0) - (a.sl.gold ? 1 : 0) || a.sl.price - b.sl.price);
   const order = [carryIndex(ctx, prof), ...s.team.map((_, i) => i)].filter((i, k, arr) => i >= 0 && s.team[i] && arr.indexOf(i) === k);
   for (const { sl, i } of slots) {
     const def = ctx.data.equipsById[sl.defId];
@@ -162,7 +175,7 @@ function simState(seed: string, team: UnitInst[], memo: BotMemo, arena?: string)
     seed, turn: 0, gold: 0, hp: START_HP, team: t, shop: clone(memo.frozen), inventory: [], phase: 'shop', arena, shopLevel: memo.shopLevel, shopTier: memo.shopTier,
     opponents: [], modifiers: { ...emptyModifiers(), nextTurnGold: memo.bonusGold }, history: [], lastEvents: [],
     stats: { maxTiers: {}, wins: 0, losses: 0, pveWins: 0, goldEquips: 0, lv3: 0, steals: 0, upgrades: 0, bestStreak: 0, streak: 0 },
-    log: [], rng: memo.rng, nextUid: memo.nextUid, seenHeadlines: [], seenSurprises: [],
+    log: [], rng: memo.rng, nextUid: memo.nextUid, seenHeadlines: [], seenSurprises: [], economySpent: memo.economySpent ?? 0,
   };
 }
 
@@ -178,7 +191,7 @@ export function advanceBot(team: UnitInst[], memo: BotMemo, turn: number, prof: 
   applyAction(ctx, { type: 'endShop' });
   return {
     team: teamUnits(s),
-    memo: { rng: ctx.rng.state, nextUid: s.nextUid, shopLevel: s.shopLevel, shopTier: s.shopTier, bonusGold: 0, frozen: s.shop.filter((x) => x.frozen) },
+    memo: { rng: ctx.rng.state, nextUid: s.nextUid, shopLevel: s.shopLevel, shopTier: s.shopTier, bonusGold: 0, frozen: s.shop.filter((x) => x.frozen), economySpent: s.economySpent ?? 0 },
   };
 }
 

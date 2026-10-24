@@ -63,6 +63,7 @@ describe('PVE 怪物回合（12.7）', () => {
   it('对手同回合也打 PVE（只模拟，不扣血）', () => {
     const s = shopAction(atTurn4(), { type: 'endShop' }, data);
     const n = applyBattleResult(s, res('draw'), data);
-    expect(n.opponents.every((o) => o.lastResult === 'pve' && o.hp === 20)).toBe(true);
+    expect(n.opponents.every((o) => o.lastResult?.vsId === 'pve_halluc' && o.lastResult.hpDelta === 0 && o.hp === 20)).toBe(true);
+    expect(n.opponents.every((o) => o.lastTeam.length === o.team.length && o.hpHistory.join() === '20,20')).toBe(true);
   });
 });

@@ -1,4 +1,6 @@
-# 引擎 / 接口说明 2.0（客户端、内容同事必读，补充 DESIGN.md 第 12~15 节）
+# 引擎 / 接口说明 2.1（客户端、内容同事必读，补充 DESIGN.md 第 12~18 节）
+
+> **2.1 变更（2026-10-25）见第 12 节**：4 职业 → 6 打法关键词（`role` 取值变了）、商店抽卡权重、对手阵容可查（`Opponent` 新字段）。下文旧条目已按 2.1 改写。
 
 > 类型以 `shared/src/types.ts` 为准；本文解释用法与所有"DESIGN 没写清、引擎做了决定"的地方。1.0 版本见 git 标签 `v1-sap`。
 
@@ -13,7 +15,8 @@ npm run typecheck:client # 客户端（1.0 客户端迁移到 2.0 API 之前会�
 npm run validate-data    # 校验 shared/data/*.json + 整局冒烟
 npx tsx scripts/sim-difficulty.ts [局数]   # 难度模拟（第 8 节）
 npx tsx scripts/sim-feel.ts [局数]         # 按回合的战斗手感统计
-npx tsx scripts/sim-archetypes.ts [局数]   # 8 条流派各跑 N 局：名次/吃鸡/前四 + 阵营/职业/单位胜率（第 8.1 节）
+npx tsx scripts/sim-archetypes.ts [局数]   # 10 条流派线各跑 N 局：名次/吃鸡/前四 + 阵营/关键词/单位胜率（第 12.6 节）
+npx tsx scripts/sim-levels.ts [局数] [回合]  # 第 T 回合 Lv2+ 单位占比（LEGACY=1 用 2.0 抽卡口径对比）
 ```
 - 前端：`import { newRun, shopAction, ... } from '@juanwang/shared'`。内容数据：`validateData({units, headlines, surprises, tutorial, equips, consumables, arenas, opponents, pve})`。`items.json` 已废弃（传了只出提醒）。
 - 素材 URL 规则不变：`UnitDef.avatar` / `EquipDef.icon` 是相对素材根的路径，URL = `'/' + path`。
@@ -28,7 +31,7 @@ battleForState(state, data, enemy?): BattleResult   // 用 state.matchup.team �
 applyBattleResult(state, result, data): RunState    // 扣血 / 其余对局 / 淘汰 / PVE 奖励 / 突发 / 结局
 injectHumanOpponents(state, snapshots, data): RunState  // endShop 后注入服务端真人快照（见第 6 节）
 simulateBattle(myTeam, enemyTeam, data, seed, opts?: BattleOptions): BattleResult
-computeSynergies(team, data, bonus?): SynergyState[]    // 8 条流派线（阵营 4 + 职业 4，固定顺序，含未激活）
+computeSynergies(team, data, bonus?): SynergyState[]    // 10 条流派线（阵营 4 + 关键词 6，固定顺序，含未激活）
 effectiveStats(unit, data, team?): {atk, hp}        // 显示用：基础 + 临时 + 装备（含算力 ×3 翻倍）
 generateArchetypeTeam(archetype|profile, turn, seed, data, opts?{scale, arena}): UnitInst[]
 botPlayTurn(state, data, {archetype}): RunState     // 替玩家按流派自动购物一回合（托管/模拟）
@@ -36,6 +39,7 @@ runTurnOffline(state, data, {pick?}): {state, result}   // 测试用：endShop�
 tutorialStep(state, data?): TutorialStepId | null
 // 查询：shopMaxTier shopSlotCounts rerollCost canUpgradeShop turnIncome arenaRules canAttach attachOutcome equipRefund equipInstRefund INVENTORY_SIZE
 //       hpLossFor stageBonus rankByHp aliveCount pveForTurn pveTeam computeRunEnd ACHIEVEMENTS SYNERGY_NAME SYNERGY_DESCS
+//       ROLE_META SYNERGY_TUNING unitRollWeights OWNED_UNIT_WEIGHT SHOP_ROLL（2.1）
 ```
 
 ### 1.1 一回合的调用顺序（客户端）
@@ -59,7 +63,7 @@ phase 'over'     → state.end = {rank, won, reason, turns, hp, archetype, arche
 | `{type:'chooseArena', index}` | 仅 phase='arena' |
 | `{type:'buy', slot, to?}` | 同 1.0：to 空位放入 / 同名合并；不传 to 先合并后空位 |
 | `{type:'sell', index}` | 得 = 等级 + 融资 onSell；身上装备按 武器/防具/饰品 顺序**进仓库**，仓库放不下的按件折算（每件 1、金色 2） |
-| `{type:'reroll'}` | 免费顺序：头条/赛场刷新免费 → 工程师 ×4 本回合首刷 → freeRerolls → 1 算力 |
+| `{type:'reroll'}` | 免费顺序：头条/赛场刷新免费 → freeRerolls → 1 算力（2.1 删除工程师首刷免费） |
 | `{type:'freeze', slot}` / `{type:'swap', a, b}` / `{type:'merge', from, to}` | 同 1.0；merge 时装备合并（见 3.3） |
 | `{type:'equip', slot, unitIndex}` | 买商店装备并装到队伍 unitIndex 的单位上；目标槽已有（非合金）装备 → 旧的换进仓库（仓库满报错，不扣钱）（见 3.3 第 16 条） |
 | `{type:'buyEquipToInventory', slot}` | 买商店装备直接放进仓库（仓库满报错）；不触发 eatItem，第一次从仓库装上时才触发 |
@@ -69,7 +73,7 @@ phase 'over'     → state.end = {rank, won, reason, turns, hp, archetype, arche
 | `{type:'useConsumable', slot, target?}` | 买并使用消耗品；unit 型（转型）需要 target；新闻稿可传 target 指定，否则随机 |
 | `{type:'upgradeShop'}` | 4 算力；提前解锁下一阶；每局最多 2 次；会免费重抽未冻结的单位格 |
 | `{type:'chooseHeadline', option}` | 仅 phase='headline' |
-| `{type:'endShop'}` | endTurn 技能 → 研究员 ×2 → RLHF 成长 → phase='battle' → 推进 7 名对手的购物并确定 matchup |
+| `{type:'endShop'}` | endTurn 技能 → RLHF 成长 → 成长 ×4（全队 +1/+1）→ phase='battle' → 推进 7 名对手的购物并确定 matchup |
 | `{type:'choosePveReward', index}` | 仅有 pending 时 |
 | `{type:'continue'}` | phase='result' 且没有 pending |
 
@@ -81,7 +85,8 @@ phase 'over'     → state.end = {rank, won, reason, turns, hp, archetype, arche
 | `hp` | 热度，初始 20，归零淘汰（取代 lives/trophies） |
 | `arena` / `arenaOptions` | 本局赛场 id / 开局可选的 3 个 |
 | `shopLevel` / `shopTier` | 升级商店次数（0~2）/ 升级解锁到的阶；商店最高阶 = `max(按回合, shopTier)`（`shopMaxTier(s)`） |
-| `opponents: Opponent[]` | 7 名对手：`{id, name, avatar, archetype{faction?,role?}, presetId?, hp, alive, team(本回合阵容), isHuman, eliminatedTurn?, place?, lastResult?, bot}`；`bot` 是机器人内部记忆，客户端忽略 |
+| `opponents: Opponent[]` | 7 名对手：`{id, name, avatar, archetype{faction?,role?}, presetId?, hp, alive, team(本回合阵容), isHuman, eliminatedTurn?, place?, lastTeam, lastSynergies, lastResult?, hpHistory, bot}`；`bot` 是机器人内部记忆，客户端忽略。新字段见 12.4 |
+| `economySpent?` | 经济 ×4 的花费进度（0~5） |
 | `matchup?` | endShop 后的本回合对局；AI 阵容已按难度缩放 |
 | `pve?` | `{pveId, turn, won?}` 当前/最近一次 PVE |
 | `pending?` | `{type:'pveReward', pveId, options: PveRewardOption[]}` |
@@ -100,18 +105,18 @@ phase 'over'     → state.end = {rank, won, reason, turns, hp, archetype, arche
 ## 3. 规则决定清单
 ### 3.1 商店 / 局
 1. 开局：`newRun` → phase 'arena'（随机 3 个赛场）→ `chooseArena` → 回合 1。7 名对手同时生成（opponents.json 预设按种子洗牌取 7 个；不足 7 个循环使用并加编号）。
-2. 回合开始：算力 = 10 + 下回合加成 + 赛场 goldPerTurn + 商人羁绊（×2 +1 / ×4 +2，不叠加）+ 融资装备 turnGold → 修正器清零 → 生成商店 → 待生效突发 → 偶数回合头条 → 商店（startTurn 技能 + 开源 ×5）。
-3. 商店：4 单位 + 2 装备 + 1 消耗品（赛场可改单位格/装备格；头条 extraSlot 加单位格）。单位按阶权重（阶 t 权重 t）；装备、消耗品等概率。
-4. 价格：单位 3 + 头条修正 + 赛场（全体 / 阵营 / 职业）− 商人 ×4（1），最低 1；装备 = 数据价 + 头条 item 修正 + 赛场 equipPriceMod − 商人 ×4，最低 min(1, 数据价)；消耗品 = 数据价 + 头条 item 修正。免费槽恒为 0。每个动作后整体重新定价（商人羁绊会随队伍变化）。
+2. 回合开始：算力 = 基础曲线 + 下回合加成 + 赛场 goldPerTurn + 经济羁绊（×2 +1 / ×4 +2，不叠加；`turnIncome().economy`）+ 融资装备 turnGold → 修正器清零 → 生成商店 → 待生效突发 → 偶数回合头条 → 商店（startTurn 技能 + 开源 ×5）。
+3. 商店：4 单位 + 2 装备 + 1 消耗品（赛场可改单位格/装备格；头条 extraSlot 加单位格）。单位权重见 12.3（2.1：最高阶 3 / 次高 2 / 其余 1，已在队伍中的单位 ×2.5）；装备、消耗品等概率。
+4. 价格：单位 3 + 头条修正 + 赛场（全体 / 阵营 / 关键词）− 经济 ×4（1），最低 1；装备 = 数据价 + 头条 item 修正 + 赛场 equipPriceMod，最低 min(1, 数据价)（2.1：经济不再给装备降价）；消耗品 = 数据价 + 头条 item 修正。免费槽恒为 0。每个动作后整体重新定价（经济羁绊会随队伍变化）。
 5. 升级商店：4 算力，`shopTier = 当前最高阶 + 1`，`shopLevel++`（最多 2），已是 T6 时不可升；会免费重抽未冻结的**单位格**，并在 lastEvents 发 `shopLevelUp`。之后随着回合推进按回合的阶会追上来（`max`）。
-6. 进化同 1.0（3 份 Lv2、6 份 Lv3，每次合并 max+1/+1，进化奖励免费槽 = 当前最高阶 + 1）。工程师 ×2：进化的单位额外永久 +1/+1；×4：再给全队永久 +1/+1。
+6. 进化同 1.0（3 份 Lv2、6 份 Lv3，每次合并 max+1/+1，进化奖励免费槽 = 当前最高阶 + 1）。（2.1 删除工程师的进化加成。）
 7. 头条/突发沿用 1.0 的时机（偶数回合商店前头条；奇数回合结算后 30% 突发、下一回合开始生效）。**战场类效果**写进 `modifiers.battle`，在本回合的战斗生效：头条 = 本回合，突发 = 下一回合（因为突发在下一回合开始时结算）。见 3.6。
 8. `lifeTrade`：失去 `DIFFICULTY.lifeTradeHp`（3）热度换 +amount 算力与 1 次免费刷新，热度 ≤ 3 时不生效。`selfHpLoss` / `damageOpponent` 不会直接淘汰人（最低留 1）。
 9. 回合上限 20：结算后按热度排名（同热度玩家靠前）。
 
-### 3.2 羁绊（DESIGN 12.1/12.2，`engine/synergy.ts`）
-10. 按单位个数统计（不同实例各算 1，等级不计）；**档位逐级叠加**（3 个时 2 个档的效果也生效）。阵营 **2/3/5** → tier 1/2/3（原设计 2/4/6，5 格队伍凑不出 6，已改），职业 2/4 → tier 1/2。
-11. 战斗开场在 start、赛场之后发 `synergyTier`（我方先，阵营在前、职业在后，每条激活的线一个事件），紧接着是该档的开场效果。商店阶段的档位（开源 ×3/×5、研究员 ×2、商人、工程师）按当前队伍实时计算。
+### 3.2 羁绊（DESIGN 12.1 / 16，`engine/synergy.ts`）
+10. 按单位个数统计（不同实例各算 1，等级不计）；**档位逐级叠加**（3 个时 2 个档的效果也生效）。阵营 **2/3/5** → tier 1/2/3（原设计 2/4/6，5 格队伍凑不出 6，已改），关键词 2/4 → tier 1/2。
+11. 战斗开场在 start、赛场之后发 `synergyTier`（我方先，阵营在前、关键词在后，每条激活的线一个事件），紧接着是该档的开场效果。商店阶段的档位（开源 ×3/×5、召唤、成长、经济）按当前队伍实时计算。
 12. 统计口径：开战时的阵容（不含开战后召唤/偷来的单位），加上羁绊人数加成（赛场 synergyBonus，永久；头条/突发 synergyBonus，本回合，只加我方）。
 13. 阵营 ×5 用满 5 格即可达成；赛场/头条的 synergyBonus 可以提前凑档。
 14. 各档实现细节：
@@ -119,10 +124,7 @@ phase 'over'     → state.end = {rank, won, reason, turns, hp, archetype, arche
     - 闭源 ×2 开战最前排 +3 护盾；×3 每个闭源单位 +floor(战前血量/3)（至少 1）护盾，该单位护盾被打碎时对攻击者反弹 2；×5 反弹改为攻击者攻击力，且闭源单位的护盾不会被穿透（金色显卡无视护盾、destroy 对它们都无效——destroy 改为造成阈值伤害）。
     - 算力 ×2 开战时"装备最多的单位"（件数 → 攻击 → 站位）+2 攻；×3 算力单位的装备数值 ×2（概率封顶 100%，布尔/枚举不变，商店阶段的 RLHF/融资也翻倍）；×5 装备最多的单位每次行动多攻击 1 段。
     - 民间 ×2 开战召唤 1 个水军到最后排；×3 召唤物额外继承召唤者 50% 攻/血（开战水军继承攻+血最高的民间单位），非召唤物友军阵亡时在原位召唤 1 个水军（召唤物阵亡不再触发，避免无限）；×5 召唤物阵亡时对敌方全体 1 伤害（`explode` 事件）。
-    - 研究员 ×2 回合结束（endShop）研究员永久 +1 攻；×4 研究员技能触发两次（商店与战斗都算）。
-    - 商人 ×2 每回合 +1 算力；×4 每回合 +2 算力，且单位与装备 -1 价。
-    - 偶像 ×2 偶像阵亡时己方存活全体本场 +1 攻；×4 开战时随机一名偶像，攻+血最低的其他友军攻/血追平它。
-    - 工程师 ×2 进化额外 +1/+1；×4 每回合首次刷新免费 + 进化时全队永久 +1/+1。
+    - 6 个打法关键词的实现见第 12.2 节。
 
 ### 3.3 装备 / 消耗品（`engine/equip.ts`）
 15. 装备是永久的，**属性加成不写进 atk/hp**，而是在显示（`effectiveStats`）与开战时计算，所以卸下/换装/变金都能干净地生效。
@@ -143,8 +145,8 @@ phase 'over'     → state.end = {rank, won, reason, turns, hp, archetype, arche
 26. 免疫（对齐）：单次伤害 ≤ 阈值时整段免疫，`damage.immune = true, amount = 0`。
 27. 反弹伤害不会再触发反弹；反弹算作被反弹者的"反弹伤害"计入总结。
 28. 触发排序同 1.0：同一批按攻击高→低、我方先、站位前→后；死亡在每次技能结算后立即处理。faint / kill 即使单位已死也结算。
-29. 技能重复：研究员 ×4（研究员单位）+1 次，微调 +1/+2 次，上限 5；每次重复单独发 `ability` 事件（`repeat` 从 1 开始），并发 `equipProc`（微调）。
-30. 1.0 扩展全部保留：`perLevel`、`filter`（新增 `role`）、`consume`、`maxHp/maxHpPerLevel`、`choices`、`n`、`count`、`unitId`。
+29. 技能重复：微调 +1/+2 次，上限 5（2.1 删除研究员 ×4）；每次重复单独发 `ability` 事件（`repeat` 从 1 开始），并发 `equipProc`（微调）。
+30. 1.0 扩展全部保留：`perLevel`、`filter`（`role` = 打法关键词）、`consume`、`maxHp/maxHpPerLevel`、`choices`、`n`、`count`、`unitId`。
 
 ### 3.5 新效果（DESIGN 13）
 31. `steal`：对目标敌人（按 target 选，常用 lowestHpEnemy）若当前血量 ≤ 阈值（`maxHp + (lv-1)×maxHpPerLevel`，未写 maxHp = 无条件）且我方未满 → 移到我方末尾（uid 不变，本场为我方作战，不写回永久 buff）；否则造成阈值点技能伤害。事件 `steal {unit(偷前), source, to(偷后)}`。
@@ -202,10 +204,11 @@ phase 'over'     → state.end = {rank, won, reason, turns, hp, archetype, arche
 {type:'start', me, enemy: UnitSnap[], first: 'me'|'enemy', arena?}       // 战前阵容（含装备静态加成、临时加成）
 {type:'arena', arena, name}                                              // 赛场规则生效（statAll / startShield）
 {type:'synergyTier', side, kind:'faction'|'role', key, name, count, tier, line?: {unit, line}}  // text 如 "开源 ×3：共享升级！"
-{type:'ability', unit, trigger, effect, targets, repeat}                 // repeat>1 = 研究员/微调的重复触发
+{type:'ability', unit, trigger, effect, targets, repeat}                 // repeat>1 = 微调的重复触发
 {type:'attack', action, unit: UnitRef&{atk}, target, hit, hits}          // 一段普攻；action = 第几次行动
 {type:'damage', unit, source?, amount, blocked, hp, shield, kind:'attack'|'ability'|'reflect'|'explode'|'splash', immune?, shieldBroken?}
-{type:'heal' | 'buff' | 'shield' | 'summon' | 'move' | 'multiAttack' | 'bonus' | 'say'}  // 同 1.0
+{type:'buff', ..., permanent, synergy?}   // permanent=true → 赛后写回，播金色"永久 +N"浮字；synergy = 触发它的羁绊线（2.1）
+{type:'heal' | 'shield' | 'summon' | 'move' | 'multiAttack' | 'bonus' | 'say'}  // 同 1.0
 {type:'faint', unit, killer?, consumed?, benched?}
 {type:'steal', unit, source, to}
 {type:'explode', unit, amount, targets}
@@ -223,7 +226,7 @@ phase 'over'     → state.end = {rank, won, reason, turns, hp, archetype, arche
 播放建议：start → move/steal（队形与头条）→ arena → synergyTier 横幅（0.6s 慢放 + 台词）→ equipProc/shield → 开战技能 → 循环 [attack → damage(×n) → faint/revive/explode/技能链] → end。
 
 ## 5. 内容数据格式（validateData 认的字段；内容同事当前的写法都已兼容）
-- **units.json**：在 1.0 基础上 + `role?: researcher|trader|idol|engineer`（也认中文）、`attackTarget?: frontEnemy|backEnemy|randomEnemy|lowestHpEnemy|highestAtkEnemy`、`lines` 可以是数组（旧）或对象 `{common: string[], onSynergy: string|string[]}`（其余键的数组都并入通用台词）。PVE 怪物直接写在 units.json 里带 `token:true`。规范化后 `UnitDef.lines = {general, onSynergy?}`。
+- **units.json**：在 1.0 基础上 + `role: multi|shield|summon|explode|growth|economy`（也认中文 多刀/护盾/召唤/自爆/成长/经济；**旧职业 researcher/trader/idol/engineer 及其中文会报错并提示迁移**，见 12.1）、`attackTarget?: frontEnemy|backEnemy|randomEnemy|lowestHpEnemy|highestAtkEnemy`、`lines` 可以是数组（旧）或对象 `{common: string[], onSynergy: string|string[]}`（其余键的数组都并入通用台词）。PVE 怪物直接写在 units.json 里带 `token:true`。规范化后 `UnitDef.lines = {general, onSynergy?}`。
 - **equips.json**：`{id, name, slot, price, desc, goldDesc, effect, goldEffect, icon}`。effect 写法：`stat{atk,hp,ignoreShield?,splash?,immuneAtMost?}`、`extraAttack{chance}`、`retarget{target,atk?}`、`startShield{amount,reflect?}`、`revive{hp|hpRatio,to:'back'|'same'}`、`growth{atk,hp}`、`copyNeighbor{stats:['atk','hp']}`、`abilityRepeat{times}`、`income{perTurn,onSell}`；也可以是这些对象的数组（叠加）。没写 goldEffect = 数值 ×2。12 个固定 id 的效果读不懂时回退内置并提醒；未知 type 报错。
 - **consumables.json**：`{id, name, price, targetKind, desc, effect, icon}`，effect.type：`freeRerolls{amount}` / `levelUpRandom` / `transformRandomSameTier`（还认 `gold`、`buff`）。
 - **arenas.json**：`{id, name, desc, icon, effect}`，effect（单个或数组）：`priceMod{kind:'unit'|'equip', amount, filter?{faction|role}}`、`statAll{atk,hp}`、`economy{goldPerTurn?,unitSlots?,equipSlots?,rerollFree?,unitPriceMod?,equipPriceMod?}`、`rerollBuff{slot,atk,hp,cap?}`（slot 目前只支持 0 = 最前排，每回合最多 cap=5 次）、`shopSlots{kind,amount}`、`summonBuff{atk,hp}`、`synergyBonus{key,amount}`、`startShield{amount,filter?}`。
@@ -240,11 +243,12 @@ phase 'over'     → state.end = {rank, won, reason, turns, hp, archetype, arche
 | `POST /api/result` | `{name, room?, rank(1~8), turns(1~20), hp(0~20), archetype?, seed, bestUnit?}` | `{ok, best(是否刷新个人最佳), position(全服榜位置)}` |
 | `GET /api/leaderboard?room&date` | 同 1.0 | `{room, date, entries:[{pos, name, rank, turns, hp, archetype, won, seed, bestUnit, date, room}]}` |
 | `GET /api/daily` / `GET /healthz` | 不变 | |
-- archetype 合法值：open/closed/compute/folk/researcher/trader/idol/engineer/mixed（= `state.end.archetype`）。装备 id 按 shared/data/equips.json（缺失时内置 12 件）白名单校验。
+- archetype 合法值：open/closed/compute/folk/multi/shield/summon/explode/growth/economy/mixed（= `state.end.archetype`）；2.0 的 researcher/trader/idol/engineer 过渡期仍接受（旧客户端缓存），原样存储。装备 id 按 shared/data/equips.json（缺失时内置 12 件）白名单校验。
 - 榜单排序：名次小 → 同名次时吃鸡比回合少、其余比存活回合多 → 热度高 → 更早。`won = rank === 1`。
 - 存档 version 2；1.0 的存档（trophies/lives 口径）加载时丢弃。
 
 ## 7. 机器人（`engine/bot.ts`）
+- 2.1：玩家托管/模拟的机器人没有预设装备时，按流派线的缺省偏好买装备（`ARCHETYPE_EQUIPS`，关键词优先，如成长 → RLHF/数据集、护盾 → 防火墙/对齐、多刀 → 发布会/显卡）。
 - 估值 = 阶×3 + 攻 + 血（场上单位 + 等级×4 + 装备件数×3）+ 流派匹配 14 + 核心单位 4 + 与现有队伍同线 +1/个（上限 3）。
 - 每回合：合体优先 → 空位买估值最高 → 满员时卖最弱换更强（流派内单位只会被流派内单位替换，流派单位优先顶掉流派外的单位，带装备的不卖）→ 装备往主力（流派内估值最高者）上堆（空槽或能合成金色才装，偏好装备优先）→ 消耗品（新闻稿/咖啡）→ 回合 ≥3、满员、有余钱时升级商店 → 刷新（`DIFFICULTY.botRerolls` 次，流派成员 <3 时多 2 次）→ 排阵（血厚、阵亡/受伤/复活技能、穿防具的在前；开战技能、带武器的靠后）。
 - 不吃头条/突发；AI 对手每回合与玩家一样的商店规则（赛场相同）。
@@ -318,3 +322,89 @@ phase 'over'     → state.end = {rank, won, reason, turns, hp, archetype, arche
 - 错误文案都在 `state.error`，直接 toast（见下方清单）。
 - 错误文案：`仓库已满（最多 6 件），先卖掉或装上一件吧`（unequip / buyEquipToInventory）、`仓库已满，换下的旧装备放不下：先卖掉仓库里的装备，或先把旧装备卸下/装到别人身上`（equip 替换）、`仓库里没有这件装备`、`这个槽没有装备`、`没有这个装备槽`、`这里没有单位`、`请选择一个单位`、`没有这件装备`、`未知装备`、`算力不够，需要 N 算力`、`已经是金色版了…`、`现在不是商店阶段`。
 - 引导局不涉及仓库（tutorial.json 不变，原 `equip` 动作照常）。
+
+## 12. 2.1 变更（2026-10-25，DESIGN 16~18）
+> 第 8.1 / 8.2 节的流派表是 2.0（4 职业）时代的历史数据，以本节 12.6 为准。
+
+### 12.1 `role` = 打法关键词
+- `Role = 'multi' | 'shield' | 'summon' | 'explode' | 'growth' | 'economy'`（`ROLES` 按此顺序）。字段名仍叫 `role`，`UnitDef.role`、`Archetype.role`、`TargetFilter.role`、`ArenaRules.rolePriceMod`、`synergyBonus.key` 都用新值。
+- 校验器接受英文与中文（多刀/护盾/召唤/自爆/成长/经济）。**旧职业 researcher/trader/idol/engineer（及中文）一律报错**，文案形如：`单位 prompt_eng: role "researcher" 是 2.0 的旧职业（研究员），2.1 已改为打法关键词，请改成 multi/shield/summon/explode/growth/economy（多刀/护盾/召唤/自爆/成长/经济）之一（DESIGN 第 16 节）`。覆盖 units.role、技能 filter.role、赛场 priceMod.filter.role / rolePriceMod / synergyBonus.key、头条突发 synergyBonus.key、对手 archetype。
+- 非致命提醒（warnings）：商店单位缺 role；某关键词不是 5~6 个；某关键词 T1~T2 少于 2 个。
+- `computeSynergies` 输出 10 条线：阵营 4（2/3/5）+ 关键词 6（2/4），固定顺序 `open, closed, compute, folk, multi, shield, summon, explode, growth, economy`。`dominantSynergy` 规则不变（档位 → 个数 → 阵营优先），所以"4 个多刀 + 3 个开源"判为多刀流。
+- 成就：`tier:<关键词>:2`（"打法·多刀 ×4" 等），阵营的 ×3/×5 不变；结局 `archetypeName` 如"多刀流"。
+- 已删除：研究员（回合结束 +1 攻、技能双发）、商人、偶像、工程师（进化加成、首刷免费）的全部效果。
+
+### 12.2 关键词羁绊（`ROLE_META` / `SYNERGY_TUNING`，`engine/synergy.ts`）
+`ROLE_META[role] = {key, name, tagline, thresholds:[2,4], descs:[2 档说明, 4 档说明], shouts}`，客户端直接显示 name / descs（`SYNERGY_NAME` / `SYNERGY_DESCS` / `SYNERGY_SHOUT` 与它同源）。数值集中在 `SYNERGY_TUNING`（descs 按它生成），当前值：
+
+| 关键词 | 2 个 | 4 个（含永久成长路径） |
+|---|---|---|
+| 多刀 | 多刀单位每次行动 25% 多 1 段 | 必定多 1 段；**额外那段（本次行动的最后一段，段数 ≥2 时）命中后该单位永久 +1 攻** |
+| 护盾 | 开战时护盾单位 +**4** 护盾（设计 3，平衡上调） | 开战时全体友军获得"碎盾反弹 3"（与闭源 ×3 的 2 取大）；**护盾单位每被打碎一次护盾，永久 +1/+2** |
+| 召唤 | 召唤物 **+2/+2**（设计 +1/+1） | 召唤物 **+3/+3**（设计 +2/+2）；开战额外召唤 1 个水军到最后排；**每次召唤，召唤者永久 +2/+2**（设计 +1/+1） |
+| 自爆 | 爆炸伤害 **+1**（explode 技能、自爆单位的阵亡伤害技能、×4 自爆；按目标各 +1） | 自爆单位阵亡时：对敌方最前排造成 自身攻击 +1 的伤害，并对敌方全体 1 余波（只限自爆单位阵亡，非自爆友军阵亡不触发）；**每次爆炸后，其余存活的自爆友军永久 +1/+1** |
+| 成长 | 成长单位每次获得永久加成时额外 +1/+1 | **成长单位获得永久加成时，相邻友军获得同样加成（原始数值，不再继续传递；成长邻居仍吃 ×2 的 +1/+1）**；回合结束（endShop）全队永久 +1/+1 |
+| 经济 | 每回合 **+2** 算力（设计 +1） | 每回合 **+3** 算力（设计 +2），单位 -1 价（装备不降价）；**每花掉 4 算力（设计 6），随机一名经济单位永久 +1/+1** |
+
+实现细节：
+- "永久加成"（成长 ×2/×4 认的）= 技能 permanent buff、开源 ×3/×5、RLHF、1 号位光环、头条 buffTeam/buffFaction permanent、消耗品永久 buff、关键词 ×4 的成长、经济 ×4、成长 ×4 回合末加成。不含合体/进化的 +1/+1 与召唤物出生属性。商店侧统一走 `permGrow(ctx, unit, atk, hp)`。
+- 召唤的加成在商店召唤（`shopSummon`）与战斗召唤都生效（与赛场 summonBuff、头条 summonBuff、民间 ×3 继承叠加）；"召唤者"= 召唤技能的施放者 / 民间 ×3 开战水军的继承来源 / 民间 ×3 友军阵亡召唤里阵亡的那个单位（阵亡也照样记永久成长）。开战额外水军没有召唤者。
+- 战斗内的永久成长：存活单位发 `buff` 事件 `{permanent:true, synergy:<key>}`（文案如"越砍越快：永久 +1 攻（多刀 ×4）"），写进 `BattleResult.permanentBuffs`，`applyBattleResult` 赛后写回队伍；已阵亡的我方原队伍单位不发事件但同样写回。敌方/偷来/召唤物不写回。成长 ×2 触发的那次 buff 也带 `synergy:'growth'`，文案后缀"（成长 +1/+1）"。**客户端：`buff.permanent === true` 播金色"永久 +N"浮字。**
+- 经济 ×4 的花费：buy / reroll / equip / buyEquipToInventory / useConsumable / upgradeShop 的实付算力，只在 ×4 激活时累计到 `RunState.economySpent`（跨回合保留；机器人存在 `BotMemo.economySpent`）。商店侧扣钱统一走 `spendGold(ctx, n)`。
+- `turnIncome()` 返回字段 `trader` 改名为 **`economy`**。
+- 自爆 ×4 的"任意友军阵亡全体 1 伤"按协调要求限定为自爆单位阵亡（2.1 表格里已删此句，保留为余波，数值 `explodeAftershock`）。
+
+### 12.3 商店抽卡（DESIGN 17）
+- 阶权重 `tierWeights(maxTier)`：当前最高阶 3、次高阶 2、其余 1（原为阶数 t）。
+- 逐单位权重 `unitRollWeights(data, maxTier, ownedDefIds)`：阶的总权重平均分给该阶单位，**已在队伍中的 defId ×2.5**（`OWNED_UNIT_WEIGHT`；仓库/装备无关）。商店刷新、头条 extraSlot 都用它；指定阶的抽取（进化奖励、freeUnit、PVE 奖励、转型）不加权。客户端可用它显示出现概率。
+- `SHOP_ROLL = {ownedWeight, legacyTierWeights}` 供模拟脚本临时切回 2.0 口径。
+- 内置默认的新闻稿价格 3 → 2（真实数据以 consumables.json 为准）。
+- **效果（`scripts/sim-levels.ts 400 8`，机器人水平玩家、10 条线轮流、真实数据）**：第 8 回合商店结束时队伍 Lv2+ 占比
+
+| 口径 | 玩家 Lv2+ | 玩家 Lv3 | AI 对手 Lv2+ | AI 对手 Lv3 |
+|---|---|---|---|---|
+| 2.0 抽卡（阶权重 t、不加权） | 49.5% | 9.3% | 43.6% | 6.2% |
+| **2.1 抽卡（3/2/1 + 已有 ×2.5）** | **61.6%** | **14.0%** | **59.7%** | **11.7%** |
+
+（改动前的旧引擎 + 旧数据实测为玩家 51.5% / AI 46.4%，口径一致。）
+
+### 12.4 对手阵容可查（DESIGN 18，`Opponent` 新字段）
+| 字段 | 说明 |
+|---|---|
+| `lastTeam: UnitInst[]` | 上一轮战斗的完整阵容（单位、等级、属性、装备，前排在前）。**与你交战的对手 = 你看到的阵容（AI 已按难度缩放）**；其余对手 = 它的真实阵容；PVE 回合 = 打怪用的阵容。`injectHumanOpponents` 注入时也立即填上快照。开局为 `[]` |
+| `lastSynergies: SynergyState[]` | `lastTeam` 已激活的羁绊（tier > 0，含赛场人数加成，不含你的头条加成） |
+| `lastResult?: {outcome:'win'\|'lose'\|'draw', vsId, hpDelta}` | vsId = `'me'`（你）/ 对手 id / PVE id；hpDelta = 这一轮掉的热度（≤0）。落单打"幽灵"时 vsId = 幽灵阵容的主人。**替代 2.0 的字符串 `'win'|'loss'|'draw'|'pve'`**（注意 loss → lose） |
+| `hpHistory: number[]` | `[0]` = 20，之后每回合结算后追加一次热度（淘汰那回合记 0，之后不再追加） |
+- 写入时机：`applyBattleResult`（你的这场 + `resolveOtherMatches` 里的其余对局 / PVE 模拟）。旧存档缺这些字段时自动补齐（`normalizeOpponent`），字符串 lastResult 丢弃。
+- 辅助导出：`opponentSynergies(team, state, data)`、`recordFight`。
+
+### 12.5 其他接口变化
+- `BattleEvent` `buff` 增加 `synergy?: SynergyKey`。
+- `RunState.economySpent?`、`BotMemo.economySpent?`。
+- 新导出：`ROLE_META`、`RoleMeta`、`SYNERGY_TUNING`、`unitRollWeights`、`OWNED_UNIT_WEIGHT`、`SHOP_ROLL`、`permGrow`、`spendGold`、`adjacentUnits`；`data.ts` 的 `LEGACY_ROLES` / `roleProblem`。
+- 机器人：无预设装备时按流派线缺省偏好买装备（`ARCHETYPE_EQUIPS`）。
+- 服务端 archetype 白名单换成 10 线 + mixed（旧 4 职业过渡期仍接受）。
+- 内置默认（`defaults.ts`，仅在缺 json 时用）：赛场"研究院/春晚舞台"→"成长营（成长 -1 价）/召唤祭（召唤人数 +1）"，4 个职业对手预设改为成长/经济/多刀/召唤。
+
+### 12.6 模拟结果（2026-10-25，真实数据 = 内容同事提交的六关键词版，SYNERGY_TUNING 为 12.2 的当前值）
+`npx tsx scripts/sim-difficulty.ts 400`：中位结束回合 **12**（P25 10 / P75 15），平均名次 **3.78**，吃鸡率 **12.8%**，前四 64.5%。达标（吃鸡 10%~25%、中位 10~14），DIFFICULTY 不需要调。`npm test` 的 realdata 200 局同口径断言（吃鸡上限放宽到 25%）。
+
+`npx tsx scripts/sim-archetypes.ts 150`：
+
+| 流派 | 平均名次 | 吃鸡率 | 前四率 | 平均回合 | 达成中档 |
+|---|---|---|---|---|---|
+| 自爆 | 2.49 | 36.7% | 88.7% | 15.8 | 88.0% |
+| 民间 | 3.23 | 22.0% | 75.3% | 13.2 | 92.0% |
+| 算力 | 3.57 | 17.3% | 68.0% | 13.0 | 90.0% |
+| 开源 | 3.61 | 15.3% | 70.0% | 12.8 | 91.3% |
+| 闭源 | 3.89 | 15.3% | 64.0% | 12.1 | 84.7% |
+| 成长 | 4.05 | 22.0% | 58.7% | 11.6 | 94.0% |
+| 护盾 | 4.15 | 13.3% | 52.0% | 12.0 | 96.7% |
+| 多刀 | 4.44 | 3.3% | 54.0% | 11.4 | 90.7% |
+| 召唤 | 4.47 | 7.3% | 49.3% | 11.3 | 92.0% |
+| 经济 | 4.64 | 5.3% | 48.0% | 11.1 | 89.3% |
+
+胜率贡献：自爆 62.5%、护盾 59.3%、闭源 58.4%、开源 56.0%、算力 55.5%、民间 54.5%、多刀 54.5%、召唤 53.8%、成长 53.3%、经济 50.8%。
+
+**自爆偏强是内容造成的，不是羁绊数值**：把自爆羁绊整个关掉（×2 +0、×4 前排/余波/成长全关）自爆线仍是 2.76；自爆线 5 个单位都是"阵亡 → 对敌方全体造成等于自身攻击的爆炸"（AoE），T1 就有两个（水军机器人、Vibe Coder），单位胜率 63~66% 包揽前列。用一份临时数据把这 5 个单位的爆炸 `amount` 改成 0.5（伤害减半）再跑：自爆 2.91~2.99，其余 9 条线 3.12~4.31（全部落在 3.3~4.5 附近）；改成 `randomEnemy` ×2 目标则自爆 3.09。建议内容侧二选一（或叠加）：爆炸 `amount: 0.5` / 目标改 `randomEnemy(2)`，并把一个 T1 自爆单位换成非 AoE 的阵亡伤害。经济、召唤、多刀在自爆被压下来之后都进入区间（sim f：召唤 4.20、经济 4.31、多刀 3.68）。
+调参工具：`TUNE='{"explodeBonus":0}' ONLY=explode,economy DATA_DIR=<目录> npx tsx scripts/sim-archetypes.ts 100`。

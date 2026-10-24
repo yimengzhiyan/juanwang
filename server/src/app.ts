@@ -7,10 +7,13 @@ import { Store, type ResultEntry } from './store';
 
 export const MAX_NAME = 12;
 export const MAX_OPPONENTS = 7;
-const ARCHETYPES = ['open', 'closed', 'compute', 'folk', 'researcher', 'trader', 'idol', 'engineer', 'mixed'];
+/** 流派 key：4 阵营 + 6 打法关键词（2.1）+ mixed */
+const ARCHETYPES = ['open', 'closed', 'compute', 'folk', 'multi', 'shield', 'summon', 'explode', 'growth', 'economy', 'mixed'];
+/** 2.0 的旧职业：过渡期仍接受（旧客户端缓存），原样存储 */
+const LEGACY_ARCHETYPES = ['researcher', 'trader', 'idol', 'engineer'];
 function cleanArchetype(v: unknown): string | null {
   if (v === undefined || v === null || v === '') return null;
-  if (typeof v !== 'string' || !ARCHETYPES.includes(v)) throw new HttpError(400, `archetype 应为 ${ARCHETYPES.join('/')}`);
+  if (typeof v !== 'string' || !(ARCHETYPES.includes(v) || LEGACY_ARCHETYPES.includes(v))) throw new HttpError(400, `archetype 应为 ${ARCHETYPES.join('/')}`);
   return v;
 }
 export const MAX_TEAM = 5;

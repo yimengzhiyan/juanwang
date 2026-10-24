@@ -59,14 +59,34 @@ export function faction(v: unknown): Faction | null {
   return FACTION_ALIAS[v] ?? FACTION_ALIAS[v.toLowerCase()] ?? null;
 }
 const ROLE_ALIAS: Record<string, Role> = {
-  researcher: 'researcher', '研究员': 'researcher', research: 'researcher',
-  trader: 'trader', '商人': 'trader', merchant: 'trader',
-  idol: 'idol', '偶像': 'idol',
-  engineer: 'engineer', '工程师': 'engineer',
+  multi: 'multi', '多刀': 'multi', multiattack: 'multi',
+  shield: 'shield', '护盾': 'shield',
+  summon: 'summon', '召唤': 'summon',
+  explode: 'explode', '自爆': 'explode', explosion: 'explode',
+  growth: 'growth', '成长': 'growth', grow: 'growth',
+  economy: 'economy', '经济': 'economy', eco: 'economy',
 };
+/** 2.0 的旧职业（2.1 起废弃，DESIGN 16）：校验时给出明确的迁移提示 */
+export const LEGACY_ROLES: Record<string, string> = {
+  researcher: '研究员', '研究员': '研究员', trader: '商人', '商人': '商人', idol: '偶像', '偶像': '偶像', engineer: '工程师', '工程师': '工程师',
+};
+export const ROLE_HINT = 'multi/shield/summon/explode/growth/economy（多刀/护盾/召唤/自爆/成长/经济）';
 export function role(v: unknown): Role | null {
   if (typeof v !== 'string') return null;
   return ROLE_ALIAS[v] ?? ROLE_ALIAS[v.toLowerCase()] ?? null;
+}
+/** 非法 role 的报错文案（旧职业给出迁移提示） */
+export function roleProblem(at: string, field: string, v: unknown): string {
+  const legacy = typeof v === 'string' ? LEGACY_ROLES[v] ?? LEGACY_ROLES[v.toLowerCase()] : undefined;
+  if (legacy) return `${at}: ${field} "${String(v)}" 是 2.0 的旧职业（${legacy}），2.1 已改为打法关键词，请改成 ${ROLE_HINT} 之一（DESIGN 第 16 节）`;
+  return `${at}: ${field} 应为 ${ROLE_HINT}，收到 "${String(v)}"`;
+}
+/** 羁绊线 key（阵营或关键词）；非法时写 problem 并返回 null */
+function synergyKeyOf(v: unknown, at: string, field: string, p: string[]): SynergyKey | null {
+  const k = (faction(v) ?? role(v)) as SynergyKey | null;
+  if (k) return k;
+  p.push(typeof v === 'string' && (LEGACY_ROLES[v] ?? LEGACY_ROLES[v.toLowerCase()]) ? roleProblem(at, field, v) : `${at}: ${field} 应为阵营 open/closed/compute/folk 或打法关键词 ${ROLE_HINT}，收到 "${String(v)}"`);
+  return null;
 }
 
 /** "randomFriend(2)" → {target:'randomFriend', n:2} */
@@ -91,7 +111,7 @@ function normFilter(raw: unknown, at: string, p: string[]): TargetFilter | undef
   }
   if (raw.role !== undefined) {
     const r = role(raw.role);
-    if (!r) p.push(`${at}: filter.role 非法`);
+    if (!r) p.push(roleProblem(at, 'filter.role', raw.role));
     else f.role = r;
   }
   for (const k of ['minTier', 'maxTier'] as const) {
@@ -221,7 +241,7 @@ function normUnit(raw: unknown, i: number, p: string[], w: string[]): UnitDef | 
   };
   if (raw.role !== undefined && raw.role !== null && raw.role !== '' && raw.role !== 'none') {
     const r = role(raw.role);
-    if (!r) p.push(`${at}: role 应为 researcher/trader/idol/engineer（或省略）`);
+    if (!r) p.push(roleProblem(at, 'role', raw.role));
     else u.role = r;
   }
   const ab = normAbility(raw.ability, at, p);
@@ -492,6 +512,21 @@ function parseArenaRules(raw: unknown, at: string, p: string[]): ArenaRules | nu
     const keys = ['unitPriceMod', 'factionPriceMod', 'rolePriceMod', 'equipPriceMod', 'goldPerTurn', 'unitSlotsMod', 'equipSlotsMod', 'rerollFree',
       'rerollFrontBuff', 'rerollFrontCap', 'battleBuff', 'summonBuff', 'synergyBonus', 'startShield'];
     const r = Object.fromEntries(Object.entries(raw).filter(([k]) => keys.includes(k))) as ArenaRules;
+    if (r.rolePriceMod) {
+      const ro = role(r.rolePriceMod.role);
+      if (!ro) p.push(roleProblem(at, 'rolePriceMod.role', r.rolePriceMod.role));
+      else r.rolePriceMod = { ...r.rolePriceMod, role: ro };
+    }
+    if (r.synergyBonus) {
+      r.synergyBonus = (Array.isArray(r.synergyBonus) ? r.synergyBonus : []).flatMap((b) => {
+        const key = synergyKeyOf(b?.key, at, 'synergyBonus.key', p);
+        return key ? [{ key, amount: num(b.amount, 1) }] : [];
+      });
+    }
+    if (r.startShield?.filter) {
+      const f = normFilter(r.startShield.filter, at, p);
+      r.startShield = { ...r.startShield, ...(f ? { filter: f } : {}) };
+    }
     return Object.keys(r).length ? r : null;
   }
   const items = (Array.isArray(raw) ? raw : [raw]).filter(isObj);
@@ -505,7 +540,9 @@ function parseArenaRules(raw: unknown, at: string, p: string[]): ArenaRules | nu
         const amount = num(it.amount, -1);
         const f = isObj(it.filter) ? it.filter : {};
         const fa = faction(f.faction ?? it.faction);
-        const ro = role(f.role ?? it.role);
+        const roRaw = f.role ?? it.role;
+        const ro = role(roRaw);
+        if (roRaw !== undefined && !ro) p.push(roleProblem(at, 'priceMod.filter.role', roRaw));
         if (it.kind === 'equip' || it.kind === 'item') r.equipPriceMod = (r.equipPriceMod ?? 0) + amount;
         else if (fa) r.factionPriceMod = { faction: fa, amount };
         else if (ro) r.rolePriceMod = { role: ro, amount };
@@ -535,9 +572,8 @@ function parseArenaRules(raw: unknown, at: string, p: string[]): ArenaRules | nu
         r.summonBuff = { atk: num(it.atk, 1), hp: num(it.hp, 1) };
         break;
       case 'synergyBonus': {
-        const key = (faction(it.key) ?? role(it.key)) as SynergyKey | null;
-        if (!key) p.push(`${at}: synergyBonus.key 应为阵营或职业`);
-        else (r.synergyBonus ??= []).push({ key, amount: num(it.amount, 1) });
+        const key = synergyKeyOf(it.key, at, 'synergyBonus.key', p);
+        if (key) (r.synergyBonus ??= []).push({ key, amount: num(it.amount, 1) });
         break;
       }
       case 'startShield': {
@@ -577,7 +613,7 @@ function normArena(raw: unknown, i: number, p: string[], w: string[]): ArenaDef 
   return a;
 }
 
-function parseArchetype(raw: Obj): Archetype {
+function parseArchetype(raw: Obj, at: string, p: string[]): Archetype {
   const a: Archetype = {};
   const src = raw.archetype;
   const tryKey = (v: unknown) => {
@@ -587,6 +623,7 @@ function parseArchetype(raw: Obj): Archetype {
       const r = role(part);
       if (f) a.faction = f;
       if (r) a.role = r;
+      if (!f && !r && (LEGACY_ROLES[part] ?? LEGACY_ROLES[part.toLowerCase()])) p.push(roleProblem(at, 'archetype', part));
     }
   };
   if (isObj(src)) {
@@ -604,8 +641,8 @@ function normOpponent(raw: unknown, i: number, p: string[]): OpponentPreset | nu
   const at = `对手 ${String(raw.id ?? `#${i}`)}`;
   if (!isStr(raw.id)) return void p.push(`opponents[${i}]: 缺少 id`), null;
   if (!isStr(raw.name)) p.push(`${at}: 缺少 name`);
-  const archetype = parseArchetype(raw);
-  if (!archetype.faction && !archetype.role) p.push(`${at}: archetype 需要 faction 或 role（如 {"faction":"compute"}）`);
+  const archetype = parseArchetype(raw, at, p);
+  if (!archetype.faction && !archetype.role) p.push(`${at}: archetype 需要 faction 或 role（如 {"faction":"compute"} 或 {"role":"summon"}）`);
   const o: OpponentPreset = { id: raw.id, name: String(raw.name ?? raw.id), avatar: isStr(raw.avatar) ? raw.avatar : 'units/botnet.svg', archetype };
   const eq = strList(raw.equips ?? raw.equipBias);
   if (eq.length) o.equips = eq;
@@ -777,8 +814,7 @@ export function normEventEffect(raw: unknown, at: string, p: string[]): EventEff
       return { type: 'battleSummon', side: side ?? 'me', unitId: String(raw.unitId ?? 'token_shuijun'), count: num(raw.count, 1) };
     }
     case 'synergyBonus': {
-      const key = (faction(raw.key) ?? role(raw.key)) as SynergyKey | null;
-      if (!key) p.push(`${at}: synergyBonus.key 应为阵营或职业`);
+      const key = synergyKeyOf(raw.key, at, 'synergyBonus.key', p);
       return { type: 'synergyBonus', key: key ?? 'open', amount: num(raw.amount, 1) };
     }
     case 'wager':
@@ -1001,10 +1037,12 @@ export function validateData(raw: RawGameData): GameData {
   if (opponents.length < 7) w.push(`opponents: 只有 ${opponents.length} 个预设，不足 7 个时会重复使用（名字加编号）`);
   const shop = units.filter((u) => !u.token);
   const noRole = shop.filter((u) => !u.role);
-  if (noRole.length) w.push(`units: ${noRole.length} 个商店单位没有 role（职业羁绊不会计入）：${noRole.slice(0, 8).map((u) => u.id).join(', ')}${noRole.length > 8 ? ' …' : ''}`);
+  if (noRole.length) w.push(`units: ${noRole.length} 个商店单位没有 role（打法关键词羁绊不会计入；DESIGN 16 要求每个单位恰好 1 个）：${noRole.slice(0, 8).map((u) => u.id).join(', ')}${noRole.length > 8 ? ' …' : ''}`);
   for (const r of ROLES) {
-    const n = shop.filter((u) => u.role === r).length;
-    if (shop.length >= 20 && n > 0 && (n < 5 || n > 10)) w.push(`units: 职业 ${r} 有 ${n} 个（DESIGN 建议 7~9）`);
+    const list = shop.filter((u) => u.role === r);
+    if (shop.length < 20) continue;
+    if (list.length < 5 || list.length > 6) w.push(`units: 关键词 ${r} 有 ${list.length} 个（DESIGN 16 建议 5~6）`);
+    if (list.length && list.filter((u) => u.tier <= 2).length < 2) w.push(`units: 关键词 ${r} 的 T1~T2 单位少于 2 个，前期难以成型（DESIGN 16）`);
   }
   for (const f of FACTIONS) if (shop.length >= 20 && shop.filter((u) => u.faction === f).length < 6) w.push(`units: 阵营 ${f} 少于 6 个，6 档羁绊很难凑齐`);
   if (tutorial) {

@@ -9,7 +9,7 @@ import {
   type UnitEquips, type UnitInst, type UnitRef, type UnitSnap,
 } from '../types';
 import { abilityAmount, abilityBuff, abilityMult, consumeBonus, destroyThreshold, matchesFilter, resolveChoice } from './shop';
-import { SYNERGY_NAME, SYNERGY_SHOUT, mergeBonus, synergiesFromDefs, tierMap, type SynergyBonus, type TierMap } from './synergy';
+import { SYNERGY_NAME, SYNERGY_SHOUT, SYNERGY_TUNING, mergeBonus, synergiesFromDefs, tierMap, type SynergyBonus, type TierMap } from './synergy';
 import { equipCount, equipEntries, equipMultFor, equipTotals, type EquipEntry } from './equip';
 import { buildSummary } from './summary';
 
@@ -55,7 +55,7 @@ interface BU {
   chain: number;
   /** 算力 ×5：每次攻击额外 1 次 */
   bonusHit: boolean;
-  /** 闭源 ×3/×5 */
+  /** 碎盾反弹（闭源 ×3 = 2、护盾 ×4 = 3，取较大）；reflectAtk = 闭源 ×5（反弹攻击者攻击力） */
   closedReflect: number;
   reflectAtk: boolean;
   unpierceable: boolean;
@@ -192,7 +192,7 @@ class Battle {
       hp: Math.max(0, t.hp), shield: t.shield, kind, ...(broken ? { shieldBroken: true } : {}),
       text: `${srcName ? `${srcName} 对 ` : ''}${this.name(t)} 造成 ${dealt} 点伤害${blocked ? `（护盾挡下 ${blocked}${broken ? '，护盾碎了' : ''}）` : ''}${pierce && t.shield > 0 ? '（无视护盾）' : ''}`,
     });
-    // 碎盾反弹（闭源 ×3 / ×5、金色防火墙）
+    // 碎盾反弹（闭源 ×3 / ×5、护盾 ×4、金色防火墙）
     if (broken && src && src.side !== t.side && kind !== 'reflect' && this.isAlive(src)) {
       const r = Math.max(t.reflectAtk ? src.atk : t.closedReflect, t.eq.shieldReflect ?? 0);
       if (r > 0) {
@@ -200,6 +200,9 @@ class Battle {
         this.damage(t, src, r, 'reflect');
       }
     }
+    // 护盾 ×4：护盾单位的护盾每被打碎一次，永久 +1/+2
+    const gs = SYNERGY_TUNING.growPerm.shield;
+    if (broken && gs > 0 && t.def.role === 'shield' && this.tiers[t.side].shield >= 2) this.growPerm(t, gs, 2 * gs, 'shield', `${this.name(t)} 碎盾成长：永久 +${gs}/+${2 * gs}（护盾 ×4）`);
     if (dealt <= 0) return 0;
     if (t.hp <= 0) {
       if (!t.killer && src) t.killer = src;
@@ -288,18 +291,32 @@ class Battle {
     this.emit({ type: 'revive', unit: this.snap(u), via, source: src ? this.ref(src) : undefined, text: `${this.name(u)} 以 ${u.hp} 血复活了！` });
   }
 
-  /** 阵亡时的羁绊：偶像 ×2、民间 ×3（友军阵亡召唤水军）、民间 ×5（召唤物阵亡爆炸） */
+  /** 阵亡时的羁绊：自爆 ×4（自爆单位炸最前排 + 任意友军阵亡全体 1 伤害）、民间 ×5（召唤物阵亡爆炸）、民间 ×3（友军阵亡召唤水军） */
   onDeathSynergies(u: BU): void {
     const t = this.tiers[u.side];
     if (u.consumed) return;
-    if (t.idol >= 1 && u.def.role === 'idol') {
-      for (const f of this.living(u.side)) this.buff(f, 1, 0, false, undefined, `${this.name(f)} +1 攻（偶像陨落）`);
+    const ref = { uid: u.uid, defId: u.defId, side: u.side, pos: u.lastPos };
+    if (t.explode >= 2 && u.def.role === 'explode') {
+      const front = this.living(other(u.side))[0];
+      const dmg = SYNERGY_TUNING.explodeFrontMul > 0 ? Math.round(u.atk * SYNERGY_TUNING.explodeFrontMul) + this.explodeBonus(u.side) : 0;
+      if (front && dmg > 0) {
+        this.emit({ type: 'explode', unit: ref, amount: dmg, targets: [this.ref(front)], text: `${this.name(u)} 自爆 ×4：对 ${this.name(front)} 造成 ${dmg} 伤害` });
+        this.damage(u, front, dmg, 'explode');
+      }
+      // 余波：自爆单位阵亡时对敌方全体 1 伤害（只限自爆单位，避免与攻击无关的无脑伤害）
+      const all = this.living(other(u.side));
+      if (SYNERGY_TUNING.explodeAftershock > 0 && all.length) {
+        this.emit({ type: 'explode', unit: ref, amount: SYNERGY_TUNING.explodeAftershock, targets: all.map((x) => this.ref(x)), text: `${this.name(u)} 阵亡余波：敌方全体 ${SYNERGY_TUNING.explodeAftershock} 伤害（自爆 ×4）` });
+        for (const x of all) this.damage(u, x, SYNERGY_TUNING.explodeAftershock, 'explode');
+      }
+      this.afterExplosion(u);
     }
     if (t.folk >= 3 && u.summon) {
       const targets = this.living(other(u.side));
       if (targets.length) {
-        this.emit({ type: 'explode', unit: { uid: u.uid, defId: u.defId, side: u.side, pos: u.lastPos }, amount: 1, targets: targets.map((x) => this.ref(x)), text: `${this.name(u)} 阵亡爆炸：敌方全体 1 伤害` });
+        this.emit({ type: 'explode', unit: ref, amount: 1, targets: targets.map((x) => this.ref(x)), text: `${this.name(u)} 阵亡爆炸：敌方全体 1 伤害` });
         for (const x of targets) this.damage(u, x, 1, 'explode');
+        this.afterExplosion(u);
       }
     }
     if (t.folk >= 2 && !u.summon) {
@@ -369,11 +386,38 @@ class Battle {
   }
 
   // ── 技能执行 ──
+  /** 自爆 ×2：本方"爆炸伤害" +EXPLODE_BONUS（explode 技能、自爆单位的阵亡伤害技能、自爆 ×4 的自爆） */
+  explodeBonus(side: Side): number {
+    return this.tiers[side].explode >= 1 ? SYNERGY_TUNING.explodeBonus : 0;
+  }
+
+  /** 自爆 ×4：本方每发生一次爆炸，其余（存活的）自爆友军永久 +1/+1 */
+  afterExplosion(u: BU): void {
+    if (this.tiers[u.side].explode < 2) return;
+    for (const x of this.living(u.side)) {
+      const g = SYNERGY_TUNING.growPerm.explode;
+      if (x !== u && x.def.role === 'explode' && g > 0) this.growPerm(x, g, g, 'explode', `${this.name(x)} 被爆炸点燃：永久 +${g}/+${g}（自爆 ×4）`);
+    }
+  }
+
+  /**
+   * 羁绊带来的永久成长（关键词 ×4）：存活 → buff 事件（permanent:true, synergy）；
+   * 已阵亡的我方原队伍单位也照样记进 permanentBuffs（赛后写回），只是不发事件。
+   */
+  growPerm(t: BU, atk: number, hp: number, key: SynergyKey, text: string): void {
+    if (this.isAlive(t)) {
+      this.buff(t, atk, hp, true, undefined, text, { synergy: key });
+      return;
+    }
+    if (t.side === 'me' && t.orig) {
+      const cur = this.perm.get(t.uid) ?? { atk: 0, hp: 0 };
+      this.perm.set(t.uid, { atk: cur.atk + atk, hp: cur.hp + hp });
+    }
+  }
+
   runAbility(p: Pending): void {
     const u = p.u;
-    const t = this.tiers[u.side];
     let reps = 1;
-    if (u.def.role === 'researcher' && t.researcher >= 2) reps++;
     reps += u.eq.abilityRepeat ?? 0;
     reps = Math.max(1, Math.min(5, Math.round(reps)));
     for (let r = 1; r <= reps; r++) {
@@ -396,9 +440,13 @@ class Battle {
     });
     const amt = abilityAmount(ab, u.level);
     switch (ab.effect) {
-      case 'damage':
-        for (const x of tg) this.damage(u, x, amt, 'ability');
+      case 'damage': {
+        // 自爆单位的阵亡伤害技能也算"爆炸"（自爆 ×2 +2）
+        const boom = p.trigger === 'faint' && u.def.role === 'explode' ? this.explodeBonus(u.side) : 0;
+        for (const x of tg) this.damage(u, x, amt + boom, boom ? 'explode' : 'ability');
+        if (boom && tg.length) this.afterExplosion(u);
         break;
+      }
       case 'destroy': {
         const limit = destroyThreshold(ab, u.level);
         for (const x of tg) {
@@ -508,11 +556,12 @@ class Battle {
         break;
       }
       case 'explode': {
-        const dmg = Math.max(0, Math.round(u.atk * (ab.amount ?? 1)));
+        const dmg = Math.max(0, Math.round(u.atk * (ab.amount ?? 1))) + this.explodeBonus(u.side);
         const targets = tg.filter((x) => this.isAlive(x));
         if (!targets.length || dmg <= 0) break;
         this.emit({ type: 'explode', unit: this.ref(u), amount: dmg, targets: targets.map((x) => this.ref(x)), text: `${this.name(u)} 自爆！对 ${targets.length} 个目标造成 ${dmg} 伤害` });
         for (const x of targets) this.damage(u, x, dmg, 'explode');
+        this.afterExplosion(u);
         break;
       }
       case 'doubleStats':
@@ -544,8 +593,19 @@ class Battle {
     this.emit({ type: 'shield', unit: this.ref(x), source: src ? this.ref(src) : undefined, amount: amt, total: x.shield, text: text ?? `${this.name(x)} 获得 ${amt} 点护盾` });
   }
 
-  buff(t: BU, atk: number, hp: number, permanent: boolean, src?: BU, text?: string): void {
+  /**
+   * 加属性。permanent = 赛后写回（我方原队伍单位）。
+   * 成长 ×2：成长单位获得永久加成时额外 +1/+1；成长 ×4：成长单位获得永久加成时，相邻友军获得同样的加成（不再继续传递）。
+   */
+  buff(t: BU, atk: number, hp: number, permanent: boolean, src?: BU, text?: string, opts: { synergy?: SynergyKey; noSpread?: boolean } = {}): void {
     if (!this.isAlive(t) || (atk === 0 && hp === 0)) return;
+    const base = { atk, hp };
+    const gt = this.tiers[t.side].growth;
+    const growthHit = permanent && (atk > 0 || hp > 0) && t.def.role === 'growth' && gt >= 1;
+    if (growthHit) {
+      atk += 1;
+      hp += 1;
+    }
     const a0 = t.atk;
     const h0 = t.hp;
     t.atk = Math.max(0, t.atk + atk);
@@ -556,10 +616,19 @@ class Battle {
       this.perm.set(t.uid, { atk: cur.atk + atk, hp: cur.hp + hp });
     }
     const sign = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
+    const synergy = opts.synergy ?? (growthHit ? 'growth' : undefined);
     this.emit({
       type: 'buff', unit: this.ref(t), source: src ? this.ref(src) : undefined, atk: t.atk - a0, hp: t.hp - h0, newAtk: t.atk, newHp: t.hp, permanent,
-      text: text ?? `${this.name(t)} ${sign(atk)}/${sign(hp)}${permanent ? '（永久）' : ''}`,
+      ...(synergy ? { synergy } : {}),
+      text: (text ?? `${this.name(t)} ${sign(atk)}/${sign(hp)}${permanent ? '（永久）' : ''}`) + (growthHit ? '（成长 +1/+1）' : ''),
     });
+    if (growthHit && gt >= 2 && !opts.noSpread) {
+      const line = this.living(t.side);
+      const i = line.indexOf(t);
+      for (const n of [line[i - 1], line[i + 1]]) {
+        if (n) this.buff(n, base.atk, base.hp, true, t, `${this.name(n)} 互相成长 ${sign(base.atk)}/${sign(base.hp)}（成长 ×4）`, { synergy: 'growth', noSpread: true });
+      }
+    }
   }
 
   swap(a: BU, b: BU): void {
@@ -599,7 +668,7 @@ class Battle {
   }
 
   /**
-   * 召唤：赛场 summonBuff（双方）、头条 summonBuff（我方）、民间 ×3 继承召唤者 50% 属性。
+   * 召唤：赛场 summonBuff（双方）、头条 summonBuff（我方）、召唤 ×2/×4（+1/+1 / +2/+2）、民间 ×3 继承召唤者 50% 属性。
    */
   summonUnit(side: Side, id: string, at: number, src: BU | undefined, mult: number): BU | null {
     const def = this.data.unitsById[id];
@@ -615,6 +684,12 @@ class Battle {
       atk += this.mods.summonBuff.atk;
       hp += this.mods.summonBuff.hp;
     }
+    const st = this.tiers[side].summon;
+    if (st >= 1) {
+      const n = SYNERGY_TUNING.summonStat[st >= 2 ? 1 : 0];
+      atk += n;
+      hp += n;
+    }
     if (src && this.tiers[side].folk >= 2) {
       atk += Math.floor(src.atk / 2);
       hp += Math.floor(src.maxHp / 2);
@@ -622,7 +697,11 @@ class Battle {
     const inst: UnitInst = {
       uid: `s${++this.summonCount}_${src?.uid ?? side}`, defId: id, atk: Math.max(0, atk), hp: Math.max(1, hp), level: 1, xp: 0, shield: 0, tempAtk: 0, tempHp: 0, equips: {},
     };
-    return this.spawn(inst, side, at, src);
+    const b = this.spawn(inst, side, at, src);
+    // 召唤 ×4：每次召唤，召唤者永久 +1/+1
+    const gu = SYNERGY_TUNING.growPerm.summon;
+    if (b && src && src.side === side && st >= 2 && gu > 0) this.growPerm(src, gu, gu, 'summon', `${this.name(src)} 摇人成功：永久 +${gu}/+${gu}（召唤 ×4）`);
+    return b;
   }
 
   spawn(inst: UnitInst, side: Side, at: number, src?: BU): BU | null {
@@ -775,17 +854,14 @@ class Battle {
         this.summonUnit(side, def.id, this.sides[side].length, tier >= 2 ? src : undefined, 1);
         break;
       }
-      case 'idol':
+      case 'shield':
+        for (const u of l) if (u.def.role === 'shield') this.addShield(u, SYNERGY_TUNING.shieldStart, undefined, `${this.name(u)} 获得 ${SYNERGY_TUNING.shieldStart} 点护盾（护盾）`);
+        if (tier >= 2) for (const u of l) u.closedReflect = Math.max(u.closedReflect, SYNERGY_TUNING.shieldReflect);
+        break;
+      case 'summon':
         if (tier >= 2) {
-          const idols = l.filter((u) => u.def.role === 'idol');
-          if (!idols.length) break;
-          const star = this.rng.pick(idols);
-          const rest = l.filter((u) => u !== star);
-          if (!rest.length) break;
-          const weak = rest.reduce((m, x) => (x.atk + x.hp < m.atk + m.hp ? x : m));
-          const da = Math.max(0, star.atk - weak.atk);
-          const dh = Math.max(0, star.hp - weak.hp);
-          this.buff(weak, da, dh, false, star, `${this.name(weak)} 复制了偶像 ${this.name(star)} 的属性`);
+          const def = this.data.unitsById.token_shuijun;
+          if (def) this.summonUnit(side, def.id, this.sides[side].length, undefined, 1);
         }
         break;
       default:
@@ -827,9 +903,10 @@ class Battle {
     return this.pick(t, 1, u, [], enemies)[0] ?? enemies[0];
   }
 
-  attackOnce(u: BU, hit: number, hits: number): void {
+  /** 一段普攻，返回是否命中（有目标并结算了伤害，含被护盾挡下 / 免疫） */
+  attackOnce(u: BU, hit: number, hits: number): boolean {
     const t = this.attackTarget(u);
-    if (!t) return;
+    if (!t) return false;
     const front = this.living(t.side)[0];
     if (t !== front && u.eq.retarget) this.equipProc(u, (e) => e.retarget, `改打 ${this.name(t)}`);
     this.emit({
@@ -843,6 +920,7 @@ class Battle {
       const behind = i >= 0 ? line[i + 1] : line[t.lastPos];
       if (behind && this.isAlive(behind)) this.damage(u, behind, u.eq.splash, 'splash');
     }
+    return true;
   }
 
   /** 一次行动：beforeAttack → n 段攻击 → 追击 */
@@ -854,13 +932,20 @@ class Battle {
     let hits = Math.max(1, u.hits);
     u.hits = 0;
     if (u.bonusHit) hits++;
+    // 多刀 ×2：25% 额外 1 段；×4：必定额外 1 段
+    const mt = this.tiers[u.side].multi;
+    if (u.def.role === 'multi' && mt >= 1 && (mt >= 2 || this.rng.chance(SYNERGY_TUNING.multiChance))) hits++;
     if (u.eq.extraAttackChance && this.rng.chance(u.eq.extraAttackChance)) {
       hits++;
       this.equipProc(u, (e) => e.extraAttackChance, '额外攻击 1 次');
     }
+    const multiGrow = u.def.role === 'multi' && mt >= 2;
     for (let h = 1; h <= hits; h++) {
       if (!this.isAlive(u) || !this.living(other(u.side)).length) break;
-      this.attackOnce(u, h, hits);
+      const landed = this.attackOnce(u, h, hits);
+      // 多刀 ×4：额外的那一段（最后一段）命中后，该单位永久 +1 攻
+      const gm = SYNERGY_TUNING.growPerm.multi;
+      if (multiGrow && gm > 0 && h === hits && h > 1 && landed) this.growPerm(u, gm, 0, 'multi', `${this.name(u)} 越砍越快：永久 +${gm} 攻（多刀 ×4）`);
       this.resolve();
     }
     this.flushChains();

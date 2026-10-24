@@ -3,9 +3,10 @@ import { clone } from '../clone';
 import type { BattleResult, GameData, RunEnd, RunState, SurpriseDef, SynergyKey, UnitInst } from '../types';
 import { MAX_TURNS, clearBattleTemps, emitEvent, log, makeCtx, teamUnits, type Ctx } from './shop';
 import { DIFFICULTY } from './difficulty';
-import { aliveCount, hpLossFor, processEliminations, rankByHp, resolveOtherMatches, stageBonus } from './lobby';
+import { aliveCount, hpLossFor, normalizeOpponent, processEliminations, rankByHp, recordFight, resolveOtherMatches, stageBonus } from './lobby';
 import { rollPveRewards } from './pve';
-import { SYNERGY_NAME, computeSynergies, dominantSynergy, stateBonus } from './synergy';
+import { ROLE_META, SYNERGY_NAME, computeSynergies, dominantSynergy, stateBonus } from './synergy';
+import { ROLES } from '../types';
 import { effectiveStats } from './equip';
 
 export { hpLossFor, stageBonus };
@@ -23,7 +24,7 @@ export const ACHIEVEMENTS: Record<string, string> = {
   streak5: '五连胜',
   steal: '挖角成功',
   'tier:open:3': '流派·开源 ×5', 'tier:closed:3': '流派·闭源 ×5', 'tier:compute:3': '流派·算力 ×5', 'tier:folk:3': '流派·民间 ×5',
-  'tier:researcher:2': '流派·研究员 ×4', 'tier:trader:2': '流派·商人 ×4', 'tier:idol:2': '流派·偶像 ×4', 'tier:engineer:2': '流派·工程师 ×4',
+  ...Object.fromEntries(ROLES.map((r) => [`tier:${r}:2`, `打法·${ROLE_META[r].name} ×4`])),
   'tier:open:2': '流派·开源 ×3', 'tier:closed:2': '流派·闭源 ×3', 'tier:compute:2': '流派·算力 ×3', 'tier:folk:2': '流派·民间 ×3',
 };
 
@@ -92,6 +93,13 @@ export function applyBattleResult(state: RunState, result: BattleResult, data: G
   const isPve = mu?.kind === 'pve';
   let hpLoss = 0;
   const opp = mu?.kind === 'pvp' ? s.opponents.find((o) => o.id === mu.opponentId) : undefined;
+  for (const o of s.opponents) normalizeOpponent(o);
+  const aliveBefore = s.opponents.filter((o) => o.alive);
+  // 本回合对手：记下你看到的阵容（AI 已缩放）
+  if (opp && mu) {
+    const loss = w === 'me' ? hpLossFor(s.turn, result.survivors) * (s.modifiers.rewardMul ?? 1) : 0;
+    recordFight(opp, mu.team, s, data, { outcome: w === 'me' ? 'lose' : w === 'enemy' ? 'win' : 'draw', vsId: 'me', hpDelta: -loss });
+  }
 
   // 1. 玩家这一场
   if (isPve) {
@@ -112,18 +120,15 @@ export function applyBattleResult(state: RunState, result: BattleResult, data: G
     const loss = hpLossFor(s.turn, result.survivors) * (s.modifiers.rewardMul ?? 1);
     if (opp) {
       opp.hp -= loss;
-      opp.lastResult = 'loss';
       emitEvent(ctx, { type: 'hpLoss', who: opp.id, name: opp.name, amount: loss, hp: Math.max(0, opp.hp), by: 'me', text: `${opp.name} 热度 -${loss}` });
     }
     log(ctx, `胜利！${mu?.name ?? '对手'} -${loss} 热度`);
   } else if (w === 'enemy') {
     hpLoss = hpLossFor(s.turn, result.survivors) + (s.modifiers.wager?.loseHp ?? 0);
     s.hp -= hpLoss;
-    if (opp) opp.lastResult = 'win';
     emitEvent(ctx, { type: 'hpLoss', who: 'me', name: '你', amount: hpLoss, hp: Math.max(0, s.hp), by: opp?.id, text: `热度 -${hpLoss}` });
     log(ctx, `失败，热度 -${hpLoss}（剩 ${Math.max(0, s.hp)}）`);
   } else {
-    if (opp) opp.lastResult = 'draw';
     log(ctx, '和局，双方不掉热度');
   }
   if (!isPve) {
@@ -167,8 +172,9 @@ export function applyBattleResult(state: RunState, result: BattleResult, data: G
   s.lastSurprise = undefined;
   s.surprisePending = false;
 
-  // 4. 淘汰 / 结局
+  // 4. 淘汰 / 结局（先结算淘汰，再给本回合开始时还活着的对手记热度曲线）
   const myPlace = processEliminations(ctx);
+  for (const o of aliveBefore) o.hpHistory.push(Math.max(0, o.hp));
   if (myPlace !== undefined) {
     s.phase = 'over';
     s.pending = undefined;

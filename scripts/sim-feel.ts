@@ -1,11 +1,11 @@
 // 手感诊断（2.0）：机器人水平玩家打 N 局，按回合统计战斗行动数、技能/装备触发、羁绊档位、单位数与属性。
 // 用法：npx tsx scripts/sim-feel.ts [局数=200]
-import { botPlayTurn, battleForState, applyBattleResult, newRun, shopAction, effectiveStats, type Archetype } from '../shared/src/index';
+import { FACTIONS, ROLES, botPlayTurn, battleForState, applyBattleResult, newRun, shopAction, effectiveStats, type Archetype } from '../shared/src/index';
 import { loadData } from './load-data';
 
 const data = loadData();
 const N = Number(process.argv[2] ?? 200);
-const ARCHES: Archetype[] = [{ faction: 'open' }, { faction: 'closed' }, { faction: 'compute' }, { faction: 'folk' }, { role: 'researcher' }, { role: 'trader' }, { role: 'idol' }, { role: 'engineer' }];
+const ARCHES: Archetype[] = [...FACTIONS.map((faction) => ({ faction })), ...ROLES.map((role) => ({ role }))];
 type Row = { n: number; actions: number; abil: number; equip: number; tiers: number; units: number; atk: number; hp: number; timeout: number };
 const per: Record<number, Row> = {};
 for (let g = 0; g < N; g++) {

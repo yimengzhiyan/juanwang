@@ -144,5 +144,62 @@ describe('真人快照注入', () => {
     expect(n2.opponents.filter((o) => o.isHuman)).toHaveLength(2);
     expect(n2.opponents.find((o) => o.name === '小红')!.team[0].defId).toBe('agi');
     expect(s.opponents.some((o) => o.isHuman)).toBe(false);
+    // 注入的真人快照也填 lastTeam / lastSynergies
+    const h = n.opponents.find((o) => o.name === '小红')!;
+    expect(h.lastTeam.map((u) => u.defId)).toEqual(['crawler', 'qwen_chan', 'hf']);
+    expect(h.lastSynergies.map((x) => `${x.key}${x.tier}`)).toContain('open2');
+  });
+});
+
+describe('对手阵容可查（DESIGN 18）', () => {
+  it('开局：lastTeam / lastSynergies 为空，hpHistory = [20]', () => {
+    for (const o of createOpponents('Q', data)) expect(o).toMatchObject({ lastTeam: [], lastSynergies: [], hpHistory: [20] });
+  });
+  it('每回合模拟后写入：lastTeam（含装备/等级）、已激活羁绊、lastResult{outcome, vsId, hpDelta}、hpHistory', () => {
+    const s = toBattle(setTeam(start('R'), [mk('wrapper')]));
+    const vs = s.matchup!.opponentId;
+    const n = applyBattleResult(s, res('me', { survivors: 1 }), data);
+    const loss = hpLossFor(1, 1);
+    const me = n.opponents.find((o) => o.id === vs)!;
+    // 你的对手：lastTeam = 你看到的阵容（已缩放），结果 = 输给你
+    expect(me.lastTeam).toEqual(s.matchup!.team);
+    expect(me.lastResult).toEqual({ outcome: 'lose', vsId: 'me', hpDelta: -loss });
+    expect(me.hpHistory).toEqual([20, 20 - loss]);
+    for (const o of n.opponents) {
+      expect(o.lastTeam.length).toBeGreaterThan(0);
+      expect(o.lastResult).toBeDefined();
+      expect(o.hpHistory).toEqual([20, o.hp]);
+      expect(o.lastSynergies.every((x) => x.tier > 0)).toBe(true);
+      if (o.id !== vs) {
+        const r = o.lastResult!;
+        expect(r.vsId).not.toBe('me');
+        const foe = n.opponents.find((x) => x.id === r.vsId)!;
+        expect(foe).toBeDefined();
+        expect(r.hpDelta).toBe(o.hp - 20);
+        expect(r.outcome === 'lose').toBe(r.hpDelta < 0);
+        expect(o.lastTeam).toEqual(s.opponents.find((x) => x.id === o.id)!.team);
+      }
+    }
+  });
+  it('淘汰那回合记 0，之后不再追加；旧存档缺字段时自动补齐', () => {
+    const s = toBattle(start('E'));
+    s.opponents.forEach((o) => (o.hp = 1));
+    const old = s.opponents[0] as unknown as Record<string, unknown>;
+    delete old.hpHistory;
+    delete old.lastTeam;
+    old.lastResult = 'win';
+    const n = applyBattleResult(s, res('draw'), data);
+    for (const o of n.opponents) {
+      if (!o.alive) expect(o.hpHistory.at(-1)).toBe(0);
+      expect(typeof o.lastResult).toBe('object');
+    }
+    const dead = n.opponents.filter((o) => !o.alive);
+    expect(dead.length).toBeGreaterThan(0);
+    if (n.phase === 'result') {
+      let c = shopAction(n, { type: 'continue' }, data);
+      if (c.phase === 'headline') c = shopAction(c, { type: 'chooseHeadline', option: 0 }, data);
+      const n2 = applyBattleResult(toBattle(c), res('draw'), data);
+      for (const o of n2.opponents.filter((x) => dead.some((d) => d.id === x.id))) expect(o.hpHistory).toEqual(n.opponents.find((x) => x.id === o.id)!.hpHistory);
+    }
   });
 });

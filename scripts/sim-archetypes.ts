@@ -1,16 +1,20 @@
-// 流派平衡模拟：机器人玩家分别偏好 8 条流派各跑 N 局，输出每条流派的平均名次 / 吃鸡率 / 前四率，
+// 流派平衡模拟：机器人玩家分别偏好 10 条流派线（4 阵营 + 6 打法关键词）各跑 N 局，输出每条流派的平均名次 / 吃鸡率 / 前四率，
 // 以及各阵营 / 职业 / 单位在玩家 PVP 战斗中的胜率贡献（按该线在阵容中的占比加权）。供内容同事调平衡。
 // 用法：npx tsx scripts/sim-archetypes.ts [每流派局数=300]；DIFF='{"maxScale":1.05}' 可临时覆盖难度。
 import {
-  DIFFICULTY, FACTIONS, ROLES, SYNERGY_NAME, applyBattleResult, battleForState, botPlayTurn, newRun, shopAction,
+  DIFFICULTY, SYNERGY_TUNING, FACTIONS, ROLES, SYNERGY_NAME, applyBattleResult, battleForState, botPlayTurn, newRun, shopAction,
   type Archetype, type RunState, type SynergyKey,
 } from '../shared/src/index';
 import { loadData } from './load-data';
 
-const data = loadData();
+const data = loadData(process.env.DATA_DIR); // DATA_DIR=... 可指向另一份内容数据做对比
 const N = Number(process.argv[2] ?? 300);
 Object.assign(DIFFICULTY, JSON.parse(process.env.DIFF ?? '{}'));
-const ARCHES: [SynergyKey, Archetype][] = [...FACTIONS.map((f) => [f, { faction: f }] as [SynergyKey, Archetype]), ...ROLES.map((r) => [r, { role: r }] as [SynergyKey, Archetype])];
+// TUNE='{"explodeAftershock":0}' 临时覆盖关键词羁绊数值；ONLY=explode,summon 只跑这些线
+Object.assign(SYNERGY_TUNING, JSON.parse(process.env.TUNE ?? '{}'));
+const ONLY = process.env.ONLY?.split(',');
+const ARCHES: [SynergyKey, Archetype][] = [...FACTIONS.map((f) => [f, { faction: f }] as [SynergyKey, Archetype]), ...ROLES.map((r) => [r, { role: r }] as [SynergyKey, Archetype])]
+  .filter(([k]) => !ONLY || ONLY.includes(k));
 
 type Acc = { w: number; n: number };
 const lineAcc: Record<string, Acc> = {};
@@ -60,13 +64,13 @@ for (const [key, arch] of ARCHES) {
 }
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`.padStart(6);
-console.log(`每流派 ${N} 局，耗时 ${((performance.now() - t0) / 1000).toFixed(0)}s，DIFFICULTY ${JSON.stringify(DIFFICULTY)}`);
+console.log(`每流派 ${N} 局，耗时 ${((performance.now() - t0) / 1000).toFixed(0)}s，DIFFICULTY ${JSON.stringify(DIFFICULTY)}，SYNERGY_TUNING ${JSON.stringify(SYNERGY_TUNING)}`);
 console.log('\n流派        | 平均名次 | 吃鸡率 | 前四率 | 平均回合 | 达成中档*');
 for (const r of [...rows].sort((a, b) => a.avg - b.avg)) {
   console.log(`${(SYNERGY_NAME[r.key] + '(' + r.key + ')').padEnd(18)}| ${r.avg.toFixed(2).padStart(8)} | ${pct(r.chicken)} | ${pct(r.top4)} | ${r.turns.toFixed(1).padStart(8)} | ${pct(r.reached)}`);
 }
-console.log('* 阵营达成过 ×3（tier 2）/ 职业达成过 ×2（tier 1）的局占比');
-console.log('\n阵营/职业的胜率贡献（玩家 PVP 战斗，按该线在阵容中的人数占比加权；出场 = 加权场次）');
+console.log('* 阵营达成过 ×3（tier 2）/ 关键词达成过 ×2（tier 1）的局占比');
+console.log('\n阵营/关键词的胜率贡献（玩家 PVP 战斗，按该线在阵容中的人数占比加权；出场 = 加权场次）');
 for (const k of [...FACTIONS, ...ROLES]) {
   const a = lineAcc[k];
   if (a) console.log(`${(SYNERGY_NAME[k] + '(' + k + ')').padEnd(18)}| 胜率 ${pct(a.w / a.n)} | 出场 ${a.n.toFixed(0).padStart(6)}`);

@@ -1,12 +1,12 @@
 [
   {"id":"open_summit","name":"开源大会","desc":"开源单位便宜 1 算力：人人为我，越买越壮","icon":"arenas/open_summit.svg","effect":{"type":"priceMod","kind":"unit","amount":-1,"filter":{"faction":"open"}}},
   {"id":"gpu_drought","name":"GPU 荒","desc":"全体单位 +1 攻 -1 血：一卡难求，先下手为强","icon":"arenas/gpu_drought.svg","effect":{"type":"statAll","atk":1,"hp":-1}},
-  {"id":"funding_winter","name":"融资寒冬","desc":"每回合 +2 算力，商店少 1 格单位：商人的主场","icon":"arenas/funding_winter.svg","effect":{"type":"economy","goldPerTurn":2,"unitSlots":-1}},
-  {"id":"reroll_party","name":"刷新狂欢","desc":"刷新免费，买单位 +1 价：工程师刷到合体为止","icon":"arenas/reroll_party.svg","effect":{"type":"economy","rerollFree":true,"unitPriceMod":1}},
+  {"id":"funding_winter","name":"融资寒冬","desc":"每回合 +2 算力，商店少 1 格单位：经济的主场","icon":"arenas/funding_winter.svg","effect":{"type":"economy","goldPerTurn":2,"unitSlots":-1}},
+  {"id":"reroll_party","name":"刷新狂欢","desc":"刷新免费，买单位 +1 价：刷到合体为止","icon":"arenas/reroll_party.svg","effect":{"type":"economy","rerollFree":true,"unitPriceMod":1}},
   {"id":"seat_one_aura","name":"1 号位光环","desc":"每次刷新，你的 1 号位永久 +1/+1：闭源铁前排","icon":"arenas/seat_one_aura.svg","effect":{"type":"rerollBuff","slot":0,"atk":1,"hp":1}},
   {"id":"equip_expo","name":"装备展","desc":"商店多 1 个装备格：算力流一卡顶一队","icon":"arenas/equip_expo.svg","effect":{"type":"shopSlots","kind":"equip","amount":1}},
   {"id":"folk_era","name":"人海时代","desc":"所有召唤物 +1/+1：民间水军淹没战场","icon":"arenas/folk_era.svg","effect":{"type":"summonBuff","atk":1,"hp":1}},
-  {"id":"institute","name":"研究院","desc":"研究员便宜 1 算力：越养越强的学术派","icon":"arenas/institute.svg","effect":{"type":"priceMod","kind":"unit","amount":-1,"filter":{"role":"researcher"}}},
-  {"id":"spring_gala","name":"春晚舞台","desc":"偶像羁绊人数 +1：两个偶像就能开演唱会","icon":"arenas/spring_gala.svg","effect":{"type":"synergyBonus","key":"idol","amount":1}},
+  {"id":"growth_camp","name":"成长营","desc":"成长单位便宜 1 算力","icon":"arenas/growth_camp.svg","effect":{"type":"priceMod","kind":"unit","amount":-1,"filter":{"role":"growth"}}},
+  {"id":"summon_fest","name":"召唤祭","desc":"召唤羁绊人数 +1","icon":"arenas/summon_fest.svg","effect":{"type":"synergyBonus","key":"summon","amount":1}},
   {"id":"safety_act","name":"安全法案","desc":"开战时闭源单位各得 2 护盾：铜墙铁壁再加厚","icon":"arenas/safety_act.svg","effect":{"type":"startShield","amount":2,"filter":{"faction":"closed"}}}
 ]

@@ -164,9 +164,9 @@ describe('2.0 战场类事件（头条作用于本回合战斗）', () => {
     expect(of(r3, 'summon').map((e) => [e.unit.side, e.unit.defId])).toEqual([['me', 'token_halluc'], ['me', 'token_halluc']]);
   });
   it('synergyBonus：本回合羁绊人数 +n（商店与战斗都算）', () => {
-    const s = choose({ type: 'synergyBonus', key: 'researcher', amount: 2 });
+    const s = choose({ type: 'synergyBonus', key: 'shield', amount: 2 });
     const r = battle(s, [mk('kimi')]);
-    expect(of(r, 'synergyTier').find((e) => e.key === 'researcher')).toMatchObject({ count: 2, tier: 1 });
+    expect(of(r, 'synergyTier').find((e) => e.key === 'shield')).toMatchObject({ count: 2, tier: 1 });
     expect(nextTurn(s).modifiers.battle).toEqual({});
   });
   it('wager：赢了下回合 +winGold，输了额外掉 loseHp', () => {

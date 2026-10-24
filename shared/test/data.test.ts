@@ -27,12 +27,12 @@ describe('validateData', () => {
     expect(data.tutorial?.turns).toHaveLength(3);
   });
   it('单位：role（含中文别名）、lines 对象 {common, onSynergy} / 数组旧格式、attackTarget、新效果', () => {
-    expect(data.unitsById.prompt_eng).toMatchObject({ role: 'engineer', lines: { general: ['请一步一步思考'], onSynergy: ['工程师集合！'] } });
+    expect(data.unitsById.prompt_eng).toMatchObject({ role: 'growth', lines: { general: ['请一步一步思考'], onSynergy: ['工程师集合！'] } });
     expect(data.unitsById.crawler.lines).toEqual({ general: ['这页我收下了'] });
     const units = clone(raw.units) as Record<string, unknown>[];
-    units[0] = { ...units[0], role: '研究员', attackTarget: 'lowestHpEnemy', lines: { kill: ['a'], onSynergy: ['b', 'c'] } };
+    units[0] = { ...units[0], role: '自爆', attackTarget: 'lowestHpEnemy', lines: { kill: ['a'], onSynergy: ['b', 'c'] } };
     const d = validateData({ ...raw, units });
-    expect(d.unitsById.prompt_eng).toMatchObject({ role: 'researcher', attackTarget: 'lowestHpEnemy', lines: { general: ['a'], onSynergy: ['b', 'c'] } });
+    expect(d.unitsById.prompt_eng).toMatchObject({ role: 'explode', attackTarget: 'lowestHpEnemy', lines: { general: ['a'], onSynergy: ['b', 'c'] } });
     for (const eff of ['steal', 'explode', 'doubleStats', 'revive', 'chain']) {
       units[1] = { ...units[1], ability: { trigger: 'faint', effect: eff, target: 'self', desc: 'x' } };
       expect(() => validateData({ ...raw, units })).not.toThrow();
@@ -50,6 +50,30 @@ describe('validateData', () => {
     expect(p).toMatch(/ghost/);
     expect(p).toMatch(/role 应为/);
     expect(p).toMatch(/未知 effect "teleport"/);
+  });
+  it('2.1：旧职业 role（researcher/trader/idol/engineer 及中文）一律拒绝，并提示改成打法关键词', () => {
+    const units = clone(raw.units) as Record<string, unknown>[];
+    units[0].role = 'researcher';
+    units[1].role = '偶像';
+    units[2].ability = { trigger: 'startBattle', effect: 'buff', target: 'allFriends', filter: { role: 'engineer' }, desc: 'x' };
+    const arenas = clone(raw.arenas) as Record<string, unknown>[];
+    arenas[0] = { ...arenas[0], effect: { type: 'synergyBonus', key: 'idol', amount: 1 } };
+    arenas[1] = { ...arenas[1], effect: { type: 'priceMod', kind: 'unit', amount: -1, filter: { role: 'trader' } } };
+    const opponents = clone(raw.opponents) as Record<string, unknown>[];
+    opponents[0] = { ...opponents[0], archetype: 'researcher' };
+    const p = problems({ ...raw, units, arenas, opponents });
+    expect(p).toMatch(/单位 prompt_eng: role "researcher" 是 2\.0 的旧职业（研究员），2\.1 已改为打法关键词，请改成 multi\/shield\/summon\/explode\/growth\/economy/);
+    expect(p).toMatch(/role "偶像" 是 2\.0 的旧职业/);
+    expect(p).toMatch(/filter\.role "engineer" 是 2\.0 的旧职业（工程师）/);
+    expect(p).toMatch(/synergyBonus\.key "idol" 是 2\.0 的旧职业/);
+    expect(p).toMatch(/priceMod\.filter\.role "trader" 是 2\.0 的旧职业/);
+    expect(p).toMatch(/archetype "researcher" 是 2\.0 的旧职业/);
+    // 新值与中文别名都接受
+    units.splice(0, 3, ...clone(raw.units).slice(0, 3));
+    for (const [v, k] of [['多刀', 'multi'], ['shield', 'shield'], ['召唤', 'summon'], ['explode', 'explode'], ['成长', 'growth'], ['经济', 'economy']]) {
+      units[0] = { ...(raw.units[0] as object), role: v };
+      expect(validateData({ ...raw, units }).unitsById.prompt_eng.role).toBe(k);
+    }
   });
   it('宽松规范化：randomFriend(2)、中文阵营、{units:[…]} 包装、缺省 avatar', () => {
     const units = clone(raw.units) as Record<string, unknown>[];
@@ -86,7 +110,8 @@ describe('validateData', () => {
     expect(data.arenasById.reroll_party.rules).toEqual({ rerollFree: true, unitPriceMod: 1 });
     expect(data.arenasById.seat_one_aura.rules).toEqual({ rerollFrontBuff: { atk: 1, hp: 1 } });
     expect(data.arenasById.equip_expo.rules).toEqual({ equipSlotsMod: 1 });
-    expect(data.arenasById.spring_gala.rules).toEqual({ synergyBonus: [{ key: 'idol', amount: 1 }] });
+    expect(data.arenasById.summon_fest.rules).toEqual({ synergyBonus: [{ key: 'summon', amount: 1 }] });
+    expect(data.arenasById.growth_camp.rules).toEqual({ rolePriceMod: { role: 'growth', amount: -1 } });
     expect(data.arenasById.safety_act.rules).toEqual({ startShield: { amount: 2, filter: { faction: 'closed' } } });
     const arenas = clone(raw.arenas) as Record<string, unknown>[];
     arenas[0] = { ...arenas[0], effect: { type: 'meteor' } };
@@ -94,7 +119,7 @@ describe('validateData', () => {
   });
   it('对手预设：archetype 字符串、core、taunt；PVE：team、boss、rewards', () => {
     expect(data.opponents[0]).toMatchObject({ archetype: { faction: 'compute' }, core: expect.any(Array), taunt: { defeated: expect.any(String) } });
-    expect(data.opponents.find((o) => o.id === 'opp_deepseek')!.archetype).toEqual({ role: 'researcher' });
+    expect(data.opponents.find((o) => o.id === 'opp_deepseek')!.archetype).toEqual({ role: 'shield' });
     const p = data.pve[1];
     expect(p).toMatchObject({ id: 'pve_huang', boss: { defId: 'boss_huang' }, rewards: { pick: 3 } });
     expect(p.units.at(-1)).toEqual({ defId: 'boss_huang', atk: 8, hp: 20 });
@@ -119,7 +144,8 @@ describe('validateData', () => {
     expect(ok({ type: 'battleStatMul', hp: 2, side: 'both' })).toEqual({ type: 'battleStatMul', hp: 2, side: 'both' });
     expect(ok({ type: 'stealEnemy', target: 'randomEnemy' })).toEqual({ type: 'stealEnemy', target: 'randomEnemy' });
     expect(ok({ type: 'swapAll', side: 'enemy' })).toEqual({ type: 'swapAll', side: 'enemy' });
-    expect(ok({ type: 'synergyBonus', key: 'researcher', amount: 2 })).toEqual({ type: 'synergyBonus', key: 'researcher', amount: 2 });
+    expect(ok({ type: 'synergyBonus', key: 'growth', amount: 2 })).toEqual({ type: 'synergyBonus', key: 'growth', amount: 2 });
+    expect(ok({ type: 'synergyBonus', key: '召唤', amount: 1 })).toEqual({ type: 'synergyBonus', key: 'summon', amount: 1 });
     expect(ok({ type: 'freeEquip', gold: true })).toEqual({ type: 'freeEquip', gold: true });
     const p = problems({ ...raw, headlines: [opt({ type: 'addEnemyBoss', unitId: 'ghost', atk: 1, hp: 1, rewardMul: 2 }), { ...opt({ type: 'firstStrike', side: 'up' }), id: 'h2' }, { ...opt({ type: 'stealEnemy', target: 'self' }), id: 'h3' }] });
     expect(p).toMatch(/单位 "ghost" 不存在/);

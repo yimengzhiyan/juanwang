@@ -6,7 +6,7 @@ import {
   type Ability, type ArenaRules, type BattleEvent, type EventEffect, type FreeReason, type GameData, type HeadlineDef, type Level, type Modifiers,
   type RunState, type ShopActionInput, type ShopSlot, type ShopSlotKind, type TargetFilter, type Tier, type Trigger, type UnitDef, type UnitInst,
 } from '../types';
-import { stateBonus, teamTiers, type TierMap } from './synergy';
+import { SYNERGY_TUNING, stateBonus, teamTiers, type TierMap } from './synergy';
 import { INVENTORY_SIZE, attachEquip, attachOutcome, canAttach, equipInstRefund, equipRefund, equipMultFor, equipTotals, mergeEquips } from './equip';
 import { DIFFICULTY } from './difficulty';
 
@@ -40,9 +40,29 @@ export function maxTierForTurn(turn: number): Tier {
 export function shopMaxTier(s: Pick<RunState, 'turn' | 'shopTier'>): Tier {
   return Math.min(6, Math.max(maxTierForTurn(s.turn), s.shopTier ?? 0)) as Tier;
 }
-/** 商店权重：阶 t 的权重 = t（最高阶最高，低阶线性递减） */
+/** 商店阶级权重（DESIGN 17）：当前最高阶 3、次高阶 2、其余 1（下标 i = 阶 i+1） */
 export function tierWeights(maxTier: number): number[] {
-  return Array.from({ length: maxTier }, (_, i) => i + 1);
+  if (SHOP_ROLL.legacyTierWeights) return Array.from({ length: maxTier }, (_, i) => i + 1);
+  return Array.from({ length: maxTier }, (_, i) => (i === maxTier - 1 ? 3 : i === maxTier - 2 ? 2 : 1));
+}
+/** 已在队伍中的单位（同 defId）在商店里的权重倍数（DESIGN 17；仓库无关） */
+export const OWNED_UNIT_WEIGHT = 2.5;
+/** 商店抽卡参数（模拟脚本可临时改成 2.0 口径对比：{ownedWeight: 1, legacyTierWeights: true}） */
+export const SHOP_ROLL = { ownedWeight: OWNED_UNIT_WEIGHT, legacyTierWeights: false };
+/**
+ * 商店刷单位的逐单位权重：阶的总权重按 tierWeights 平均分给该阶的单位，已在队伍中的 defId 再 × OWNED_UNIT_WEIGHT。
+ * 返回 [{id, weight}]（客户端可据此显示"出现概率"；概率 = weight / 总和）。
+ */
+export function unitRollWeights(
+  data: GameData, maxTier: number, owned: Iterable<string> = [], filt: (u: UnitDef) => boolean = () => true,
+): { id: string; weight: number }[] {
+  const own = new Set(owned);
+  const out: { id: string; weight: number }[] = [];
+  tierWeights(maxTier).forEach((w, i) => {
+    const pool = (data.shopUnitsByTier[i + 1] ?? []).filter(filt);
+    for (const u of pool) out.push({ id: u.id, weight: (w / pool.length) * (own.has(u.id) ? SHOP_ROLL.ownedWeight : 1) });
+  });
+  return out;
 }
 /** xp → 等级（Lv2 需 3 份 = xp2，Lv3 需 6 份 = xp5） */
 export function levelForXp(xp: number): Level {
@@ -133,20 +153,13 @@ export function rollUnitDef(ctx: Ctx, opts: UnitRollOpts = {}): string | null {
     return null;
   }
   const maxTier = opts.maxTier ?? shopMaxTier(ctx.s);
-  const pools: UnitDef[][] = [];
-  const weights: number[] = [];
-  tierWeights(maxTier).forEach((w, i) => {
-    const pool = filt(byTier[i + 1] ?? []);
-    if (pool.length) {
-      pools.push(pool);
-      weights.push(w);
-    }
-  });
-  if (!pools.length) {
+  const owned = teamUnits(ctx.s).map((u) => u.defId);
+  const list = unitRollWeights(ctx.data, maxTier, owned, (u) => filt([u]).length > 0);
+  if (!list.length) {
     const any = filt(ctx.data.units.filter((u) => !u.token));
     return any.length ? ctx.rng.pick(any).id : null;
   }
-  return ctx.rng.pick(pools[ctx.rng.weighted(weights)]).id;
+  return list[ctx.rng.weighted(list.map((x) => x.weight))].id;
 }
 
 export function rollEquipDef(ctx: Ctx): string | null {
@@ -160,7 +173,7 @@ export function rollConsumableDef(ctx: Ctx): string | null {
 
 // ───────────────────────── 商店 ─────────────────────────
 
-/** 单位实际价格（含头条修正、赛场、商人 ×4），最低 1 */
+/** 单位实际价格（含头条修正、赛场、经济 ×4），最低 1 */
 export function unitPrice(ctx: Ctx, defId: string, tiers?: TierMap): number {
   const m = ctx.s.modifiers;
   const a = arenaRules(ctx.s, ctx.data);
@@ -168,7 +181,7 @@ export function unitPrice(ctx: Ctx, defId: string, tiers?: TierMap): number {
   let p = UNIT_PRICE + m.unitPriceMod + (a.unitPriceMod ?? 0);
   if (def && a.factionPriceMod && def.faction === a.factionPriceMod.faction) p += a.factionPriceMod.amount;
   if (def && a.rolePriceMod && def.role === a.rolePriceMod.role) p += a.rolePriceMod.amount;
-  if (((tiers ?? tiersOf(ctx)).trader ?? 0) >= 2) p -= 1;
+  if (((tiers ?? tiersOf(ctx)).economy ?? 0) >= 2) p -= 1;
   return Math.max(1, p);
 }
 
@@ -179,8 +192,7 @@ export function slotPrice(ctx: Ctx, slot: Pick<ShopSlot, 'kind' | 'defId' | 'fre
   if (slot.kind === 'equip') {
     const base = ctx.data.equipsById[slot.defId]?.price ?? 3;
     const a = arenaRules(ctx.s, ctx.data);
-    const trader = ((tiers ?? tiersOf(ctx)).trader ?? 0) >= 2 ? 1 : 0;
-    return Math.max(Math.min(1, base), base + m.itemPriceMod + (a.equipPriceMod ?? 0) - trader);
+    return Math.max(Math.min(1, base), base + m.itemPriceMod + (a.equipPriceMod ?? 0));
   }
   const base = ctx.data.consumablesById[slot.defId]?.price ?? 1;
   return Math.max(Math.min(1, base), base + m.itemPriceMod);
@@ -296,6 +308,44 @@ function permBuff(u: UnitInst, atk: number, hp: number): void {
   u.hp += hp;
   clampHp(u);
 }
+/**
+ * 永久加成（技能 / 羁绊 / 装备 / 赛场 / 头条 / 消耗品）：成长 ×2 时成长单位每次额外 +1/+1（DESIGN 16）。
+ * 合体、进化、召唤物出生属性不算"加成"，不走这里。
+ */
+export function permGrow(ctx: Ctx, u: UnitInst, atk: number, hp: number, tiers?: TierMap, noSpread = false): void {
+  permBuff(u, atk, hp);
+  if (!(atk > 0 || hp > 0) || defOf(ctx, u)?.role !== 'growth') return;
+  const gt = (tiers ?? tiersOf(ctx)).growth ?? 0;
+  if (gt >= 1) permBuff(u, 1, 1);
+  // 成长 ×4：相邻友军获得同样的加成（互相成长，不再继续传递）
+  if (gt >= 2 && !noSpread) for (const n of adjacentUnits(ctx.s, u)) permGrow(ctx, n, atk, hp, tiers, true);
+}
+/** 队伍里左右最近的单位（跳过空位） */
+export function adjacentUnits(s: Pick<RunState, 'team'>, u: UnitInst): UnitInst[] {
+  const idx = s.team.findIndex((x) => x?.uid === u.uid);
+  if (idx < 0) return [];
+  const out: UnitInst[] = [];
+  for (let i = idx - 1; i >= 0; i--) if (s.team[i]) { out.push(s.team[i]!); break; }
+  for (let i = idx + 1; i < s.team.length; i++) if (s.team[i]) { out.push(s.team[i]!); break; }
+  return out;
+}
+/** 扣算力（买 / 刷新 / 装备 / 消耗品 / 升级商店）；经济 ×4 时累计花费进度 */
+export function spendGold(ctx: Ctx, n: number): void {
+  const s = ctx.s;
+  s.gold -= n;
+  if (n <= 0) return;
+  const tiers = tiersOf(ctx);
+  if ((tiers.economy ?? 0) < 2) return;
+  s.economySpent = (s.economySpent ?? 0) + n;
+  while (s.economySpent >= SYNERGY_TUNING.economyStep) {
+    s.economySpent -= SYNERGY_TUNING.economyStep;
+    const eco = teamUnits(s).filter((u) => defOf(ctx, u)?.role === 'economy');
+    if (!eco.length) continue;
+    const u = ctx.rng.pick(eco);
+    permGrow(ctx, u, 1, 1, tiers);
+    log(ctx, `经济 ×4：${unitName(ctx.data, u.defId)} 永久 +1/+1`);
+  }
+}
 export function canMerge(a: UnitInst, b: UnitInst): boolean {
   return a.defId === b.defId && a.level < 3 && b.level < 3;
 }
@@ -332,10 +382,6 @@ function onLevelUp(ctx: Ctx, u: UnitInst): void {
   if (s.tutorial) s.tutorial.merged = true;
   if (u.level === 3 && s.stats) s.stats.lv3++;
   log(ctx, `${unitName(ctx.data, u.defId)} 进化到 Lv${u.level}！`);
-  // 工程师 ×2：进化时额外 +1/+1；×4：全队 +1/+1
-  const tiers = tiersOf(ctx);
-  if (tiers.engineer >= 1) permBuff(u, 1, 1);
-  if (tiers.engineer >= 2) for (const t of teamUnits(s)) permBuff(t, 1, 1);
   fireShop(ctx, 'levelUp', [u.uid], {});
   const tier = Math.min(6, shopMaxTier(s) + 1);
   const id = rollUnitDef(ctx, { tier });
@@ -387,10 +433,9 @@ export function destroyThreshold(ab: Ability, level: number): number {
   return ab.maxHp + (level - 1) * (ab.maxHpPerLevel ?? 0);
 }
 
-/** 技能触发次数：1 + 研究员 ×4（研究员单位）+ 微调（含算力 ×3 翻倍） */
+/** 技能触发次数：1 + 微调（含算力 ×3 翻倍） */
 export function abilityRepeats(def: UnitDef | undefined, u: Pick<UnitInst, 'equips'>, tiers: TierMap, data: GameData): number {
   let n = 1;
-  if (def?.role === 'researcher' && (tiers.researcher ?? 0) >= 2) n += 1;
   n += equipTotals(u, data, equipMultFor(def, tiers)).abilityRepeat ?? 0;
   return Math.max(1, Math.min(5, Math.round(n)));
 }
@@ -473,7 +518,15 @@ export function shopSummon(ctx: Ctx, unitId: string, near: number, mult = 1, sum
   tok.hp *= mult;
   const sb = arenaRules(s, ctx.data).summonBuff;
   if (sb) permBuff(tok, sb.atk, sb.hp);
-  if (summoner && tiersOf(ctx).folk >= 2) {
+  const tiers = tiersOf(ctx);
+  // 召唤 ×2 / ×4：召唤物 +1/+1 / +2/+2；×4 召唤者永久 +1/+1
+  if (tiers.summon >= 1) {
+    const n = SYNERGY_TUNING.summonStat[tiers.summon >= 2 ? 1 : 0];
+    permBuff(tok, n, n);
+  }
+  const gu = SYNERGY_TUNING.growPerm.summon;
+  if (summoner && tiers.summon >= 2 && gu > 0 && indexOfUid(s, summoner.uid) >= 0) permGrow(ctx, summoner, gu, gu, tiers);
+  if (summoner && tiers.folk >= 2) {
     tok.atk += Math.floor(summoner.atk / 2);
     tok.hp += Math.floor(summoner.hp / 2);
   }
@@ -492,8 +545,7 @@ function runShopAbility(ctx: Ctx, self: UnitInst, ab: Ability, info: ShopInfo): 
       const b = abilityBuff(ab, self.level);
       for (const t of targets) {
         if (ab.permanent) {
-          t.atk += b.atk;
-          t.hp += b.hp;
+          permGrow(ctx, t, b.atk, b.hp);
         } else {
           t.tempAtk += b.atk;
           t.tempHp += b.hp;
@@ -586,8 +638,7 @@ export function applyEventEffect(ctx: Ctx, e: EventEffect): void {
       for (const u of units) {
         if (e.type === 'buffFaction' && ctx.data.unitsById[u.defId]?.faction !== e.faction) continue;
         if (e.permanent) {
-          u.atk += e.atk;
-          u.hp += e.hp;
+          permGrow(ctx, u, e.atk, e.hp);
         } else {
           u.tempAtk += e.atk;
           u.tempHp += e.hp;
@@ -733,15 +784,15 @@ export function applyEventEffect(ctx: Ctx, e: EventEffect): void {
 
 // ───────────────────────── 回合推进 ─────────────────────────
 
-/** 每回合固定收入：基础（按回合曲线 7→10）+ 下回合加成 + 赛场 + 商人羁绊 + 融资装备 */
-export function turnIncome(ctx: Ctx): { total: number; trader: number; funding: number; arena: number } {
+/** 每回合固定收入：基础（按回合曲线 7→10）+ 下回合加成 + 赛场 + 经济羁绊 + 融资装备 */
+export function turnIncome(ctx: Ctx): { total: number; economy: number; funding: number; arena: number } {
   const tiers = tiersOf(ctx);
-  const trader = tiers.trader >= 2 ? 2 : tiers.trader >= 1 ? 1 : 0;
+  const economy = tiers.economy >= 2 ? SYNERGY_TUNING.economyGold[1] : tiers.economy >= 1 ? SYNERGY_TUNING.economyGold[0] : 0;
   let funding = 0;
   for (const u of teamUnits(ctx.s)) funding += equipTotals(u, ctx.data, equipMultFor(defOf(ctx, u), tiers)).turnGold ?? 0;
   const arena = arenaRules(ctx.s, ctx.data).goldPerTurn ?? 0;
   const base = ctx.s.tutorial ? BASE_GOLD : baseGoldForTurn(ctx.s.turn); // 引导局固定 10，脚本需要
-  return { total: base + ctx.s.modifiers.nextTurnGold + trader + funding + arena, trader, funding, arena };
+  return { total: base + ctx.s.modifiers.nextTurnGold + economy + funding + arena, economy, funding, arena };
 }
 
 /** 进入某回合：重置算力与修正器 → 生成商店 →（待生效突发）→（头条 or 商店） */
@@ -758,7 +809,7 @@ export function beginTurn(ctx: Ctx, turn: number): void {
   s.matchup = undefined;
   rollShop(ctx, true);
   log(ctx, `—— 第 ${turn} 回合 ——`);
-  if (inc.trader) log(ctx, `商人羁绊：+${inc.trader} 算力`);
+  if (inc.economy) log(ctx, `经济羁绊：+${inc.economy} 算力`);
   if (inc.funding) log(ctx, `融资：+${inc.funding} 算力`);
   if (s.surprisePending && s.lastSurprise) {
     for (const e of s.lastSurprise.effects ?? [s.lastSurprise.effect]) applyEventEffect(ctx, e);
@@ -793,21 +844,24 @@ export function openShop(ctx: Ctx): void {
   ctx.s.phase = 'shop';
   fireTeam(ctx, 'startTurn', {});
   if (tiersOf(ctx).open >= 3) {
-    for (const u of teamUnits(ctx.s)) if (defOf(ctx, u)?.faction === 'open') permBuff(u, 1, 1);
+    for (const u of teamUnits(ctx.s)) if (defOf(ctx, u)?.faction === 'open') permGrow(ctx, u, 1, 1);
     log(ctx, '开源 ×5：开源单位永久 +1/+1');
   }
   repriceShop(ctx);
 }
 
-/** 回合结束（endShop）：endTurn 技能 → 研究员 ×2（永久 +1 攻）→ RLHF 成长 */
+/** 回合结束（endShop）：endTurn 技能 → RLHF 成长 → 成长 ×4（全队永久 +1/+1） */
 export function endTurnEffects(ctx: Ctx): void {
   fireTeam(ctx, 'endTurn', {});
   const tiers = tiersOf(ctx);
   for (const u of teamUnits(ctx.s)) {
     const def = defOf(ctx, u);
-    if (tiers.researcher >= 1 && def?.role === 'researcher') permBuff(u, 1, 0);
     const t = equipTotals(u, ctx.data, equipMultFor(def, tiers));
-    if (t.growAtk || t.growHp) permBuff(u, t.growAtk ?? 0, t.growHp ?? 0);
+    if (t.growAtk || t.growHp) permGrow(ctx, u, t.growAtk ?? 0, t.growHp ?? 0, tiers);
+  }
+  if (tiers.growth >= 2) {
+    for (const u of teamUnits(ctx.s)) permGrow(ctx, u, 1, 1, tiers);
+    log(ctx, '成长 ×4：全队永久 +1/+1');
   }
 }
 
@@ -856,7 +910,7 @@ function applyActionInner(ctx: Ctx, a: ShopActionInput): string | null {
         else to = firstEmpty(s);
         if (to < 0) return '队伍满了，先卖掉一个吧';
       }
-      s.gold -= slot.price;
+      spendGold(ctx, slot.price);
       s.shop.splice(a.slot, 1);
       const def = data.unitsById[slot.defId];
       let uid: string;
@@ -878,7 +932,7 @@ function applyActionInner(ctx: Ctx, a: ShopActionInput): string | null {
       fireTeam(ctx, 'friendBought', { bought: uid }, [uid]);
       // 开源 ×3：任一开源单位被购买时，全体开源单位永久 +1/+1
       if (def?.faction === 'open' && tiersOf(ctx).open >= 2) {
-        for (const u of teamUnits(s)) if (defOf(ctx, u)?.faction === 'open') permBuff(u, 1, 1);
+        for (const u of teamUnits(s)) if (defOf(ctx, u)?.faction === 'open') permGrow(ctx, u, 1, 1);
         log(ctx, '开源 ×3：全体开源单位永久 +1/+1');
       }
       return null;
@@ -917,17 +971,15 @@ function applyActionInner(ctx: Ctx, a: ShopActionInput): string | null {
       const ar = arenaRules(s, data);
       if (m.rerollFree || ar.rerollFree) {
         /* 免费 */
-      } else if (m.rerollsThisTurn === 0 && tiersOf(ctx).engineer >= 2) {
-        /* 工程师 ×4：每回合首次刷新免费 */
       } else if (m.freeRerolls > 0) m.freeRerolls--;
-      else if (s.gold >= REROLL_PRICE) s.gold -= REROLL_PRICE;
+      else if (s.gold >= REROLL_PRICE) spendGold(ctx, REROLL_PRICE);
       else return '算力不够刷新';
       m.rerollsThisTurn++;
       rollShop(ctx);
       // 赛场「1 号位光环」
       if (ar.rerollFrontBuff && m.rerollsThisTurn <= (ar.rerollFrontCap ?? 5)) {
         const front = teamUnits(s)[0];
-        if (front) permBuff(front, ar.rerollFrontBuff.atk, ar.rerollFrontBuff.hp);
+        if (front) permGrow(ctx, front, ar.rerollFrontBuff.atk, ar.rerollFrontBuff.hp);
       }
       return null;
     }
@@ -978,7 +1030,7 @@ function applyActionInner(ctx: Ctx, a: ShopActionInput): string | null {
       if (bad) return bad;
       const inv = inventoryOf(s);
       if (attachOutcome(u, def, !!slot.gold) === 'replace' && inv.length >= INVENTORY_SIZE) return INVENTORY_FULL_REPLACE;
-      s.gold -= slot.price;
+      spendGold(ctx, slot.price);
       s.shop.splice(a.slot, 1);
       const r = attachEquip(u, def, !!slot.gold);
       if (r.old) inv.push({ defId: r.old.defId, gold: r.old.gold });
@@ -998,7 +1050,7 @@ function applyActionInner(ctx: Ctx, a: ShopActionInput): string | null {
       if (slot.price > s.gold) return `算力不够，需要 ${slot.price} 算力`;
       const inv = inventoryOf(s);
       if (inv.length >= INVENTORY_SIZE) return INVENTORY_FULL;
-      s.gold -= slot.price;
+      spendGold(ctx, slot.price);
       s.shop.splice(a.slot, 1);
       inv.push({ defId: def.id, gold: !!slot.gold, fresh: true });
       if (slot.gold) s.stats.goldEquips++;
@@ -1065,7 +1117,7 @@ function applyActionInner(ctx: Ctx, a: ShopActionInput): string | null {
       const cur = shopMaxTier(s);
       if (cur >= 6) return '已经是最高阶了';
       if (s.gold < UPGRADE_PRICE) return `算力不够，需要 ${UPGRADE_PRICE} 算力`;
-      s.gold -= UPGRADE_PRICE;
+      spendGold(ctx, UPGRADE_PRICE);
       s.shopLevel++;
       s.shopTier = cur + 1;
       s.stats.upgrades++;
@@ -1123,7 +1175,7 @@ function useConsumable(ctx: Ctx, slotIdx: number, target?: number): string | nul
     const def = ctx.data.unitsById[tu!.defId];
     if (!(ctx.data.shopUnitsByTier[def?.tier ?? 1] ?? []).some((u) => u.id !== tu!.defId)) return '没有可以变的单位';
   }
-  s.gold -= slot.price;
+  spendGold(ctx, slot.price);
   s.shop.splice(slotIdx, 1);
   log(ctx, `使用 ${c.name}${tu ? ` → ${unitName(ctx.data, tu.defId)}` : ''}`);
   const touched: UnitInst[] = [];
@@ -1135,7 +1187,7 @@ function useConsumable(ctx: Ctx, slotIdx: number, target?: number): string | nul
       s.gold += ef.amount;
       break;
     case 'buff':
-      if (ef.permanent) permBuff(tu!, ef.atk, ef.hp);
+      if (ef.permanent) permGrow(ctx, tu!, ef.atk, ef.hp);
       else {
         tu!.tempAtk += ef.atk;
         tu!.tempHp += ef.hp;
@@ -1177,7 +1229,6 @@ export function currentUnitSlots(s: RunState, data: GameData): number {
 export function rerollCost(s: RunState, data: GameData): number {
   const m = s.modifiers;
   if (m.rerollFree || arenaRules(s, data).rerollFree || m.freeRerolls > 0) return 0;
-  if (m.rerollsThisTurn === 0 && teamTiers(s.team, data, stateBonus(s, data)).engineer >= 2) return 0;
   return REROLL_PRICE;
 }
 /** 升级商店是否可用（客户端按钮状态） */

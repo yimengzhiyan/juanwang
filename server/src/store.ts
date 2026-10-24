@@ -9,7 +9,7 @@ export interface Snapshot {
   turn: number;
   /** 上传时的热度（0~20） */
   hp: number;
-  /** 流派 key（open/…/engineer/mixed），可选 */
+  /** 流派 key（open/closed/compute/folk/multi/shield/summon/explode/growth/economy/mixed），可选 */
   archetype: string | null;
   team: UnitInst[];
   seed: string;
