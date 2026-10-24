@@ -93,18 +93,18 @@
     "name": "套壳 App",
     "tier": 1,
     "faction": "closed",
-    "role": "economy",
+    "role": "shield",
     "atk": 2,
     "hp": 3,
     "ability": {
-      "name": "套壳变现",
-      "shortDesc": "卖出多给1算力",
-      "trigger": "sell",
-      "effect": "gold",
+      "name": "套层壳",
+      "shortDesc": "开战自身+3护盾",
+      "trigger": "startBattle",
+      "effect": "shield",
       "target": "self",
-      "amount": 1,
+      "amount": 3,
       "perLevel": true,
-      "desc": "被出售时：额外 +1 算力（每级 +1）"
+      "desc": "开战：自身获得 3 护盾（每级 +3）"
     },
     "lines": {
       "common": [
@@ -112,7 +112,7 @@
         "换个皮再上线",
         "API 又涨价了"
       ],
-      "onSynergy": "换皮也是生意"
+      "onSynergy": "再套一层壳"
     },
     "avatar": "units/wrapper.svg"
   },
@@ -233,18 +233,18 @@
     "name": "小扎",
     "tier": 2,
     "faction": "closed",
-    "role": "shield",
+    "role": "economy",
     "atk": 3,
     "hp": 3,
     "ability": {
       "name": "一亿签字费",
-      "shortDesc": "最弱友军+4盾",
+      "shortDesc": "开战挖走≤3血敌人",
       "trigger": "startBattle",
-      "effect": "shield",
-      "target": "lowestHpFriend",
-      "amount": 4,
-      "perLevel": true,
-      "desc": "开战：血最少的友军 +4 护盾（每级 +4）"
+      "effect": "steal",
+      "target": "lowestHpEnemy",
+      "maxHp": 3,
+      "maxHpPerLevel": 2,
+      "desc": "开战：敌方最低血≤3就挖走，否则打3，每级+1"
     },
     "lines": {
       "common": [
@@ -252,7 +252,7 @@
         "开源？先放一放",
         "超级智能挂钥匙上"
       ],
-      "onSynergy": "签字费护体"
+      "onSynergy": "砸钱挖人，到账"
     },
     "avatar": "characters/zuck.png"
   },
@@ -265,14 +265,13 @@
     "atk": 3,
     "hp": 4,
     "ability": {
-      "name": "替你挡着",
-      "shortDesc": "前排+4护盾",
-      "trigger": "startBattle",
-      "effect": "shield",
-      "target": "frontFriend",
-      "amount": 4,
-      "perLevel": true,
-      "desc": "开战：最前排友军 +4 护盾（每级 +4）"
+      "name": "还我4o",
+      "shortDesc": "阵亡1血复活",
+      "trigger": "faint",
+      "effect": "revive",
+      "target": "self",
+      "perLevel": false,
+      "desc": "还我4o：阵亡时以 1 血复活一次"
     },
     "lines": {
       "common": [
@@ -280,7 +279,7 @@
         "我替你挡着",
         "别把我下线"
       ],
-      "onSynergy": "我替你挡着"
+      "onSynergy": "我回来了，想我吗"
     },
     "avatar": "units/ai_gf.svg"
   },
