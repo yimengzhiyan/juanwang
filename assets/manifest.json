@@ -80,7 +80,13 @@
     "researcher": "ui/role_researcher.svg",
     "trader": "ui/role_trader.svg",
     "idol": "ui/role_idol.svg",
-    "engineer": "ui/role_engineer.svg"
+    "engineer": "ui/role_engineer.svg",
+    "multi": "ui/role_multi.svg",
+    "shield": "ui/role_shield.svg",
+    "summon": "ui/role_summon.svg",
+    "explode": "ui/role_explode.svg",
+    "growth": "ui/role_growth.svg",
+    "economy": "ui/role_economy.svg"
   },
   "tiers": {
     "tier_1": "ui/tier_1.svg",
@@ -103,7 +109,9 @@
     "folk_era": "arenas/folk_era.svg",
     "institute": "arenas/institute.svg",
     "spring_gala": "arenas/spring_gala.svg",
-    "safety_act": "arenas/safety_act.svg"
+    "safety_act": "arenas/safety_act.svg",
+    "growth_camp": "arenas/growth_camp.svg",
+    "summon_fest": "arenas/summon_fest.svg"
   },
   "opponents": {
     "shuijun_hq": "opponents/shuijun_hq.svg",
@@ -130,5 +138,6 @@
   },
   "fonts": {
     "fredoka": "fonts/fredoka-latin.woff2"
-  }
+  },
+  "note3": "DESIGN 16: roles 以 multi/shield/summon/explode/growth/economy 6 个打法图标为准；researcher/trader/idol/engineer 为旧职业图标，内容切换完成后删除"
 }
