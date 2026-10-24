@@ -34,8 +34,10 @@ export const SYNERGY_TUNING = {
   shieldReflect: 3,
   /** 召唤 ×2 / ×4：召唤物 +n/+n */
   summonStat: [2, 3] as [number, number],
-  /** 自爆 ×2：爆炸伤害加成 */
-  explodeBonus: 1,
+  /** 自爆 ×2：开战时自爆单位本场 +n/+n */
+  explodeStart: 1,
+  /** 自爆 ×2：爆炸伤害加成（2.1 平衡后为 0：对低攻自爆单位相当于翻倍） */
+  explodeBonus: 0,
   /** 自爆 ×4：自爆单位阵亡时对敌方全体的余波伤害 */
   explodeAftershock: 1,
   /** 自爆 ×4：自爆单位阵亡时对敌方最前排的伤害 = 自身攻击 × explodeFrontMul（0 = 关闭） */
@@ -67,7 +69,7 @@ export const ROLE_META: Record<Role, RoleMeta> = {
   },
   explode: {
     key: 'explode', name: '自爆', tagline: '死也要带走一片', thresholds: ROLE_THRESHOLDS,
-    descs: [`爆炸伤害 +${T.explodeBonus}`, `自爆单位阵亡时额外对敌方最前排造成等于自身攻击的伤害、对敌方全体 ${T.explodeAftershock} 伤害；每次爆炸后，其余自爆友军永久 +${T.growPerm.explode}/+${T.growPerm.explode}`],
+    descs: [`开战时自爆单位 +${T.explodeStart}/+${T.explodeStart}`, `自爆单位阵亡时额外对敌方最前排造成等于自身攻击的伤害、对敌方全体 ${T.explodeAftershock} 伤害；每次爆炸后，其余自爆友军永久 +${T.growPerm.explode}/+${T.growPerm.explode}`],
     shouts: ['点火！', '连环爆炸！'],
   },
   growth: {

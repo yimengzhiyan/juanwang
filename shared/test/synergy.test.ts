@@ -226,13 +226,15 @@ describe('召唤 summon', () => {
 });
 
 describe('自爆 explode', () => {
-  it('×2：爆炸伤害 +1（explode 技能、自爆单位的阵亡伤害技能）', () => {
-    const r = fight([u('x1'), u('x2')], [u('hitter'), u('poke')], { first: 'enemy' });
-    expect(of(r, 'explode')[0]).toMatchObject({ unit: { defId: 'x1' }, amount: 4 });
-    expect(of(r, 'damage').some((e) => e.kind === 'explode' && e.source?.defId === 'x2' && e.amount === 2)).toBe(true);
+  it('×2：开战时自爆单位本场 +1/+1（不加爆炸伤害）', () => {
+    const r = fight([u('x1'), u('x2'), u('o1')], [u('hitter'), u('poke')], { first: 'enemy' });
+    expect(of(r, 'buff').filter((e) => e.synergy === 'explode').map((e) => [e.unit.defId, e.atk, e.hp, e.permanent])).toEqual([['x1', 1, 1, false], ['x2', 1, 1, false]]);
+    // x1 3 攻 +1（自爆）+1（开源 ×2）= 5，爆炸 = 自身攻击，不再额外 +1
+    expect(of(r, 'explode')[0]).toMatchObject({ unit: { defId: 'x1' }, amount: 5 });
+    expect(of(r, 'damage').some((e) => e.kind === 'ability' && e.source?.defId === 'x2' && e.amount === 1)).toBe(true);
     expect(r.permanentBuffs).toEqual([]);
   });
-  it('×4：自爆单位阵亡时炸敌方最前排（攻击 +1）+ 敌方全体 1 余波；每次爆炸，其余自爆友军永久 +1/+1', () => {
+  it('×4：自爆单位阵亡时炸敌方最前排（= 自身攻击）+ 敌方全体 1 余波；每次爆炸，其余自爆友军永久 +1/+1', () => {
     const x4 = u('x4');
     const r = fight([u('x3'), x4, u('x1'), u('x2'), u('o1')], [u('hitter'), u('poke')], { first: 'enemy' });
     const ex = of(r, 'explode').filter((e) => e.unit.defId === 'x3');

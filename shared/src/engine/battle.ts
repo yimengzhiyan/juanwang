@@ -386,7 +386,7 @@ class Battle {
   }
 
   // ── 技能执行 ──
-  /** 自爆 ×2：本方"爆炸伤害" +EXPLODE_BONUS（explode 技能、自爆单位的阵亡伤害技能、自爆 ×4 的自爆） */
+  /** 自爆 ×2 的爆炸伤害加成（SYNERGY_TUNING.explodeBonus，2.1 默认 0；作用于 explode 技能、自爆单位的阵亡伤害技能、×4 自爆） */
   explodeBonus(side: Side): number {
     return this.tiers[side].explode >= 1 ? SYNERGY_TUNING.explodeBonus : 0;
   }
@@ -858,6 +858,11 @@ class Battle {
         for (const u of l) if (u.def.role === 'shield') this.addShield(u, SYNERGY_TUNING.shieldStart, undefined, `${this.name(u)} 获得 ${SYNERGY_TUNING.shieldStart} 点护盾（护盾）`);
         if (tier >= 2) for (const u of l) u.closedReflect = Math.max(u.closedReflect, SYNERGY_TUNING.shieldReflect);
         break;
+      case 'explode': {
+        const n = SYNERGY_TUNING.explodeStart;
+        if (n) for (const u of l) if (u.def.role === 'explode') this.buff(u, n, n, false, undefined, `${this.name(u)} +${n}/+${n}（自爆）`, { synergy: 'explode' });
+        break;
+      }
       case 'summon':
         if (tier >= 2) {
           const def = this.data.unitsById.token_shuijun;

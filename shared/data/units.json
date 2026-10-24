@@ -126,12 +126,13 @@
     "hp": 1,
     "ability": {
       "name": "刷屏自爆",
-      "shortDesc": "阵亡炸全场",
+      "shortDesc": "阵亡半伤炸全场",
       "trigger": "faint",
       "effect": "explode",
       "target": "allEnemies",
       "perLevel": false,
-      "desc": "刷屏自爆：阵亡时对敌方全体造成自身攻击伤害"
+      "desc": "刷屏自爆：阵亡时对敌方全体造成一半攻击伤害",
+      "amount": 0.5
     },
     "lines": {
       "common": [
@@ -153,12 +154,14 @@
     "hp": 2,
     "ability": {
       "name": "删库跑路",
-      "shortDesc": "阵亡炸全场",
+      "shortDesc": "阵亡炸随机2人",
       "trigger": "faint",
       "effect": "explode",
-      "target": "allEnemies",
+      "target": "randomEnemy",
       "perLevel": false,
-      "desc": "删库跑路：阵亡时对敌方全体造成自身攻击伤害"
+      "desc": "阵亡时对随机 2 名敌人造成自身攻击伤害",
+      "amount": 1,
+      "n": 2
     },
     "lines": {
       "common": [
@@ -514,15 +517,16 @@
     "faction": "open",
     "role": "explode",
     "atk": 2,
-    "hp": 5,
+    "hp": 4,
     "ability": {
       "name": "求索冲击",
-      "shortDesc": "阵亡炸全场",
+      "shortDesc": "阵亡半伤炸全场",
       "trigger": "faint",
       "effect": "explode",
       "target": "allEnemies",
       "perLevel": false,
-      "desc": "服务器炸了：阵亡时对敌方全体造成自身攻击伤害"
+      "desc": "服务器炸了：阵亡时对敌方全体造成一半攻击伤害",
+      "amount": 0.5
     },
     "lines": {
       "common": [
@@ -757,16 +761,17 @@
     "tier": 5,
     "faction": "folk",
     "role": "explode",
-    "atk": 4,
-    "hp": 6,
+    "atk": 3,
+    "hp": 5,
     "ability": {
       "name": "星舰试飞",
-      "shortDesc": "阵亡炸全场",
+      "shortDesc": "阵亡半伤炸全场",
       "trigger": "faint",
       "effect": "explode",
       "target": "allEnemies",
       "perLevel": false,
-      "desc": "星舰试飞：阵亡时对敌方全体造成自身攻击伤害"
+      "desc": "星舰试飞：阵亡时对敌方全体造成一半攻击伤害",
+      "amount": 0.5
     },
     "lines": {
       "common": [
@@ -874,8 +879,8 @@
     "tier": 6,
     "faction": "compute",
     "role": "explode",
-    "atk": 6,
-    "hp": 9,
+    "atk": 5,
+    "hp": 8,
     "ability": {
       "name": "奇点",
       "shortDesc": "阵亡炸全场",
@@ -883,7 +888,8 @@
       "effect": "explode",
       "target": "allEnemies",
       "perLevel": false,
-      "desc": "奇点：阵亡时对敌方全体造成自身攻击伤害"
+      "desc": "奇点：阵亡时对敌方全体造成自身攻击伤害",
+      "amount": 1
     },
     "lines": {
       "common": [

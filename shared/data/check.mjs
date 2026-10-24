@@ -173,7 +173,7 @@ for (const u of units) {
   if (['explode', 'revive'].includes(a.effect) && a.trigger !== 'faint') err(`${at}: ${a.effect} 只配 faint`);
   if (a.effect === 'chain' && a.trigger !== 'kill') err(`${at}: chain 只配 kill`);
   if (['revive', 'chain', 'doubleStats'].includes(a.effect) && tgt !== 'self') err(`${at}: ${a.effect} 目标应为 self`);
-  if (a.effect === 'explode' && tgt !== 'allEnemies') err(`${at}: explode 目标应为 allEnemies`);
+  if (a.effect === 'explode' && tgt !== 'allEnemies' && tgt !== 'randomEnemy') err(`${at}: explode 目标应为 allEnemies 或 randomEnemy`);
   if (a.effect === 'steal' && !/Enemy/.test(tgt)) err(`${at}: steal 目标应为敌方`);
   if (a.choices !== undefined) {
     if (!Array.isArray(a.choices) || a.choices.length < 2) err(`${at}: choices 至少 2 个`);
