@@ -248,7 +248,7 @@
       "target": "lowestHpEnemy",
       "maxHp": 3,
       "maxHpPerLevel": 2,
-      "desc": "开战：敌方最低血≤3则挖走，否则打3；阈值每级+1"
+      "desc": "开战：敌方最低血≤3就挖走，否则打3，每级+1"
     },
     "lines": {
       "common": [
