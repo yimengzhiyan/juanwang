@@ -8,7 +8,7 @@ export { newRun, shopAction, ARENA_CHOICES, type NewRunOpts } from './engine/run
 export {
   maxTierForTurn, shopMaxTier, tierWeights, levelForXp, xpForLevel, isHeadlineTurn, currentUnitSlots, shopSlotCounts, rerollCost, canUpgradeShop,
   canMerge, abilityAmount, abilityBuff, matchesFilter, turnIncome, arenaRules,
-  TEAM_SIZE, START_HP, MAX_TURNS, BASE_GOLD, UNIT_PRICE, REROLL_PRICE, UPGRADE_PRICE, MAX_SHOP_LEVEL, SHOP_UNIT_SLOTS, SHOP_EQUIP_SLOTS, SHOP_CONSUMABLE_SLOTS,
+  TEAM_SIZE, START_HP, MAX_TURNS, BASE_GOLD, baseGoldForTurn, UNIT_PRICE, REROLL_PRICE, UPGRADE_PRICE, MAX_SHOP_LEVEL, SHOP_UNIT_SLOTS, SHOP_EQUIP_SLOTS, SHOP_CONSUMABLE_SLOTS,
 } from './engine/shop';
 export {
   computeSynergies, activeSynergies, dominantSynergy, teamTiers, tierForCount, stateBonus, synergiesFromDefs,

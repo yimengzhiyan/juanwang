@@ -3,6 +3,8 @@ import { custom, data, mk, of, plain, setTeam, start, withAb } from './helpers';
 import { simulateBattle } from '../src/engine/battle';
 import { shopAction } from '../src/engine/run';
 import { beginTurn, makeCtx, turnIncome } from '../src/engine/shop';
+import { baseGoldForTurn } from '../src/engine/shop';
+const G1 = baseGoldForTurn(1);
 import { computeSynergies, dominantSynergy } from '../src/engine/synergy';
 import type { BattleOptions, Faction, Role, UnitInst } from '../src/types';
 
@@ -140,9 +142,9 @@ describe('研究员 researcher', () => {
 describe('商人 trader', () => {
   it('×2：每回合 +1 算力；×4：+2 算力且单位价格 -1', () => {
     const s = setTeam(start('t'), [mk('wrapper'), mk('doubao_chan')]);
-    expect(turnIncome(makeCtx(s, data)).total).toBe(11);
+    expect(turnIncome(makeCtx(s, data)).total).toBe(G1 + 1);
     let s4 = setTeam(start('t4'), [mk('wrapper'), mk('doubao_chan'), mk('zuck'), mk('scalper')]);
-    expect(turnIncome(makeCtx(s4, data))).toMatchObject({ total: 12, trader: 2 });
+    expect(turnIncome(makeCtx(s4, data))).toMatchObject({ total: G1 + 2, trader: 2 });
     s4 = shopAction(s4, { type: 'freeze', slot: 0 }, data);
     expect(s4.shop.filter((x) => x.kind === 'unit').every((x) => x.price === 2)).toBe(true);
   });

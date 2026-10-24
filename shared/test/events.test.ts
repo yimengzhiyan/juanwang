@@ -5,6 +5,10 @@ import { applyBattleResult } from '../src/engine/result';
 import { battleForState } from '../src/engine/helpers';
 import { DIFFICULTY } from '../src/engine/difficulty';
 import type { EventEffect, GameData, HeadlineDef, RunState, UnitInst } from '../src/types';
+import { baseGoldForTurn } from '../src/engine/shop';
+/** 第 1 / 第 2 回合的基础算力（起始算力曲线） */
+const G1 = baseGoldForTurn(1);
+const G2 = baseGoldForTurn(2);
 
 const base = (): RunState => setTeam(start('ev'), [mk('wrapper'), mk('qwen_chan'), mk('crawler', { level: 2, xp: 2, atk: 4, hp: 4 })]);
 const choose = (effect: EventEffect | EventEffect[], s0: RunState = base(), d: GameData = data) => {
@@ -48,7 +52,7 @@ describe('头条出现时机', () => {
 
 describe('1.0 事件效果（沿用）', () => {
   it('gold / priceMod（item = 装备与消耗品）', () => {
-    expect(choose({ type: 'gold', amount: 3 }).gold).toBe(13);
+    expect(choose({ type: 'gold', amount: 3 }).gold).toBe(G1 + 3);
     const s = choose({ type: 'priceMod', target: 'item', amount: 1 });
     const e = s.shop.find((x) => x.kind === 'equip')!;
     expect(e.price).toBe(data.equipsById[e.defId].price + 1);
@@ -71,7 +75,7 @@ describe('1.0 事件效果（沿用）', () => {
   it('shopRerollFree / rerollShop / extraSlot', () => {
     let s = choose({ type: 'shopRerollFree' });
     s = shopAction(shopAction(s, { type: 'reroll' }, data), { type: 'reroll' }, data);
-    expect(s.gold).toBe(10);
+    expect(s.gold).toBe(G1);
     const before = base();
     const s2 = choose({ type: 'rerollShop' }, before);
     expect(JSON.stringify(s2.shop)).not.toBe(JSON.stringify(before.shop));
@@ -93,21 +97,21 @@ describe('1.0 事件效果（沿用）', () => {
     const s = choose({ type: 'duplicate' });
     expect(team(s)).toHaveLength(4);
     const s2 = choose({ type: 'sacrifice', amount: 4 });
-    expect(s2.gold).toBe(14);
+    expect(s2.gold).toBe(G1 + 4);
     expect(team(s2).map((u) => u.defId)).toEqual(['qwen_chan', 'crawler']);
     const sum = (x: RunState) => team(x).reduce((a, u) => a + u.level, 0);
     expect(sum(choose({ type: 'levelUpRandom' }))).toBe(sum(base()) + 1);
   });
   it('nextTurnGold / enemyDebuff', () => {
-    expect(nextTurn(choose({ type: 'nextTurnGold', amount: 3 })).gold).toBeGreaterThanOrEqual(13);
+    expect(nextTurn(choose({ type: 'nextTurnGold', amount: 3 })).gold).toBeGreaterThanOrEqual(G2 + 3);
     const r = battle(choose({ type: 'enemyDebuff', amount: 2 }), [mk('gpt_chan')]);
     expect(of(r, 'attack').find((e) => e.unit.side === 'enemy')!.unit.atk).toBe(4);
   });
   it(`lifeTrade：失去 ${DIFFICULTY.lifeTradeHp} 热度换算力与 1 次免费刷新；热度不够时不生效`, () => {
     const s = choose({ type: 'lifeTrade', amount: 4 });
-    expect(s).toMatchObject({ hp: 20 - DIFFICULTY.lifeTradeHp, gold: 14 });
+    expect(s).toMatchObject({ hp: 20 - DIFFICULTY.lifeTradeHp, gold: G1 + 4 });
     expect(s.modifiers.freeRerolls).toBe(1);
-    expect(choose({ type: 'lifeTrade', amount: 4 }, { ...base(), hp: 2 })).toMatchObject({ hp: 2, gold: 10 });
+    expect(choose({ type: 'lifeTrade', amount: 4 }, { ...base(), hp: 2 })).toMatchObject({ hp: 2, gold: G1 });
   });
 });
 
@@ -187,7 +191,7 @@ describe('2.0 战场类事件（头条作用于本回合战斗）', () => {
     expect(data.equipsById[f.defId].slot).toBe('armor');
     const n = shopAction(s, { type: 'equip', slot: s.shop.indexOf(f), unitIndex: 0 }, data);
     expect(n.team[0]!.equips.armor).toEqual({ defId: f.defId, gold: true });
-    expect(n.gold).toBe(10);
+    expect(n.gold).toBe(G1);
   });
 });
 
@@ -214,7 +218,7 @@ describe('突发', () => {
     }
     expect(s!.surprisePending).toBe(true);
     const n = shopAction(s!, { type: 'continue' }, d);
-    expect(n).toMatchObject({ turn: 2, gold: 12, surprisePending: false });
+    expect(n).toMatchObject({ turn: 2, gold: G2 + 2, surprisePending: false });
     expect(n.modifiers.battle.first).toBe('enemy');
   });
 });

@@ -15,6 +15,13 @@ export const TEAM_SIZE = 5;
 export const START_HP = 20;
 export const MAX_TURNS = 20;
 export const BASE_GOLD = 10;
+/** 起始算力曲线：前期少给，减少"全买了"的无脑感；回合 1~2：7，3~4：8，5~6：9，7+：10 */
+export function baseGoldForTurn(turn: number): number {
+  if (turn <= 2) return 7;
+  if (turn <= 4) return 8;
+  if (turn <= 6) return 9;
+  return BASE_GOLD;
+}
 export const UNIT_PRICE = 3;
 export const REROLL_PRICE = 1;
 export const MAX_XP = 5;
@@ -719,14 +726,15 @@ export function applyEventEffect(ctx: Ctx, e: EventEffect): void {
 
 // ───────────────────────── 回合推进 ─────────────────────────
 
-/** 每回合固定收入：基础 10 + 下回合加成 + 赛场 + 商人羁绊 + 融资装备 */
+/** 每回合固定收入：基础（按回合曲线 7→10）+ 下回合加成 + 赛场 + 商人羁绊 + 融资装备 */
 export function turnIncome(ctx: Ctx): { total: number; trader: number; funding: number; arena: number } {
   const tiers = tiersOf(ctx);
   const trader = tiers.trader >= 2 ? 2 : tiers.trader >= 1 ? 1 : 0;
   let funding = 0;
   for (const u of teamUnits(ctx.s)) funding += equipTotals(u, ctx.data, equipMultFor(defOf(ctx, u), tiers)).turnGold ?? 0;
   const arena = arenaRules(ctx.s, ctx.data).goldPerTurn ?? 0;
-  return { total: BASE_GOLD + ctx.s.modifiers.nextTurnGold + trader + funding + arena, trader, funding, arena };
+  const base = ctx.s.tutorial ? BASE_GOLD : baseGoldForTurn(ctx.s.turn); // 引导局固定 10，脚本需要
+  return { total: base + ctx.s.modifiers.nextTurnGold + trader + funding + arena, trader, funding, arena };
 }
 
 /** 进入某回合：重置算力与修正器 → 生成商店 →（待生效突发）→（头条 or 商店） */

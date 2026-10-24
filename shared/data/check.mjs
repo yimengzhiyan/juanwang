@@ -27,7 +27,7 @@ const EFFECTS = [...OLD_EFFECTS, ...NEW_EFFECTS];
 const ROLES = ['researcher', 'trader', 'idol', 'engineer'];
 const TARGETS = ['self', 'frontFriend', 'backFriend', 'adjacentFriends', 'randomFriend', 'allFriends', 'lowestHpFriend', 'frontEnemy', 'backEnemy', 'randomEnemy', 'allEnemies', 'lowestHpEnemy', 'highestAtkEnemy', 'killer', 'summoned', 'boughtUnit'];
 const FACTIONS = ['open', 'closed', 'compute', 'folk'];
-const ABILITY_KEYS = ['trigger', 'effect', 'target', 'amount', 'atk', 'hp', 'permanent', 'perLevel', 'n', 'unitId', 'count', 'desc', 'filter', 'consume', 'maxHp', 'maxHpPerLevel', 'choices'];
+const ABILITY_KEYS = ['name', 'shortDesc', 'trigger', 'effect', 'target', 'amount', 'atk', 'hp', 'permanent', 'perLevel', 'n', 'unitId', 'count', 'desc', 'filter', 'consume', 'maxHp', 'maxHpPerLevel', 'choices'];
 const CHOICE_KEYS = ABILITY_KEYS.filter((k) => !['trigger', 'choices'].includes(k));
 const ITEM_EFFECTS = { buff: ['atk', 'hp', 'permanent'], shield: ['amount'], copyStatsFrom: [], levelUp: [], gold: ['amount'], summonToken: ['unitId'], teamBuff: ['atk', 'hp', 'permanent'], pullFront: [], transformRandomSameTier: [] };
 const EVENT_EFFECTS = {
@@ -145,6 +145,11 @@ for (const u of units) {
   if (NEW_EFFECTS.includes(a.effect) && !u.token) newEffUnits.push(`${u.id}:${a.effect}`);
   const tgt = String(a.target ?? '').replace(/\(\d+\)$/, '');
   if (!TARGETS.includes(tgt)) err(`${at}: target 非法 ${a.target}`);
+  // 卡面直显：技能名 ≤5 字、短描述 ≤10 字（纯效果，不带触发器前缀也能懂）
+  if (!a.name) err(`${at}: 缺 ability.name`);
+  else if (len(a.name) > 5) err(`${at}: ability.name 超 5 字「${a.name}」`);
+  if (!a.shortDesc) err(`${at}: 缺 ability.shortDesc`);
+  else if (len(a.shortDesc) > 10) err(`${at}: ability.shortDesc 超 10 字（${len(a.shortDesc)}）「${a.shortDesc}」`);
   if (!a.desc) err(`${at}: 缺 desc`);
   else if (len(a.desc) > 24) err(`${at}: desc 超 24 字（${len(a.desc)}）「${a.desc}」`);
   if (a.filter !== undefined) {
@@ -239,6 +244,7 @@ for (const q of equips) {
   else slotCount[q.slot]++;
   if (!q.name) err(`${at}: 缺 name`);
   for (const k of ['desc', 'goldDesc']) if (!q[k] || len(q[k]) > 24) err(`${at}: ${k} 缺失或超 24 字`);
+  for (const k of ['shortDesc', 'goldShortDesc']) if (!q[k]) err(`${at}: 缺 ${k}`); else if (len(q[k]) > 8) err(`${at}: ${k} 超 8 字「${q[k]}」`);
   if (!/\d/.test(q.desc + q.goldDesc)) err(`${at}: 描述要写清数值`);
   if (![2, 3].includes(q.price)) err(`${at}: price 应 2~3`);
   checkEquipEffect(q.effect, `${at}.effect`);

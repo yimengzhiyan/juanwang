@@ -142,6 +142,8 @@ function normAbility(raw: unknown, at: string, p: string[]): Ability | undefined
     target: t?.target ?? 'self',
     desc: isStr(raw.desc) ? raw.desc : '',
   };
+  if (isStr(raw.name)) a.name = raw.name;
+  if (isStr(raw.shortDesc)) a.shortDesc = raw.shortDesc;
   normAbilityExtras(raw, a, at, p);
   const n = t?.n ?? a.n;
   if (n !== undefined) a.n = n;
@@ -401,6 +403,8 @@ function normEquip(raw: unknown, i: number, p: string[], w: string[]): EquipDef 
     slot: slot ?? 'weapon',
     desc: isStr(raw.desc) ? raw.desc : def?.desc ?? '',
     goldDesc: isStr(raw.goldDesc) ? raw.goldDesc : isStr(raw.gold_desc) ? raw.gold_desc : def?.goldDesc ?? '金色：效果 ×2',
+    ...(isStr(raw.shortDesc) ? { shortDesc: raw.shortDesc } : {}),
+    ...(isStr(raw.goldShortDesc) ? { goldShortDesc: raw.goldShortDesc } : {}),
     price: Math.max(0, num(raw.price, def?.price ?? 3)),
     effect,
     goldEffect,

@@ -3,6 +3,8 @@ import { data, mk, of, setTeam, start } from './helpers';
 import { newRun, shopAction } from '../src/engine/run';
 import { simulateBattle } from '../src/engine/battle';
 import { MAX_SHOP_LEVEL, UPGRADE_PRICE, makeCtx, maxTierForTurn, rollUnitDef, shopMaxTier, tierWeights, turnIncome } from '../src/engine/shop';
+import { baseGoldForTurn } from '../src/engine/shop';
+const G1 = baseGoldForTurn(1);
 import type { RunState, ShopSlot } from '../src/types';
 
 const ok = (s: RunState, a: Parameters<typeof shopAction>[1]) => {
@@ -32,7 +34,7 @@ describe('newRun / 赛场三选一', () => {
   });
   it('newRun(seed, data, {arena}) 直接指定赛场（null = 无赛场）；同种子一致', () => {
     const s = start('x');
-    expect(s).toMatchObject({ phase: 'shop', turn: 1, gold: 10 });
+    expect(s).toMatchObject({ phase: 'shop', turn: 1, gold: G1 });
     expect(s.arena).toBeUndefined();
     expect(kinds(s)).toEqual(['unit', 'unit', 'unit', 'unit', 'equip', 'equip', 'consumable']);
     expect(start('x')).toEqual(s);
@@ -44,20 +46,20 @@ describe('newRun / 赛场三选一', () => {
 describe('购买 / 出售 / 刷新 / 冻结 / 交换', () => {
   it('购买扣 3 算力，放进第一个空位；算力不够报错', () => {
     let s = ok(start('b'), { type: 'buy', slot: 0 });
-    expect(s.gold).toBe(7);
+    expect(s.gold).toBe(G1 - 3);
     expect(s.team[0]).not.toBeNull();
     s = { ...s, gold: 2 };
     expect(shopAction(s, { type: 'buy', slot: 0 }, data).error).toMatch(/算力不够/);
   });
   it('出售得到 = 等级 的算力，并触发 sell 技能', () => {
     const s = setTeam(start('s'), [mk('labeler', { level: 2, xp: 2 })]);
-    expect(ok(s, { type: 'sell', index: 0 }).gold).toBe(10 + 2 + 2);
+    expect(ok(s, { type: 'sell', index: 0 }).gold).toBe(G1 + 2 + 2);
   });
   it('刷新花 1 算力，冻结槽保留；冻结的槽下回合保留', () => {
     let s = ok(start('r'), { type: 'freeze', slot: 0 });
     const frozen = s.shop[0];
     s = ok(s, { type: 'reroll' });
-    expect(s.gold).toBe(9);
+    expect(s.gold).toBe(G1 - 1);
     expect(s.shop[0]).toEqual(frozen);
     expect(s.modifiers.rerollsThisTurn).toBe(1);
   });
@@ -85,7 +87,7 @@ describe('阶级解锁 / 升级商店', () => {
     let s = ok(start('u'), { type: 'freeze', slot: 4 });
     const eqSlot = s.shop[4];
     s = ok(s, { type: 'upgradeShop' });
-    expect(s).toMatchObject({ gold: 10 - UPGRADE_PRICE, shopLevel: 1, shopTier: 2 });
+    expect(s).toMatchObject({ gold: G1 - UPGRADE_PRICE, shopLevel: 1, shopTier: 2 });
     expect(s.lastEvents[0]).toMatchObject({ type: 'shopLevelUp', shopLevel: 1, tier: 2 });
     expect(s.shop).toContainEqual(eqSlot);
     expect(shopMaxTier(s)).toBe(2);
@@ -131,11 +133,11 @@ describe('赛场规则（10 张，各一条）', () => {
   it('融资寒冬：每回合 +2 算力，商店少 1 格单位', () => {
     const s = at('funding_winter');
     expect(s.shop.filter((x) => x.kind === 'unit')).toHaveLength(3);
-    expect(turnIncome(makeCtx(s, data)).total).toBe(12);
+    expect(turnIncome(makeCtx(s, data)).total).toBe(G1 + 2);
   });
   it('刷新狂欢：刷新免费，买单位 +1 价', () => {
     const s = at('reroll_party');
-    expect(ok(s, { type: 'reroll' }).gold).toBe(10);
+    expect(ok(s, { type: 'reroll' }).gold).toBe(G1);
     expect(price(s, 'crawler')).toBe(4);
   });
   it('1 号位光环：每次刷新，1 号位永久 +1/+1', () => {

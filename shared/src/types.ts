@@ -53,6 +53,10 @@ export interface TargetFilter { faction?: Faction; role?: Role; minTier?: number
 export type AbilityChoice = Partial<Omit<Ability, 'trigger' | 'choices'>>;
 
 export interface Ability {
+  /** 技能名（≤5 字），用于战斗大字与卡面标题 */
+  name?: string;
+  /** 卡面短描述（≤10 字），无需点击即可读 */
+  shortDesc?: string;
   trigger: Trigger;
   effect: Effect;
   target: Target;
@@ -160,6 +164,9 @@ export interface EquipDef {
   desc: string;
   /** 金色版描述 */
   goldDesc: string;
+  /** 卡面短描述（≤8 字） */
+  shortDesc?: string;
+  goldShortDesc?: string;
   price: number;
   effect: EquipEffect;
   goldEffect: EquipEffect;
