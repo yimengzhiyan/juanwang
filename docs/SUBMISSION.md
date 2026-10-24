@@ -38,7 +38,7 @@
 - 演示视频：`docs/submission/demo.mp4`
 - 截图：`docs/submission/01_home.png` … `08_over.png`，封面 `cover.png`
 - 玩法一页纸与路演稿：`docs/RULES.md`
-- 代码仓库：（GitHub 地址待填）
+- 代码仓库：https://github.com/yimengzhiyan/juanwang
 
 ## 声明
 非商用参赛作品。人物均为善意戏仿，只使用公开新闻与自嘲梗，不涉及任何真实个人的私德评价；不使用任何注册商标与原画。
