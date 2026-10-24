@@ -7,8 +7,8 @@ import { esc } from './cards';
 
 export type Kind =
   | 'shopUnit' | 'shopEquip' | 'shopCons' | 'team' | 'reroll' | 'freeze' | 'sell' | 'fight' | 'upgrade'
-  | 'infoBuy' | 'infoUse' | 'infoSell';
-const ALL: Kind[] = ['shopUnit', 'shopEquip', 'shopCons', 'team', 'reroll', 'freeze', 'sell', 'fight', 'upgrade', 'infoBuy', 'infoUse', 'infoSell'];
+  | 'infoBuy' | 'infoUse' | 'infoSell' | 'inv';
+const ALL: Kind[] = ['shopUnit', 'shopEquip', 'shopCons', 'team', 'reroll', 'freeze', 'sell', 'fight', 'upgrade', 'infoBuy', 'infoUse', 'infoSell', 'inv'];
 
 export function allowedKinds(step: TutorialStepId | null): Set<Kind> {
   switch (step) {

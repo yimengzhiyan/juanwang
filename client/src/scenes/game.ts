@@ -1,17 +1,19 @@
 // 对局页（商店阶段 + 头条）：顶栏、8 人房头像条、羁绊条、下回合预告、我方 5 槽、商店（单位/装备/消耗品）、信息条、操作按钮、引导。
 import gsap from 'gsap';
 import {
-  MAX_SHOP_LEVEL, MAX_TURNS, UPGRADE_PRICE, canAttach, canMerge, canUpgradeShop, effectiveStats, equipRefund, equipTotals, isHeadlineTurn,
+  INVENTORY_SIZE, MAX_SHOP_LEVEL, MAX_TURNS, UPGRADE_PRICE, attachOutcome, canAttach, canMerge, canUpgradeShop, effectiveStats, equipTotals, isHeadlineTurn,
   maxTierForTurn, pveForTurn, rerollCost, shopMaxTier, stageBonus, stateBonus, tutorialStep,
-  type RunState, type ShopActionInput, type SynergyState, type TutorialStepId,
+  type EquipSlot, type RunState, type ShopActionInput, type SynergyState, type TutorialStepId,
 } from '@juanwang/shared';
 import { app, act, go, markSeen, onRun, saveSettings, settings, type Scene } from '../store';
 import { muteButton, renderSynergy, renderTeam, runSynergies, synergyPanel, topbar, updateTopbar } from '../ui/team';
 import { openCodex } from '../ui/codex';
+import { arenaPill } from '../ui/arenaChip';
+import { inventoryBar, renderInventory } from '../ui/inventory';
 import { renderShop } from '../ui/shop';
 import { abilityText, esc, FACTION_NAME, FREE_LABEL, ROLE_NAME, SLOT_NAME, TIER_NAME } from '../ui/cards';
 import { attachDrag } from '../ui/drag';
-import { closeAllModals, confirmBox, showItemDetail, showUnitDetail } from '../ui/modal';
+import { closeAllModals, showItemDetail, showUnitDetail } from '../ui/modal';
 import { toast } from '../ui/toast';
 import { extraBanner, showHeadline } from '../ui/headline';
 import { allowedKinds, stepText, tutorialBubble, type Kind } from '../ui/tutorial';
@@ -31,6 +33,7 @@ type Sel =
   | { kind: 'equip'; slot: number }
   | { kind: 'cons'; slot: number }
   | { kind: 'team'; index: number }
+  | { kind: 'inv'; index: number }
   | null;
 
 interface Before {
@@ -63,7 +66,10 @@ export function gameScene(): Scene {
   const teamRow = teamArea.querySelector('.team-row') as HTMLElement;
   const modHint = teamArea.querySelector('.mod-hint') as HTMLElement;
   teamArea.querySelector('.notes-slot')!.replaceWith(notes);
+  const arp = arenaPill(data);
+  teamArea.querySelector('.area-label > span')!.after(arp.el);
   muteButton(teamArea.querySelector('.mute-mini') as HTMLElement);
+  const invBar = inventoryBar();
   const shop = document.createElement('section');
   shop.className = 'shop panel';
   shop.innerHTML = `<div class="shop-head"><span>商店</span><small class="shop-bonus"></small><button class="up-btn" data-kind="upgrade"></button></div><div class="shop-units"></div><div class="shop-items"></div>`;
@@ -83,7 +89,7 @@ export function gameScene(): Scene {
   const bubble = tutorialBubble(data, skipTutorial, finishTutorial);
   el.append(top);
   if (strip) el.append(strip);
-  el.append(lobby.el, syn, panel.el, teamArea, shop, bubble.el, info, bar);
+  el.append(lobby.el, syn, panel.el, teamArea, invBar.el, shop, bubble.el, info, bar);
   if (s00.tutorial) lobby.el.style.display = 'none';
 
   let sel: Sel = null;
@@ -111,6 +117,9 @@ export function gameScene(): Scene {
     detectTierUp(syns);
     renderTeam(teamRow, s, data);
     renderShop(shopUnits, shopItems, s, data);
+    renderInventory(invBar, s, data);
+    // 引导局不涉及仓库：空仓库时整条隐藏，步骤不变
+    invBar.el.style.display = s.tutorial && !(s.inventory ?? []).length ? 'none' : '';
     markSeen([...s.team.filter(Boolean).map((u) => u!.defId), ...s.shop.filter((x) => x.kind === 'unit').map((x) => x.defId)]);
     // 队形修正提示
     const hints: string[] = [];
@@ -122,6 +131,7 @@ export function gameScene(): Scene {
     modHint.textContent = hints.join(' · ');
     modHint.style.display = hints.length ? '' : 'none';
     renderNext(s);
+    arp.update(s);
     // 商店加成提示
     const m = s.modifiers;
     const bonus: string[] = [];
@@ -130,7 +140,6 @@ export function gameScene(): Scene {
     if (m.unitPriceMod) bonus.push(`单位 ${m.unitPriceMod > 0 ? '+' : ''}${m.unitPriceMod}`);
     if (m.itemPriceMod) bonus.push(`装备 ${m.itemPriceMod > 0 ? '+' : ''}${m.itemPriceMod}`);
     if (m.enemyAtkDebuff) bonus.push(`敌方 -${m.enemyAtkDebuff} 攻`);
-    if (s.arena && data.arenasById[s.arena]) bonus.unshift(data.arenasById[s.arena].name);
     shopBonus.textContent = bonus.join(' · ');
     // 升级商店按钮：当前阶 → 下一阶、价格、剩余次数
     const t = shopMaxTier(s);
@@ -146,8 +155,9 @@ export function gameScene(): Scene {
     const rc = rerollCost(s, data);
     (bar.querySelector('.act-reroll .cost') as HTMLElement).innerHTML = rc ? `<img src="${ui('gold')}" alt="">${rc}` : '免费';
     // 选中态校验
-    if (sel && sel.kind !== 'team' && s.shop[sel.slot]?.kind !== (sel.kind === 'shop' ? 'unit' : sel.kind === 'equip' ? 'equip' : 'consumable')) sel = null;
+    if (sel && sel.kind !== 'team' && sel.kind !== 'inv' && s.shop[sel.slot]?.kind !== (sel.kind === 'shop' ? 'unit' : sel.kind === 'equip' ? 'equip' : 'consumable')) sel = null;
     if (sel?.kind === 'team' && !s.team[sel.index]) sel = null;
+    if (sel?.kind === 'inv' && !(s.inventory ?? [])[sel.index]) sel = null;
     el.classList.toggle('is-offline', !isOnline());
     renderSelection();
     renderInfo();
@@ -194,6 +204,7 @@ export function gameScene(): Scene {
       parts.splice(2);
     }
     notes.style.display = parts.length ? '' : 'none';
+    teamArea.classList.toggle('has-next', parts.length > 0);
     (teamArea.querySelector('.front-hint') as HTMLElement).style.display = parts.length ? 'none' : '';
     if (!parts.length) return;
     const head = `下回合：${parts.join(' · ')}`;
@@ -207,7 +218,7 @@ export function gameScene(): Scene {
   function renderBuyPop(): void {
     shop.querySelectorAll('.buy-pop').forEach((n) => n.remove());
     const s = run();
-    if (!sel || sel.kind === 'team' || s.phase !== 'shop') {
+    if (!sel || sel.kind === 'team' || sel.kind === 'inv' || s.phase !== 'shop') {
       popKey = '';
       return;
     }
@@ -221,7 +232,7 @@ export function gameScene(): Scene {
     const cost = slot.free ? `<small>${FREE_LABEL[slot.freeReason ?? 'levelUp']}</small>` : `<img src="${ui('gold')}" alt="">${slot.price}`;
     let main = '';
     if (sel.kind === 'shop') main = `<button class="btn btn--go buy-pop-btn${poor ? ' is-poor' : ''}" data-kind="infoBuy">${slot.free ? '免费拿' : '购买 '}${cost}</button>`;
-    else if (sel.kind === 'equip') main = `<div class="buy-pop-hint${poor ? ' is-poor' : ''}">点一个单位装上 ${cost}</div>`;
+    else if (sel.kind === 'equip') main = `<div class="buy-pop-hint${poor ? ' is-poor' : ''}">点单位装上 / 点仓库存起来 ${cost}</div>`;
     else {
       const c = data.consumablesById[slot.defId];
       main = c?.targetKind === 'unit'
@@ -256,6 +267,20 @@ export function gameScene(): Scene {
   function renderSelection(): void {
     const s = run();
     el.querySelectorAll('.is-selected,.is-target,.is-merge,.is-replace').forEach((n) => n.classList.remove('is-selected', 'is-target', 'is-merge', 'is-replace'));
+    const invFull = (s.inventory ?? []).length >= INVENTORY_SIZE;
+    /** 某件装备（商店 / 仓库）能装到哪些单位：new = 空槽，gold = 合成金色，replace = 替换（旧的进仓库；从商店买且仓库满时不可） */
+    const markEquipTargets = (defId: string, gold: boolean, fromInv: boolean): void => {
+      const def = data.equipsById[defId];
+      s.team.forEach((u, i) => {
+        if (!u || !def) return;
+        const c = teamRow.children[i];
+        if (canAttach(u, def, gold)) return;
+        const out = attachOutcome(u, def, gold);
+        if (out === 'new') c.classList.add('is-target');
+        else if (out === 'gold') c.classList.add('is-merge');
+        else if (fromInv || !invFull) c.classList.add('is-target', 'is-replace');
+      });
+    };
     renderBuyPop();
     if (!sel) return;
     if (sel.kind === 'shop') {
@@ -269,16 +294,13 @@ export function gameScene(): Scene {
     } else if (sel.kind === 'equip') {
       el.querySelector(`[data-src="equip:${sel.slot}"]`)?.classList.add('is-selected');
       const sl = s.shop[sel.slot];
-      const def = data.equipsById[sl.defId];
-      s.team.forEach((u, i) => {
-        if (!u || !def) return;
-        const cur = u.equips?.[def.slot];
-        const c = teamRow.children[i];
-        if (canAttach(u, def, !!sl.gold)) return;
-        if (!cur) c.classList.add('is-target');
-        else if (cur.defId === def.id && !cur.gold && !sl.gold) c.classList.add('is-merge');
-        else c.classList.add('is-target', 'is-replace');
-      });
+      markEquipTargets(sl.defId, !!sl.gold, false);
+      if (!invFull) invBar.el.classList.add('is-target');
+    } else if (sel.kind === 'inv') {
+      const it = (s.inventory ?? [])[sel.index];
+      el.querySelector(`[data-src="inv:${sel.index}"]`)?.classList.add('is-selected');
+      if (it) markEquipTargets(it.defId, it.gold, true);
+      bar.querySelector('.act-sell')?.classList.add('is-target');
     } else if (sel.kind === 'cons') {
       el.querySelector(`[data-src="cons:${sel.slot}"]`)?.classList.add('is-selected');
       const c = data.consumablesById[s.shop[sel.slot].defId];
@@ -298,7 +320,16 @@ export function gameScene(): Scene {
   function sellValue(i: number): number {
     const u = run().team[i];
     if (!u) return 0;
-    return u.level + equipRefund(u) + (equipTotals(u, data).sellGold ?? 0);
+    // 装备优先进仓库，放不下的才折算
+    let room = INVENTORY_SIZE - (run().inventory ?? []).length;
+    let overflow = 0;
+    for (const sl of ['weapon', 'armor', 'trinket'] as EquipSlot[]) {
+      const e = u.equips?.[sl];
+      if (!e) continue;
+      if (room > 0) room--;
+      else overflow += e.gold ? 2 : 1;
+    }
+    return u.level + overflow + (equipTotals(u, data).sellGold ?? 0);
   }
 
   function renderInfo(): void {
@@ -347,6 +378,13 @@ export function gameScene(): Scene {
         const slotIdx = sel.slot;
         mk(slot.price ? `使用 <img src="${ui('gold')}" alt="">${slot.price}` : '使用', 'btn--go', 'infoUse', () => useConsumable(slotIdx));
       }
+    } else if (sel.kind === 'inv') {
+      const idx = sel.index;
+      const it = (s.inventory ?? [])[idx];
+      const def = data.equipsById[it.defId];
+      text.innerHTML = `<div class="info-head"><b class="info-name">${it.gold ? '金·' : ''}${esc(def.name)}</b><span class="chip chip--xs"><img src="${ui(`slot_${def.slot}`)}" alt="">${SLOT_NAME[def.slot]}</span><span class="chip chip--xs">仓库</span></div><p>${esc(it.gold ? def.goldDesc : def.desc)}<br><em>点或拖到单位身上装备（免费）</em></p>`;
+      detailLink(() => showItemDetail(data, 'equip', def.id, it.gold));
+      mk(`出售 +${it.gold ? 2 : 1}<img src="${ui('gold')}" alt="">`, 'btn--danger', 'infoSell', () => doSellInv(idx));
     } else {
       const u = s.team[sel.index]!;
       const def = data.unitsById[u.defId];
@@ -385,6 +423,7 @@ export function gameScene(): Scene {
     lock('[data-src^="equip:"]', 'shopEquip');
     lock('[data-src^="cons:"]', 'shopCons');
     lock('.tslot', 'team');
+    lock('[data-src^="inv:"], [data-src^="ueq:"], .inv-bar', 'inv');
     for (const k of ['reroll', 'freeze', 'sell', 'fight', 'upgrade', 'infoBuy', 'infoUse', 'infoSell'] as Kind[]) lock(`[data-kind="${k}"]`, k);
     const focus = (q: string): boolean => {
       const list = el.querySelectorAll(q);
@@ -478,10 +517,12 @@ export function gameScene(): Scene {
   }
   function doSell(index: number): void {
     sel = null;
-    doAct({ type: 'sell', index }, teamRow.children[index]?.querySelector('.ucard'));
+    const had = Object.values(run().team[index]?.equips ?? {}).some(Boolean);
+    const n = doAct({ type: 'sell', index }, teamRow.children[index]?.querySelector('.ucard'));
+    if (!n.error && had) toast(n.log[n.log.length - 1] ?? '装备放进了仓库', 'info');
   }
   function doFreeze(): void {
-    if (!sel || sel.kind === 'team') {
+    if (!sel || sel.kind === 'team' || sel.kind === 'inv') {
       toast('先点一个商店里的卡片，再冻结', 'info');
       return;
     }
@@ -489,7 +530,7 @@ export function gameScene(): Scene {
     doAct({ type: 'freeze', slot });
     sfx.freeze();
   }
-  /** 装备：同槽换装时先确认折算 */
+  /** 商店装备装到单位：同槽换装时旧装备自动进仓库（仓库满由引擎报错） */
   function doEquip(slot: number, unitIndex: number): void {
     const s = run();
     const sl = s.shop[slot];
@@ -509,21 +550,69 @@ export function gameScene(): Scene {
       toast(`算力不够（需要 ${sl.price}）`);
       return;
     }
-    const cur = u.equips?.[def.slot];
-    const go2 = (): void => {
-      sel = null;
-      doAct({ type: 'equip', slot, unitIndex }, el.querySelector(`[data-src="equip:${slot}"]`));
-    };
-    if (cur && !(cur.defId === def.id && !cur.gold && !sl.gold)) {
-      const old = data.equipsById[cur.defId];
-      confirmBox(
-        `${data.unitsById[u.defId]?.name ?? ''} 的${SLOT_NAME[def.slot]}槽已有「${cur.gold ? '金·' : ''}${old?.name ?? cur.defId}」。替换成「${sl.gold ? '金·' : ''}${def.name}」？旧装备折算 +${cur.gold ? 2 : 1} 算力`,
-        '替换',
-        go2,
-      );
+    sel = null;
+    const n = doAct({ type: 'equip', slot, unitIndex }, el.querySelector(`[data-src="equip:${slot}"]`));
+    if (!n.error && attachOutcome(u, def, !!sl.gold) === 'replace') toast('换下的旧装备放进了仓库', 'info');
+  }
+  // ───── 仓库 ─────
+  const invCell = (i: number): HTMLElement | null => invBar.el.querySelector(`[data-src="inv:${i}"]`);
+  function doBuyInv(slot: number): void {
+    sel = null;
+    doAct({ type: 'buyEquipToInventory', slot }, el.querySelector(`[data-src="equip:${slot}"]`));
+  }
+  function doEquipInv(invIndex: number, unitIndex: number): void {
+    const s = run();
+    if (!s.team[unitIndex]) {
+      toast('装备要装到一个单位身上', 'info');
       return;
     }
-    go2();
+    sel = null;
+    doAct({ type: 'equipFromInventory', invIndex, unitIndex }, invCell(invIndex));
+  }
+  function doSellInv(invIndex: number): void {
+    sel = null;
+    doAct({ type: 'sellInventory', invIndex }, invCell(invIndex));
+  }
+  function doUnequip(unitIndex: number, slot: EquipSlot): void {
+    sel = null;
+    closeEqMenu();
+    doAct({ type: 'unequip', unitIndex, slot }, teamRow.children[unitIndex]?.querySelector(`.uc-eq[data-slot="${slot}"]`));
+  }
+  /** 点单位身上的装备格：小菜单「卸下 / 查看」 */
+  let eqMenu: HTMLElement | null = null;
+  function closeEqMenu(): void {
+    eqMenu?.remove();
+    eqMenu = null;
+  }
+  function openEqMenu(unitIndex: number, slot: EquipSlot): void {
+    closeEqMenu();
+    const s = run();
+    const e = s.team[unitIndex]?.equips?.[slot];
+    const def = e ? data.equipsById[e.defId] : undefined;
+    const anchor = teamRow.children[unitIndex]?.querySelector(`.uc-eq[data-slot="${slot}"]`);
+    if (!e || !def || !anchor) return;
+    const m = document.createElement('div');
+    m.className = 'eq-menu';
+    eqMenu = m;
+    m.innerHTML = `<div class="eq-menu-name">${e.gold ? '金·' : ''}${esc(def.name)}</div><button class="btn btn--sm btn--ice eq-un" data-kind="inv">卸下进仓库</button><button class="btn btn--sm eq-view">查看</button>`;
+    el.appendChild(m);
+    const r = anchor.getBoundingClientRect();
+    const pr = el.getBoundingClientRect();
+    const w = m.offsetWidth;
+    const left = Math.max(8, Math.min(pr.width - w - 8, r.left - pr.left + r.width / 2 - w / 2));
+    m.style.left = `${left}px`;
+    m.style.top = `${r.bottom - pr.top + 8}px`;
+    gsap.fromTo(m, { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.18, ease: 'back.out(2.5)' });
+    (m.querySelector('.eq-un') as HTMLElement).onclick = (ev) => {
+      ev.stopPropagation();
+      sfx.click();
+      doUnequip(unitIndex, slot);
+    };
+    (m.querySelector('.eq-view') as HTMLElement).onclick = (ev) => {
+      ev.stopPropagation();
+      closeEqMenu();
+      showItemDetail(data, 'equip', def.id, e.gold);
+    };
   }
   function useConsumable(slot: number, target?: number): void {
     const s = run();
@@ -552,12 +641,16 @@ export function gameScene(): Scene {
   }
 
   // 拖拽 / 单击
-  const kindOf = (src: string): Kind => (src.startsWith('shop:') ? 'shopUnit' : src.startsWith('equip:') ? 'shopEquip' : src.startsWith('cons:') ? 'shopCons' : 'team');
+  const kindOf = (src: string): Kind =>
+    src.startsWith('shop:') ? 'shopUnit' : src.startsWith('equip:') ? 'shopEquip' : src.startsWith('cons:') ? 'shopCons' : src.startsWith('inv:') || src.startsWith('ueq:') ? 'inv' : 'team';
   const detach = attachDrag(el, {
     canDrag: (src) => run().phase === 'shop' && can(kindOf(src)),
+    onDragStart: () => closeEqMenu(),
     canDrop: (src, drop) => {
-      if (drop === 'sell') return src.startsWith('team:') && can('sell');
-      if (drop === 'freeze') return !src.startsWith('team:') && can('freeze');
+      if (drop === 'sell') return (src.startsWith('team:') || src.startsWith('inv:')) && can('sell');
+      if (drop === 'freeze') return /^(shop|equip|cons):/.test(src) && can('freeze');
+      if (drop === 'inv') return (src.startsWith('equip:') || src.startsWith('ueq:')) && can('inv');
+      if (src.startsWith('ueq:')) return false;
       return can('team');
     },
     onTap: (src) => onTapSrc(src),
@@ -569,6 +662,11 @@ export function gameScene(): Scene {
       else if (k === 'shop' && s.shop[n]) showUnitDetail(data, s.shop[n].defId);
       else if (k === 'equip' && s.shop[n]) showItemDetail(data, 'equip', s.shop[n].defId, !!s.shop[n].gold);
       else if (k === 'cons' && s.shop[n]) showItemDetail(data, 'consumable', s.shop[n].defId);
+      else if (k === 'inv' && s.inventory?.[n]) showItemDetail(data, 'equip', s.inventory[n].defId, s.inventory[n].gold);
+      else if (k === 'ueq') {
+        const e = s.team[n]?.equips?.[src.split(':')[2] as EquipSlot];
+        if (e) showItemDetail(data, 'equip', e.defId, e.gold);
+      }
     },
     onDrop: (src, drop) => {
       if (!drop) return;
@@ -576,6 +674,12 @@ export function gameScene(): Scene {
       const n = Number(i);
       if (drop === 'sell') {
         if (k === 'team') doSell(n);
+        else if (k === 'inv') doSellInv(n);
+        return;
+      }
+      if (drop === 'inv') {
+        if (k === 'equip') doBuyInv(n);
+        else if (k === 'ueq') doUnequip(n, src.split(':')[2] as EquipSlot);
         return;
       }
       if (drop === 'freeze') {
@@ -588,6 +692,7 @@ export function gameScene(): Scene {
       const to = Number(drop.split(':')[1]);
       if (k === 'shop') doBuy(n, to);
       else if (k === 'equip') doEquip(n, to);
+      else if (k === 'inv') doEquipInv(n, to);
       else if (k === 'cons') {
         const c = data.consumablesById[run().shop[n]?.defId];
         if (c?.targetKind === 'unit' && !run().team[to]) return toast('拖到一个单位身上使用', 'info');
@@ -616,6 +721,19 @@ export function gameScene(): Scene {
       onTapTeam(n);
       return;
     }
+    if (k === 'ueq') {
+      // 已选中商店/仓库的东西时，点装备格 = 点这个单位
+      if (sel && sel.kind !== 'team') return onTapTeam(n);
+      openEqMenu(n, src.split(':')[2] as EquipSlot);
+      return;
+    }
+    closeEqMenu();
+    if (k === 'inv') {
+      if (sel?.kind === 'equip') return doBuyInv(sel.slot);
+      sel = sel?.kind === 'inv' && sel.index === n ? null : { kind: 'inv', index: n };
+      render();
+      return;
+    }
     if (k === 'shop') {
       if (sel?.kind === 'shop' && sel.slot === n) return doBuy(n);
       sel = { kind: 'shop', slot: n };
@@ -633,7 +751,9 @@ export function gameScene(): Scene {
 
   function onTapTeam(n: number): void {
     const s = run();
+    closeEqMenu();
     if (sel?.kind === 'shop') return doBuy(sel.slot, n);
+    if (sel?.kind === 'inv') return doEquipInv(sel.index, n);
     if (sel?.kind === 'equip') return doEquip(sel.slot, n);
     if (sel?.kind === 'cons') {
       const c = data.consumablesById[s.shop[sel.slot]?.defId];
@@ -653,6 +773,11 @@ export function gameScene(): Scene {
   el.addEventListener('click', (e) => {
     const t = e.target as HTMLElement;
     if (panel.isOpen() && !t.closest('.syn-panel') && !t.closest('.synergy-bar')) panel.close();
+    if (eqMenu && !t.closest('.eq-menu') && !t.closest('[data-src^="ueq:"]')) closeEqMenu();
+    if (sel?.kind === 'equip' && t.closest('.inv-bar') && !t.closest('[data-src]')) {
+      if (can('inv')) doBuyInv(sel.slot);
+      return;
+    }
     if (t.closest('[data-src]') || t.closest('button') || t.closest('.infobar') || t.closest('.syn-panel') || t.closest('.tut') || t.closest('.extra') || t.closest('.lobby')) return;
     const slot = t.closest('.tslot') as HTMLElement | null;
     if (slot && can('team')) {
@@ -672,8 +797,9 @@ export function gameScene(): Scene {
   };
   (bar.querySelector('.act-freeze') as HTMLElement).onclick = () => doFreeze();
   (bar.querySelector('.act-sell') as HTMLElement).onclick = () => {
+    if (sel?.kind === 'inv') return doSellInv(sel.index);
     if (sel?.kind !== 'team') {
-      toast('先点一个队伍里的单位，或把它拖到这里', 'info');
+      toast('先点一个队伍里的单位或仓库装备，或把它拖到这里', 'info');
       return;
     }
     doSell(sel.index);
@@ -847,6 +973,59 @@ export function gameScene(): Scene {
         else finish();
         break;
       }
+      case 'buyEquipToInventory': {
+        sfx.buy();
+        const cell = invCell((next.inventory ?? []).length - 1);
+        if (cell && b?.src) {
+          gsap.set(cell, { opacity: 0 });
+          void flyGhost(b.src.el, b.src.rect, cell.getBoundingClientRect(), { scaleTo: 0.4, duration: 0.28 }).then(() => {
+            gsap.set(cell, { opacity: 1 });
+            gsap.fromTo(cell, { scale: 1.6 }, { scale: 1, duration: 0.3, ease: 'back.out(3)' });
+          });
+        }
+        break;
+      }
+      case 'unequip': {
+        sfx.equip();
+        const cell = invCell((next.inventory ?? []).length - 1);
+        if (cell && b?.src) {
+          gsap.set(cell, { opacity: 0 });
+          void flyGhost(b.src.el, b.src.rect, cell.getBoundingClientRect(), { duration: 0.25 }).then(() => {
+            gsap.set(cell, { opacity: 1 });
+            gsap.fromTo(cell, { scale: 1.5 }, { scale: 1, duration: 0.3, ease: 'back.out(3)' });
+          });
+        }
+        statFloats();
+        break;
+      }
+      case 'equipFromInventory': {
+        const tgtUid = next.team[a.unitIndex]?.uid;
+        const target = tgtUid ? cardByUid(tgtUid) : null;
+        const it = (prev.inventory ?? [])[a.invIndex];
+        const eqDef = it ? data.equipsById[it.defId] : undefined;
+        const becameGold = !!(eqDef && next.team[a.unitIndex]?.equips?.[eqDef.slot]?.gold && !it?.gold);
+        const finish = (): void => {
+          if (!target) return;
+          const slotEl = eqDef ? (target.querySelector(`.uc-eq[data-slot="${eqDef.slot}"]`) as HTMLElement | null) : null;
+          if (slotEl) {
+            gsap.fromTo(slotEl, { scale: 2.2 }, { scale: 1, duration: 0.35, ease: 'back.out(3)' });
+            const [x, y] = center(slotEl);
+            particles.burst(x, y, { count: becameGold ? 10 : 5, kind: 'star', colors: becameGold ? ['#FFC53D', '#FFFFFF'] : ['#FFFFFF', '#7FD6FF'], size: 10, dist: becameGold ? 50 : 30, life: 0.4 });
+          }
+          if (becameGold) {
+            sfx.goldEquip();
+            tagPop(target, '金色！');
+          } else sfx.equip();
+          statFloats();
+        };
+        if (b?.src && target) void flyGhost(b.src.el, b.src.rect, target.getBoundingClientRect(), { scaleTo: 0.35, fade: true, duration: 0.3 }).then(finish);
+        else finish();
+        break;
+      }
+      case 'sellInventory': {
+        sfx.sell();
+        break;
+      }
       case 'useConsumable': {
         sfx.buy();
         const tgtUid = a.target !== undefined ? next.team[a.target]?.uid : leveled?.uid;
@@ -948,7 +1127,9 @@ export function gameScene(): Scene {
     destroy: () => {
       off();
       offNet();
+      arp.destroy();
       detach();
+      closeEqMenu();
       headlineEl?.remove();
     },
   };

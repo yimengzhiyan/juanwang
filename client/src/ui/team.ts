@@ -95,6 +95,8 @@ export function renderTeam(row: HTMLElement, s: RunState, data: GameData): void 
       if (def) {
         const c = teamCard(u, s.team, data, tiers[def.faction], bonus);
         c.dataset.src = `team:${i}`;
+        // 身上的装备格可单独拖（卸进仓库）/ 点开菜单
+        c.querySelectorAll<HTMLElement>('.uc-eq.is-on').forEach((q) => (q.dataset.src = `ueq:${i}:${q.dataset.slot}`));
         slot.appendChild(c);
       }
     } else {

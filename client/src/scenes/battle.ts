@@ -6,6 +6,7 @@ import {
   applyBattleResult, battleForState, computeSynergies, dominantSynergy, injectHumanOpponents, pveForTurn,
   type BattleEvent, type BattleResult, type EquipSlot, type Level, type RunState, type Side, type UnitEquips, type UnitInst, type UnitRef, type UnitSnap,
 } from '@juanwang/shared';
+import { arenaHudChip } from '../ui/arenaChip';
 import { app, markSeen, setRun, settings, type Scene } from '../store';
 import { setHpChip, topbar, updateTopbar } from '../ui/team';
 import { esc, plain, setCardStats, setShield, skillName, skillShort, SYN_COLOR, SYN_DARK, synIcon, tierShield, unitCard } from '../ui/cards';
@@ -72,6 +73,8 @@ export function battleScene(): Scene {
   const bannerSlot = arena.querySelector('.banner-slot') as HTMLElement;
   const bigSlot = arena.querySelector('.big-skill-slot') as HTMLElement;
   const oppName = arena.querySelector('.opp-name') as HTMLElement;
+  const arChip = arenaHudChip(data, run0);
+  if (arChip) oppName.after(arChip);
   const log = document.createElement('div');
   log.className = 'blog';
   log.innerHTML = '<div class="blog-head">战斗日志</div><div class="blog-lines"></div>';

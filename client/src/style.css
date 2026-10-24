@@ -1406,3 +1406,81 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
 .big-skill { max-width: calc(100% - 16px); }
 .bs-text { min-width: 0; }
 .bs-text b { overflow: hidden; text-overflow: ellipsis; font-size: clamp(30px, 10.5vw, 46px); }
+
+/* ═════ v4：赛场胶囊（对局页"我的队伍"行常显）═════ */
+.arp { position: relative; flex: 0 1 auto; min-width: 0; display: flex; }
+.arp:not([style*='none']) ~ .front-hint { display: none; }
+.arp-btn {
+  display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; height: 26px; padding: 0 6px 0 2px; border-radius: 99px;
+  border: 2px solid var(--outline); background: #F1EAFF; font-size: 12px; font-weight: 700; color: var(--c-purple-dark); white-space: nowrap;
+  box-shadow: 0 2px 0 rgba(59, 42, 26, 0.18);
+}
+.arp-ico { width: 20px; height: 20px; flex: none; border-radius: 50%; background: #fff; border: 1.5px solid var(--outline); object-fit: cover; }
+.arp-ico--none { display: inline-block; background: var(--c-purple); }
+.arp-name { flex: none; color: var(--text); }
+.arp-rule { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--c-purple-dark); }
+.arp-rule::before { content: '·'; margin-right: 3px; color: var(--text-sub); }
+.arp-caret { flex: none; width: 0; height: 0; border: 4px solid transparent; border-top: 5px solid var(--c-purple-dark); border-bottom: 0; margin-left: 1px; transition: transform 0.15s; }
+.arp.is-open .arp-caret { transform: rotate(180deg); }
+.team-area.has-next .arp-rule { display: none; }
+.arp-pop {
+  position: absolute; top: calc(100% + 6px); left: -40px; z-index: 30; width: min(300px, calc(100vw - 32px)); padding: 8px 10px 10px; border-radius: 14px;
+  border: 3px solid var(--outline); background: #fff; box-shadow: 0 4px 0 rgba(59, 42, 26, 0.2); font-weight: 600; white-space: normal;
+}
+.arp-pop[hidden] { display: none; }
+.arp-pop-head { display: flex; align-items: center; gap: 6px; }
+.arp-pop-head b { font-size: 15px; color: var(--text); }
+.arp-pop-head small { margin-left: auto; font-size: 11px; color: #fff; background: var(--c-purple); border-radius: 99px; padding: 0 7px; }
+.arp-pop-head .arp-ico { width: 26px; height: 26px; }
+.arp-pop-rule { margin: 6px 0 2px; font-size: 14px; color: var(--c-purple-dark); line-height: 1.35; }
+.arp-pop-flavor { margin: 0; font-size: 12px; color: var(--text-sub); }
+.arp-pop-hints { display: flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 12px; color: var(--text-sub); }
+/* 战斗页顶部（对手名一行右侧）：赛场名 */
+.side-label--enemy { display: flex; justify-content: center; align-items: center; gap: 4px; }
+.side-label--enemy .opp-name { flex: 0 1 auto; min-width: 0; }
+.side-label .hud-arena {
+  flex: none; display: inline-flex; align-items: center; gap: 3px; height: 26px; padding: 0 8px 0 2px; border-radius: 99px; border: 2.5px solid var(--outline);
+  background: #F1EAFF; color: var(--c-purple-dark); font-size: 12.5px; font-weight: 700; box-shadow: none;
+}
+.hud-arena b { white-space: nowrap; max-width: 7em; overflow: hidden; text-overflow: ellipsis; }
+.hud-arena .arp-ico { width: 20px; height: 20px; }
+
+/* ═════ v4：装备仓库条（队伍与商店之间）═════ */
+.inv-bar {
+  flex: none; display: flex; align-items: center; gap: 8px; margin: -8px 10px 0; padding: 3px 8px; border-radius: 14px; border: 2.5px solid var(--outline);
+  background: rgba(255, 255, 255, 0.9); box-shadow: 0 3px 0 rgba(59, 42, 26, 0.15); position: relative; z-index: 2;
+}
+.inv-label { flex: none; display: flex; flex-direction: column; align-items: center; line-height: 1.05; }
+.inv-label b { font-size: 13px; }
+.inv-count { font: 700 11px var(--font-num); color: var(--text-sub); }
+.inv-bar.is-full { border-color: var(--c-red); background: #FFF0F0; }
+.inv-bar.is-full .inv-count { color: var(--c-red-dark); }
+.inv-cells { flex: 1; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+.inv-cell { position: relative; aspect-ratio: 1; max-height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; justify-self: center; width: 100%; max-width: 34px; }
+.inv-cell.is-empty { border: 2px dashed var(--panel-sunk-line); background: rgba(238, 243, 248, 0.6); }
+.inv-cell.is-on { background: #fff; border: 2.5px solid var(--c-gold-dark); box-shadow: inset 0 -3px 0 #FFE8A3; cursor: grab; touch-action: none; }
+.inv-cell.is-gold { background: linear-gradient(180deg, #FFF8DD, #FFE08A); border: 3px solid var(--c-gold-dark); box-shadow: 0 0 0 2px var(--c-gold), inset 0 -3px 0 #F5C64E; }
+.inv-cell img { width: 82%; height: 82%; object-fit: contain; pointer-events: none; }
+.inv-cell em {
+  position: absolute; top: -7px; right: -7px; font: normal 700 9px/14px var(--font-ui); color: #fff; background: var(--c-red); border: 1.5px solid var(--outline);
+  border-radius: 99px; padding: 0 3px; pointer-events: none;
+}
+.inv-cell.is-selected { outline: 3px solid var(--c-blue); outline-offset: 2px; transform: translateY(-2px); }
+.inv-cell.is-dragging { opacity: 0.35; }
+.inv-bar.is-target { border-color: var(--c-blue); background: #E2F0FF; animation: pulse 0.9s ease-in-out infinite; }
+.inv-bar.is-over { border-color: var(--c-gold); background: #FFF4CC; }
+.inv-bar.is-over .inv-cell.is-empty { border-color: var(--c-gold-dark); }
+.actions .btn.is-target { outline: 3px dashed var(--c-blue); outline-offset: 3px; }
+/* 队伍卡上的装备格：可拖 / 点开菜单，扩大触控区 */
+.team-row .uc-eq.is-on { position: relative; overflow: visible; touch-action: none; }
+.team-row .uc-eq.is-on img { width: 100%; height: 100%; }
+.team-row .uc-eq.is-on::after { content: ''; position: absolute; inset: -5px; }
+.uc-eq.is-dragging { opacity: 0.3; }
+.drag-ghost.uc-eq, .drag-ghost.inv-cell { background: #fff; border: 2px solid var(--outline); border-radius: 8px; overflow: visible; }
+.drag-ghost.uc-eq img, .drag-ghost.inv-cell img { width: 100%; height: 100%; object-fit: contain; }
+.eq-menu {
+  position: absolute; z-index: 70; display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 14px; border: 3px solid var(--outline);
+  background: #fff; box-shadow: 0 4px 0 rgba(59, 42, 26, 0.2); transform-origin: 50% 0; min-width: 120px;
+}
+.eq-menu-name { font-size: 13px; font-weight: 700; text-align: center; }
+.eq-menu .btn { min-height: 36px; font-size: 14px; }
