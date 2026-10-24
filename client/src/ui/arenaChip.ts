@@ -1,7 +1,7 @@
 // 赛场胶囊：对局页"我的队伍"行常显（图标 + 名字 + 规则一句话；窄屏只显示名字，点开看完整规则）；战斗页顶栏显示名字。
 import type { GameData, RunState } from '@juanwang/shared';
 import { arenaArt, arenaHints, arenaText } from '../scenes/arena';
-import { esc, synIcon, synName } from './cards';
+import { esc, synIconHtml, synName } from './cards';
 import { toast } from './toast';
 
 export interface ArenaPill {
@@ -47,7 +47,7 @@ export function arenaPill(data: GameData): ArenaPill {
       const [rule, flavor] = arenaText(a);
       btn.innerHTML = `${icon(data, a.id)}<b class="arp-name">${esc(a.name)}</b><span class="arp-rule">${esc(rule)}</span><i class="arp-caret"></i>`;
       const hints = arenaHints(a);
-      pop.innerHTML = `<div class="arp-pop-head">${icon(data, a.id)}<b>赛场 · ${esc(a.name)}</b><small>整局生效</small></div><p class="arp-pop-rule">${esc(rule)}</p>${flavor ? `<p class="arp-pop-flavor">${esc(flavor)}</p>` : ''}${hints.length ? `<div class="arp-pop-hints">推荐：${hints.map((k) => `<span class="ar-hint"><img src="${synIcon(k)}" alt="">${esc(synName(k))}</span>`).join('')}</div>` : ''}`;
+      pop.innerHTML = `<div class="arp-pop-head">${icon(data, a.id)}<b>赛场 · ${esc(a.name)}</b><small>整局生效</small></div><p class="arp-pop-rule">${esc(rule)}</p>${flavor ? `<p class="arp-pop-flavor">${esc(flavor)}</p>` : ''}${hints.length ? `<div class="arp-pop-hints">推荐：${hints.map((k) => `<span class="ar-hint">${synIconHtml(k)}${esc(synName(k))}</span>`).join('')}</div>` : ''}`;
     },
     close: () => setOpen(false),
     destroy: () => document.removeEventListener('pointerdown', onDoc, true),

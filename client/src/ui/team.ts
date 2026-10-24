@@ -7,8 +7,9 @@ import { ui } from '../assets';
 import { settings } from '../store';
 import { setMuted } from '../fx/sound';
 import gsap from 'gsap';
-import { esc, hpColor, SYN_COLOR, synergyChip, synergyDetailHtml, synIcon, unitCard } from './cards';
+import { esc, hpColor, SYN_COLOR, synergyChip, synergyDetailHtml, synIconHtml, unitCard } from './cards';
 import { isOnline } from '../net';
+import { hscroll } from './hscroll';
 
 export function topbar(opts: { codex?: () => void; muteIn?: boolean } = {}): HTMLElement {
   const el = document.createElement('header');
@@ -64,19 +65,34 @@ export function updateTopbar(el: HTMLElement, s: RunState, showGold = true): voi
   el.classList.toggle('is-offline', !isOnline());
 }
 
-/** 当前局面的 8 条流派线（含赛场/头条人数加成） */
+/** 当前局面的流派线（阵营 4 + 打法 6，含赛场/头条人数加成） */
 export function runSynergies(s: RunState, data: GameData): SynergyState[] {
   return computeSynergies(s.team, data, stateBonus(s, data));
 }
 
-/** 羁绊条：激活的在前（档位高→低），其余按个数；0 个的只显示图标 */
+/** 羁绊条（DESIGN 16）：两行，上 = 阵营（4，档位 2/3/5），下 = 打法（6，档位 2/4）。行内激活的在前；0 个的只显示图标 */
 export function renderSynergy(el: HTMLElement, states: SynergyState[], onTap?: (st: SynergyState) => void): void {
-  el.innerHTML = '';
-  const sorted = [...states].sort((a, b) => b.tier - a.tier || b.count - a.count);
-  for (const st of sorted) {
-    const chip = synergyChip(st, { compact: st.count === 0 });
-    chip.onclick = () => onTap?.(st);
-    el.appendChild(chip);
+  el.classList.add('is-2row');
+  const rows: [string, string, SynergyState[]][] = [
+    ['fac', '阵营', states.filter((x) => x.kind === 'faction')],
+    ['role', '打法', states.filter((x) => x.kind !== 'faction')],
+  ];
+  for (const [k, label, list] of rows) {
+    // 行容器常驻（保留横向滚动位置与桌面拖动滚动），只重画徽章
+    let row = el.querySelector(`.syn-line--${k}`) as HTMLElement | null;
+    if (!row) {
+      row = document.createElement('div');
+      row.className = `syn-line syn-line--${k}`;
+      el.appendChild(row);
+      hscroll(row);
+    }
+    row.innerHTML = `<span class="syn-line-label">${label}</span>`;
+    const sorted = [...list].sort((a, b) => b.tier - a.tier || b.count - a.count);
+    for (const st of sorted) {
+      const chip = synergyChip(st, { compact: st.count === 0 });
+      chip.onclick = () => onTap?.(st);
+      row.appendChild(chip);
+    }
   }
 }
 
@@ -145,14 +161,14 @@ export function synergyPanel(): SynergyPanel {
   function renderLine(): void {
     const act = states.filter((s) => s.count > 0).sort((a, b) => Number(recent.includes(b.key)) - Number(recent.includes(a.key)) || synSort(a, b));
     if (!act.length) {
-      segs.innerHTML = '<span class="sp-empty">凑 2 个同阵营 / 同职业即可点亮羁绊</span>';
+      segs.innerHTML = '<span class="sp-empty">凑 2 个同阵营 / 同打法即可点亮羁绊</span>';
       return;
     }
     segs.innerHTML = act
       .map((st) => {
         const on = st.tier > 0;
         const txt = on ? `${st.descs[st.tier - 1] ?? ''}` : nextText(st);
-        return `<span class="sp-seg${on ? ' is-on' : ''}" data-key="${st.key}" style="--sc:${SYN_COLOR[st.key]}"><img src="${synIcon(st.key)}" alt=""><b>${esc(st.name)}${on ? `×${st.count}` : ` ${st.count}/${st.thresholds[0]}`}</b>${esc(txt)}</span>`;
+        return `<span class="sp-seg${on ? ' is-on' : ''}" data-key="${st.key}" style="--sc:${SYN_COLOR[st.key]}">${synIconHtml(st.key)}<b>${esc(st.name)}${on ? `×${st.count}` : ` ${st.count}/${st.thresholds[0]}`}</b>${esc(txt)}</span>`;
       })
       .join('');
   }
@@ -180,9 +196,9 @@ export function synergyPanel(): SynergyPanel {
       .map((s) => {
         const actives = s.descs.slice(0, s.tier).map((d, i) => `<li class="on"><i>${s.thresholds[i]}</i>${esc(d)}</li>`).join('');
         const nxt = s.tier < s.thresholds.length ? `<li class="next"><i>${s.thresholds[s.tier]}</i>再 ${s.thresholds[s.tier] - s.count} 个 → ${esc(s.descs[s.tier] ?? '')}</li>` : '<li class="max">已满档！</li>';
-        return `<div class="sp-row${s.tier ? ' is-on' : ''}" data-key="${s.key}" style="--sc:${SYN_COLOR[s.key]}"><div class="sp-row-head"><img src="${synIcon(s.key)}" alt=""><b>${esc(s.name)}</b><span>${s.count} 个${s.tier ? ` · ${s.tier} 档` : ''}</span></div><ul>${actives}${nxt}</ul></div>`;
+        return `<div class="sp-row${s.tier ? ' is-on' : ''}" data-key="${s.key}" style="--sc:${SYN_COLOR[s.key]}"><div class="sp-row-head">${synIconHtml(s.key)}<b>${esc(s.name)}</b><span>${s.count} 个${s.tier ? ` · ${s.tier} 档` : ''}</span></div><ul>${actives}${nxt}</ul></div>`;
       })
-      .join('')}${rest.length ? `<div class="sp-rest">未凑：${rest.map((s) => `<button class="sp-mini" data-key="${s.key}"><img src="${synIcon(s.key)}" alt="">${esc(s.name)}</button>`).join('')}</div>` : ''}`;
+      .join('')}${rest.length ? `<div class="sp-rest">未凑：${rest.map((s) => `<button class="sp-mini" data-key="${s.key}">${synIconHtml(s.key)}${esc(s.name)}</button>`).join('')}</div>` : ''}`;
     pop.querySelectorAll<HTMLElement>('.sp-row, .sp-mini').forEach((r) => {
       r.onclick = (e) => {
         e.stopPropagation();

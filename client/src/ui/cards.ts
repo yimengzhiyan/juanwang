@@ -4,10 +4,16 @@ import {
   type Archetype, type ConsumableDef, type EquipDef, type EquipSlot, type FreeReason, type GameData, type Level, type SynergyKey,
   type SynergyState, type UnitDef, type UnitEquips,
 } from '@juanwang/shared';
-import { assetUrl, avatarUrl, isPhotoAvatar, ui } from '../assets';
+import { assetUrl, avatarUrl, hasAsset, isPhotoAvatar, ui } from '../assets';
 
 export const FACTION_NAME: Record<string, string> = { open: '开源', closed: '闭源', compute: '算力', folk: '民间' };
-export const ROLE_NAME: Record<string, string> = { researcher: '研究员', trader: '商人', idol: '偶像', engineer: '工程师' };
+export const ROLE_NAME: Record<string, string> = {
+  researcher: '研究员', trader: '商人', idol: '偶像', engineer: '工程师',
+  // 2.1 打法关键词（DESIGN 16）
+  multi: '多刀', shield: '护盾', summon: '召唤', explode: '自爆', growth: '成长', economy: '经济',
+};
+/** 打法图标缺图时的文字徽记（1 字） */
+export const ROLE_GLYPH: Record<string, string> = { multi: '刀', shield: '盾', summon: '召', explode: '爆', growth: '长', economy: '钱', researcher: '研', trader: '商', idol: '偶', engineer: '工' };
 export const TIER_NAME = ['', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6'];
 export const SLOT_NAME: Record<EquipSlot, string> = { weapon: '武器', armor: '防具', trinket: '饰品' };
 
@@ -15,14 +21,24 @@ export const SLOT_NAME: Record<EquipSlot, string> = { weapon: '武器', armor: '
 export const SYN_COLOR: Record<string, string> = {
   open: '#58C65C', closed: '#2F80ED', compute: '#FF8C42', folk: '#FF7EB6',
   researcher: '#9B6BFF', trader: '#FFC53D', idol: '#FF7EB6', engineer: '#2F80ED',
+  multi: '#F25757', shield: '#5B8DEF', summon: '#FF7EB6', explode: '#FF8C42', growth: '#58C65C', economy: '#FFC53D',
 };
 export const SYN_DARK: Record<string, string> = {
   open: '#3E9E44', closed: '#1F5FC0', compute: '#D9692A', folk: '#D85A92',
   researcher: '#7A4FE0', trader: '#E0A21E', idol: '#D85A92', engineer: '#1F5FC0',
+  multi: '#D63E3E', shield: '#3B6CC9', summon: '#D85A92', explode: '#D9692A', growth: '#3E9E44', economy: '#E0A21E',
 };
 export const isFactionKey = (k: string): boolean => k in FACTION_NAME;
 export const synIcon = (key: string): string => ui(isFactionKey(key) ? `faction_${key}` : `role_${key}`);
-export const synName = (key: string): string => SYNERGY_NAME[key as SynergyKey] ?? (key === 'mixed' ? '杂牌军' : key);
+/** 流派线图标素材是否存在（打法图标美术未到位时用文字徽记） */
+export const hasSynIcon = (key: string): boolean => hasAsset(`ui/${isFactionKey(key) ? `faction_${key}` : `role_${key}`}.svg`);
+/** 流派线图标 HTML：有图用 <img>，缺图用带色圆底的 1 字徽记（同 class，尺寸由调用处 CSS 决定） */
+export function synIconHtml(key: string, cls = '', alt = ''): string {
+  if (hasSynIcon(key)) return `<img${cls ? ` class="${cls}"` : ''} src="${synIcon(key)}" alt="${esc(alt)}" draggable="false">`;
+  const g = ROLE_GLYPH[key] ?? Array.from(synName(key))[0] ?? '?';
+  return `<i class="syn-glyph${cls ? ` ${cls}` : ''}" style="--sc:${SYN_COLOR[key] ?? '#9B6BFF'}" title="${esc(alt || synName(key))}">${esc(g)}</i>`;
+}
+export const synName = (key: string): string => SYNERGY_NAME[key as SynergyKey] ?? ROLE_NAME[key] ?? FACTION_NAME[key] ?? (key === 'mixed' ? '杂牌军' : key);
 /** 流派（对手 archetype）→ 代表线 key */
 export const archetypeKey = (a?: Archetype | null): string | null => a?.faction ?? a?.role ?? null;
 
@@ -116,7 +132,7 @@ export function unitCard(def: UnitDef, st: CardStats, opts: CardOpts = {}): HTML
           <div class="uc-name">${esc(def.name)}</div>
           <div class="ub-tags">
             <span class="ub-tag ub-tag--fac"><img class="uc-fac" src="${ui(`faction_${def.faction}`)}" alt="" draggable="false">${FACTION_NAME[def.faction]}</span>
-            ${def.role ? `<span class="ub-tag"><img class="uc-role" src="${ui(`role_${def.role}`)}" alt="" draggable="false">${ROLE_NAME[def.role]}</span>` : ''}
+            ${def.role ? `<span class="ub-tag">${synIconHtml(def.role, 'uc-role')}${esc(synName(def.role))}</span>` : ''}
             ${opts.full ? `<span class="ub-tag ub-tag--tier">${def.token ? '召唤物' : TIER_NAME[def.tier]}</span>` : ''}
           </div>
         </div>
@@ -125,7 +141,7 @@ export function unitCard(def: UnitDef, st: CardStats, opts: CardOpts = {}): HTML
   } else {
     el.innerHTML = `
       ${STARS}
-      ${def.role ? `<img class="uc-role" src="${ui(`role_${def.role}`)}" alt="${ROLE_NAME[def.role]}" draggable="false">` : ''}
+      ${def.role ? synIconHtml(def.role, 'uc-role', synName(def.role)) : ''}
       <img class="uc-fac" src="${ui(`faction_${def.faction}`)}" alt="${FACTION_NAME[def.faction]}" draggable="false">
       ${ava}
       <div class="uc-name" style="--nl:${nameLen(def.name)}">${esc(def.name)}</div>
@@ -253,7 +269,7 @@ export function synergyChip(st: SynergyState, opts: { compact?: boolean } = {}):
   el.className = `syn syn--t${st.tier}${st.count ? '' : ' is-zero'}${opts.compact ? ' is-compact' : ''}`;
   el.dataset.key = st.key;
   el.style.setProperty('--sc', SYN_COLOR[st.key]);
-  el.innerHTML = `<img class="syn-ico" src="${synIcon(st.key)}" alt="">${opts.compact ? '' : `<span class="syn-name">${esc(st.name)}</span>`}<b>${st.tier >= st.thresholds.length ? Math.min(st.count, 9) : `${Math.min(st.count, 9)}/${nextAt}`}</b>${tierShield(st.tier)}`;
+  el.innerHTML = `${synIconHtml(st.key, 'syn-ico')}${opts.compact ? '' : `<span class="syn-name">${esc(st.name)}</span>`}<b>${st.tier >= st.thresholds.length ? Math.min(st.count, 9) : `${Math.min(st.count, 9)}/${nextAt}`}</b>${tierShield(st.tier)}`;
   return el;
 }
 
@@ -263,7 +279,7 @@ export function synergyDetailHtml(st: SynergyState): string {
     .map((t, i) => `<li class="${st.tier > i ? 'on' : ''}">${tierShield(i + 1, 'tier-shield sm')}<b>${t} 个</b><span>${esc(st.descs[i] ?? '')}</span></li>`)
     .join('');
   const next = st.next ? `再凑 ${st.next} 个升到下一档` : st.tier ? '已满档！' : '';
-  return `<div class="syn-detail"><div class="syn-detail-head"><img src="${synIcon(st.key)}" alt=""><b>${esc(st.name)}</b><span>当前 ${st.count} 个${next ? ` · ${next}` : ''}</span></div><ul>${rows}</ul></div>`;
+  return `<div class="syn-detail"><div class="syn-detail-head">${synIconHtml(st.key)}<b>${esc(st.name)}</b><span>当前 ${st.count} 个${next ? ` · ${next}` : ''}</span></div><ul>${rows}</ul></div>`;
 }
 
 /** 热度血条颜色（>50% 绿、>25% 金、其余红） */

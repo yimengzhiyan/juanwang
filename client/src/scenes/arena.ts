@@ -3,7 +3,7 @@ import gsap from 'gsap';
 import { DEFAULT_ARENAS, type ArenaDef } from '@juanwang/shared';
 import { app, act, go, type Scene } from '../store';
 import { artUrl, assetUrl, hasAsset } from '../assets';
-import { archetypeKey, esc, SYN_COLOR, synIcon, synName } from '../ui/cards';
+import { archetypeKey, esc, SYN_COLOR, synIconHtml, synName } from '../ui/cards';
 import { toast } from '../ui/toast';
 import { sfx } from '../fx/sound';
 import { reducedMotion } from '../fx/anims';
@@ -53,7 +53,7 @@ export function arenaScene(): Scene {
     <div class="ar-opps"><small>本局 ${s.opponents.length} 名对手</small><div class="ar-opp-list">${s.opponents
       .map((o) => {
         const k = archetypeKey(o.archetype);
-        return `<div class="ar-opp"><span class="lb-ava">${o.avatar ? `<img src="${artUrl(o.avatar)}" alt="">` : esc(Array.from(o.name)[0] ?? '?')}</span><b class="ar-opp-name">${esc(o.name)}</b><span class="ar-opp-info">${k ? `<em style="--sc:${SYN_COLOR[k]}"><img src="${synIcon(k)}" alt="">${esc(synName(k))}流</em>` : '<em>杂牌军</em>'}</span></div>`;
+        return `<div class="ar-opp"><span class="lb-ava">${o.avatar ? `<img src="${artUrl(o.avatar)}" alt="">` : esc(Array.from(o.name)[0] ?? '?')}</span><b class="ar-opp-name">${esc(o.name)}</b><span class="ar-opp-info">${k ? `<em style="--sc:${SYN_COLOR[k]}">${synIconHtml(k)}${esc(synName(k))}流</em>` : '<em>杂牌军</em>'}</span></div>`;
       })
       .join('')}</div></div>
     <button class="btn btn--go btn--xl ar-go" disabled>就它了</button>`;
@@ -73,7 +73,7 @@ export function arenaScene(): Scene {
         <b class="ar-name">${esc(a.name)}</b>
         <span class="ar-rule">${esc(rule)}</span>
         ${flavor ? `<small class="ar-flavor">${esc(flavor)}</small>` : ''}
-        <span class="ar-hints">${hints.map((k) => `<span class="ar-hint"><img src="${synIcon(k)}" alt="">${esc(synName(k))}</span>`).join('')}</span>
+        <span class="ar-hints">${hints.map((k) => `<span class="ar-hint">${synIconHtml(k)}${esc(synName(k))}</span>`).join('')}</span>
       </div>`;
     c.onclick = () => {
       sfx.click();

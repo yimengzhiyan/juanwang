@@ -9,7 +9,7 @@ import {
 import { arenaHudChip } from '../ui/arenaChip';
 import { app, markSeen, setRun, settings, type Scene } from '../store';
 import { setHpChip, topbar, updateTopbar } from '../ui/team';
-import { esc, plain, setCardStats, setShield, skillName, skillShort, SYN_COLOR, SYN_DARK, synIcon, tierShield, unitCard } from '../ui/cards';
+import { esc, plain, setCardStats, setShield, skillName, skillShort, SYN_COLOR, SYN_DARK, synIconHtml, tierShield, unitCard } from '../ui/cards';
 import { showUnitDetail } from '../ui/modal';
 import { lobbyView, updateDock } from '../ui/lobby';
 import { pveStrip } from '../ui/pve';
@@ -203,7 +203,7 @@ export function battleScene(): Scene {
     c.className = 'ss-chip';
     c.dataset.key = key;
     c.style.setProperty('--sc', SYN_COLOR[key] ?? '#9B6BFF');
-    c.innerHTML = `<img src="${synIcon(key)}" alt="">${esc(name)}×${count}${tierShield(tier)}`;
+    c.innerHTML = `${synIconHtml(key)}${esc(name)}×${count}${tierShield(tier)}`;
     row.appendChild(c);
     if (!skipping) gsap.fromTo(c, { scale: 0 }, { scale: 1, duration: 0.25, ease: 'back.out(3)' });
   }
@@ -469,7 +469,7 @@ export function battleScene(): Scene {
         if (u) {
           const icon = document.createElement('div');
           icon.className = 'skill-icon';
-          icon.innerHTML = `<img src="${synIcon(key)}" alt="">`;
+          icon.innerHTML = `${synIconHtml(key)}`;
           u.el.appendChild(icon);
           gsap.timeline({ onComplete: () => icon.remove() }).fromTo(icon, { scale: 0, y: 0 }, { scale: 1, y: -8, duration: 0.18, ease: 'back.out(3)' }).to(icon, { opacity: 0, duration: 0.2 }, '+=0.3');
         }
@@ -569,6 +569,13 @@ export function battleScene(): Scene {
         if (fast) return;
         refresh(u);
         const txt = ev.atk && ev.hp ? `${sgn(ev.atk)}/${sgn(ev.hp)}` : ev.atk ? `${sgn(ev.atk)} 攻` : `${sgn(ev.hp)} 血`;
+        if (ev.permanent && ev.atk >= 0 && ev.hp >= 0) {
+          // 战斗内永久成长（羁绊 4 档 / 技能）：金色「永久 +1」浮字，赛后写回队伍
+          fl(u, `永久 ${txt}`, '#FFC53D', -14, 22);
+          flashRing(u, '#FFC53D');
+          await wait(0.04);
+          return;
+        }
         fl(u, txt, ev.atk < 0 || ev.hp < 0 ? '#F25757' : ev.atk && !ev.hp ? '#FF8C42' : '#58C65C', -10, 20);
         flashRing(u, '#FFC53D');
         await wait(0.02);

@@ -7,7 +7,7 @@ import {
 } from '@juanwang/shared';
 import { app, go, goRun, newSeed, recordAchievements, settings, startRun, type Scene } from '../store';
 import { artUrl, assetUrl } from '../assets';
-import { archetypeKey, esc, miniAvatar, synIcon, synName, tierShield, unitCard } from '../ui/cards';
+import { archetypeKey, esc, miniAvatar, synIconHtml, synName, tierShield, unitCard } from '../ui/cards';
 import { showUnitDetail } from '../ui/modal';
 import { toast } from '../ui/toast';
 import { updateDock } from '../ui/lobby';
@@ -15,6 +15,13 @@ import { api } from '../net';
 import { fullscreen, reducedMotion } from '../fx/anims';
 import { particles } from '../fx/particles';
 import { sfx } from '../fx/sound';
+
+/** 成就名：引擎 ACHIEVEMENTS 优先；旧 id（tier:<key>:<n>）按流派名兜底 */
+function achName(id: string): string {
+  if (ACHIEVEMENTS[id]) return ACHIEVEMENTS[id];
+  const m = /^tier:(\w+):(\d)$/.exec(id);
+  return m ? `流派·${synName(m[1])} ${m[2]} 档` : id;
+}
 
 export function shareLink(seed: string): string {
   return `${location.origin}${location.pathname}?seed=${encodeURIComponent(seed)}`;
@@ -101,10 +108,10 @@ export function overScene(): Scene {
     </div>
     <div class="over-body panel">
       <div class="over-arch">
-        <span class="oa-badge">${domKey ? `<img class="oa-ico" src="${synIcon(domKey)}" alt="">${tierShield(dom?.tier ?? 1, 'oa-tier')}` : '<span class="oa-mixed">杂</span>'}</span>
-        <div class="oa-text"><small>本局流派</small><b>${esc(end?.archetypeName ?? (domKey ? `${synName(domKey)}流` : '杂牌军'))}</b>${dom ? `<span>${esc(dom.name)} ×${dom.count}：${esc(dom.descs[dom.tier - 1] ?? '')}</span>` : '<span>没有点亮羁绊，下局试试凑同阵营/同职业</span>'}</div>
+        <span class="oa-badge">${domKey ? `${synIconHtml(domKey, 'oa-ico')}${tierShield(dom?.tier ?? 1, 'oa-tier')}` : '<span class="oa-mixed">杂</span>'}</span>
+        <div class="oa-text"><small>本局流派${dom ? ` · ${dom.kind === 'faction' ? '阵营' : '打法'}` : ''}</small><b>${esc(end?.archetypeName ?? (domKey ? `${synName(domKey)}流` : '杂牌军'))}</b>${dom ? `<span>${esc(dom.name)} ×${dom.count}：${esc(dom.descs[dom.tier - 1] ?? '')}</span>` : '<span>没有点亮羁绊，下局试试凑同阵营 / 同打法</span>'}</div>
       </div>
-      ${ach.length ? `<div class="over-ach">${ach.map((id) => `<span class="ach${fresh.has(id) ? ' is-fresh' : ''}">${esc(ACHIEVEMENTS[id] ?? id)}${fresh.has(id) ? '<b class="ach-stamp">首次</b>' : ''}</span>`).join('')}</div>` : ''}
+      ${ach.length ? `<div class="over-ach">${ach.map((id) => `<span class="ach${fresh.has(id) ? ' is-fresh' : ''}">${esc(achName(id))}${fresh.has(id) ? '<b class="ach-stamp">首次</b>' : ''}</span>`).join('')}</div>` : ''}
       <div class="over-mid">
         <div class="over-best"><div class="over-best-card"></div><div class="over-best-label">MVP</div></div>
         <div class="over-stats">
@@ -120,7 +127,7 @@ export function overScene(): Scene {
       <div class="over-sec-title">8 人房排名</div>
       <div class="over-ranks">${finalRanking(s)
         .map(
-          (r) => `<div class="or-row${r.me ? ' is-me' : ''}"><span class="or-place p${r.place}">${r.place}</span>${r.me ? '<span class="lb-ava lb-ava--me sm">你</span>' : r.avatar ? `<span class="lb-ava sm"><img src="${artUrl(r.avatar)}" alt=""></span>` : `<span class="lb-ava lb-ava--txt sm">${esc(Array.from(r.name)[0] ?? '?')}</span>`}<span class="or-name">${esc(r.me ? `${r.name}（你）` : r.name)}</span>${r.arch ? `<img class="or-arch" src="${synIcon(r.arch)}" alt="">` : ''}</div>`,
+          (r) => `<div class="or-row${r.me ? ' is-me' : ''}"><span class="or-place p${r.place}">${r.place}</span>${r.me ? '<span class="lb-ava lb-ava--me sm">你</span>' : r.avatar ? `<span class="lb-ava sm"><img src="${artUrl(r.avatar)}" alt=""></span>` : `<span class="lb-ava lb-ava--txt sm">${esc(Array.from(r.name)[0] ?? '?')}</span>`}<span class="or-name">${esc(r.me ? `${r.name}（你）` : r.name)}</span>${r.arch ? `${synIconHtml(r.arch, 'or-arch')}` : ''}</div>`,
         )
         .join('')}</div>
       <div class="over-seed">种子 <code>${esc(s.seed)}</code></div>

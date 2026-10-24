@@ -1,12 +1,12 @@
-// 图鉴：4 阵营页签（顶部 2/3/5 档效果 + 该阵营全部单位大卡）/ 职业 / 装备 / 赛场。对局中打开时标出当前羁绊人数。
+// 图鉴：4 阵营页签（顶部 2/3/5 档效果 + 该阵营全部单位大卡）/ 打法（6 个子页签，顶部 2/4 档效果来自 ROLE_META）/ 装备 / 赛场。对局中打开时标出当前羁绊人数。
 import {
-  EQUIP_SLOTS, FACTIONS, FACTION_THRESHOLDS, ROLES, ROLE_THRESHOLDS, SYNERGY_DESCS, computeSynergies, stateBonus,
-  type GameData, type RunState, type SynergyKey, type UnitDef,
+  EQUIP_SLOTS, FACTIONS, FACTION_THRESHOLDS, ROLES, ROLE_META, SYNERGY_DESCS, computeSynergies, stateBonus,
+  type GameData, type Role, type RunState, type SynergyKey, type UnitDef,
 } from '@juanwang/shared';
 import { settings } from '../store';
-import { assetUrl, avatarUrl, isPhotoAvatar } from '../assets';
+import { assetUrl } from '../assets';
 import { openModal, showItemDetail, showUnitDetail } from './modal';
-import { esc, equipShort, SLOT_NAME, SYN_COLOR, synIcon, synName, tierShield, unitCard } from './cards';
+import { equipShort, esc, SLOT_NAME, SYN_COLOR, synIcon, synIconHtml, synName, tierShield, unitCard } from './cards';
 import { arenaArt, arenaHints, arenaText } from '../scenes/arena';
 
 type Tab = 'open' | 'closed' | 'compute' | 'folk' | 'roles' | 'equips' | 'arenas';
@@ -27,13 +27,14 @@ export function openCodex(data: GameData, run?: RunState | null): void {
     if (best && best[1] > 0) tab = best[0];
   }
 
-  /** 某条羁绊的档位说明 */
+  /** 某条羁绊的档位说明（打法线取 ROLE_META：门槛 2/4、各档效果、一句话定位） */
   const tiersHtml = (key: SynergyKey): string => {
-    const th: readonly number[] = (FACTIONS as readonly string[]).includes(key) ? FACTION_THRESHOLDS : ROLE_THRESHOLDS;
+    const meta = (ROLES as readonly string[]).includes(key) ? ROLE_META[key as Role] : undefined;
+    const th: readonly number[] = meta ? meta.thresholds : FACTION_THRESHOLDS;
     const n = counts.get(key) ?? 0;
-    const descs = SYNERGY_DESCS[key] ?? [];
+    const descs: readonly string[] = meta ? meta.descs : (SYNERGY_DESCS[key] ?? []);
     return `<div class="cx-syn" style="--sc:${SYN_COLOR[key]}">
-      <div class="cx-syn-head"><img src="${synIcon(key)}" alt=""><b>${esc(synName(key))}</b>${run ? `<span>当前 ${n} 个</span>` : ''}</div>
+      <div class="cx-syn-head">${synIconHtml(key)}<b>${esc(meta?.name ?? synName(key))}</b>${meta ? `<em>${esc(meta.tagline)}</em>` : ''}${run ? `<span>当前 ${n} 个</span>` : ''}</div>
       <ul>${th.map((t, i) => `<li class="${run && n >= t ? 'on' : ''}">${tierShield(i + 1, 'tier-shield sm')}<b>${t} 个</b><span>${esc(descs[i] ?? '')}</span></li>`).join('')}</ul>
     </div>`;
   };
@@ -75,22 +76,40 @@ export function openCodex(data: GameData, run?: RunState | null): void {
     }
   };
 
+  /** 打法页：6 个子页签（多刀/护盾/召唤/自爆/成长/经济），每页顶部 2/4 档效果 + 该打法全部单位 */
+  let role: Role = ROLES[0];
+  if (run) {
+    const best = ROLES.map((r) => [r, counts.get(r) ?? 0] as const).sort((a, b) => b[1] - a[1])[0];
+    if (best && best[1] > 0) role = best[0];
+  }
   const renderRoles = (): void => {
     list.innerHTML = '';
+    const sub = document.createElement('div');
+    sub.className = 'cx-subtabs';
     for (const r of ROLES) {
+      const b = document.createElement('button');
+      b.className = `cx-subtab${r === role ? ' on' : ''}`;
+      b.dataset.role = r;
+      b.style.setProperty('--sc', SYN_COLOR[r] ?? '#9B6BFF');
+      const n = counts.get(r) ?? 0;
+      b.innerHTML = `${synIconHtml(r)}<span>${esc(ROLE_META[r]?.name ?? synName(r))}</span>${run && n ? `<b>${n}</b>` : ''}`;
+      b.onclick = () => {
+        role = r;
+        renderRoles();
+      };
+      sub.appendChild(b);
+    }
+    list.appendChild(sub);
+    list.insertAdjacentHTML('beforeend', tiersHtml(role));
+    const pool = data.units.filter((u) => u.role === role && !u.token).sort((a, b) => a.tier - b.tier);
+    if (!pool.length) list.insertAdjacentHTML('beforeend', '<div class="codex-head">暂时没有这个打法的单位</div>');
+    for (let t = 1; t <= 6; t++) {
+      const units = pool.filter((u) => u.tier === t);
+      if (!units.length) continue;
       const sec = document.createElement('section');
       sec.className = 'codex-sec';
-      sec.innerHTML = tiersHtml(r);
-      const row = document.createElement('div');
-      row.className = 'cx-role-units';
-      for (const d of data.units.filter((u) => u.role === r && !u.token).sort((a, b) => a.tier - b.tier)) {
-        const b = document.createElement('button');
-        b.className = 'cx-ru';
-        b.innerHTML = `<span class="mini-ava tier-${d.tier}"><img class="${isPhotoAvatar(d) ? 'is-photo' : ''}" src="${avatarUrl(d)}" alt=""></span><span><b>${esc(d.name)}</b><small>T${d.tier} · ${esc(synName(d.faction))}</small></span>`;
-        b.onclick = () => showUnitDetail(data, d.id);
-        row.appendChild(b);
-      }
-      sec.appendChild(row);
+      sec.innerHTML = `<h3 class="codex-tier">T${t}</h3>`;
+      sec.appendChild(unitGrid(units));
       list.appendChild(sec);
     }
   };
@@ -133,7 +152,7 @@ export function openCodex(data: GameData, run?: RunState | null): void {
       const c = document.createElement('div');
       c.className = 'codex-arena';
       c.innerHTML = `<div class="ar-art">${art ? `<img src="${art}" alt="">` : ''}</div><div class="ca-body"><b>${esc(a.name)}</b><span>${esc(rule)}</span>${flavor ? `<small>${esc(flavor)}</small>` : ''}<span class="ar-hints">${arenaHints(a)
-        .map((k) => `<span class="ar-hint"><img src="${synIcon(k)}" alt="">${esc(synName(k))}</span>`)
+        .map((k) => `<span class="ar-hint">${synIconHtml(k)}${esc(synName(k))}</span>`)
         .join('')}</span></div>`;
       grid.appendChild(c);
     }
@@ -150,7 +169,7 @@ export function openCodex(data: GameData, run?: RunState | null): void {
   };
   const defs: [Tab, string, string | null][] = [
     ...FACTIONS.map((f) => [f, synName(f), synIcon(f)] as [Tab, string, string]),
-    ['roles', '职业', null],
+    ['roles', '打法', null],
     ['equips', '装备', null],
     ['arenas', '赛场', null],
   ];

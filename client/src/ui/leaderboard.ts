@@ -3,7 +3,7 @@ import type { GameData } from '@juanwang/shared';
 import { api, todayCN, type LbEntry } from '../net';
 import { settings } from '../store';
 import { openModal } from './modal';
-import { esc, miniAvatar, synIcon, synName } from './cards';
+import { esc, miniAvatar, synIconHtml, synName } from './cards';
 
 type Tab = 'all' | 'room' | 'today';
 
@@ -66,7 +66,7 @@ function row(data: GameData, e: LbEntry): string {
     ${best ? miniAvatar(data, best) : '<span class="mini-ava"></span>'}
     <span class="lb-name">${esc(e.name)}${e.won ? ' <b class="lb-crown">吃鸡</b>' : ''}</span>
     <span class="lb-place r${Math.min(4, e.rank)}">第${e.rank}名</span>
-    ${arch ? `<img class="lb-arch-ico" src="${synIcon(arch)}" alt="${esc(synName(arch))}" title="${esc(synName(arch))}流">` : '<span class="lb-arch-ico"></span>'}
+    ${arch ? `${synIconHtml(arch, 'lb-arch-ico', synName(arch))}` : '<span class="lb-arch-ico"></span>'}
     <span class="lb-turns">${e.turns} 回合</span>
   </div>`;
 }

@@ -3,7 +3,7 @@
 import gsap from 'gsap';
 import { START_HP, pveForTurn, type BattleResult, type Level, type RunState, type Side } from '@juanwang/shared';
 import { app, act, go } from '../store';
-import { artUrl, avatarUrl, isPhotoAvatar } from '../assets';
+import { artUrl, avatarUrl, isPhotoAvatar, ui } from '../assets';
 import { esc, hpColor, synergyChip } from '../ui/cards';
 import { extraBanner } from '../ui/headline';
 import { remainingBanner, type LobbyView } from '../ui/lobby';
@@ -23,6 +23,30 @@ export interface ResultCtx {
   after: RunState;
   units: Map<string, UnitInfo>;
   lobby?: LobbyView;
+}
+
+/** 本场我方永久成长合计（BattleResult.permanentBuffs；缺省时按 buff 事件 permanent 统计我方） */
+function growHtml(result: BattleResult): string {
+  let atk = 0;
+  let hp = 0;
+  let n = 0;
+  if (result.permanentBuffs?.length) {
+    for (const b of result.permanentBuffs) {
+      atk += b.atk;
+      hp += b.hp;
+      n++;
+    }
+  } else {
+    for (const e of result.events) {
+      if (e.type !== 'buff' || !e.permanent || e.unit.side !== 'me') continue;
+      atk += e.atk;
+      hp += e.hp;
+      n++;
+    }
+  }
+  if (!n || (atk <= 0 && hp <= 0)) return '';
+  const v = atk && hp ? `+${atk}/+${hp}` : atk ? `+${atk} 攻` : `+${hp} 血`;
+  return `<div class="sum-grow"><img src="${ui('star')}" alt="">本场永久成长 <b>${v}</b><small>${n} 次 · 已写回队伍</small></div>`;
 }
 
 /** 调试/自动化：结算页的 PVE 奖励选择 */
@@ -73,6 +97,7 @@ export function showResult(host: HTMLElement, c: ResultCtx): void {
           <span class="sum-ava"><img class="${isPhotoAvatar(mvpDef) ? 'is-photo' : ''}" src="${avatarUrl(mvpDef)}" alt=""><b class="sum-mvp-tag">MVP</b></span>
           <div class="sum-mvp-info"><b>${mvp && mvp.level > 1 ? `Lv${mvp.level} ` : ''}${esc(mvpDef.name)}</b><small>造成 ${mvpDmg} 伤害</small></div>
         </div>` : ''}
+        ${growHtml(result)}
         ${sum.reason ? `<div class="sum-reason"><i>“</i>${esc(sum.reason)}<i>”</i></div>` : ''}
         ${dmg.length ? `<div class="sum-bars">${dmg
           .slice(0, 5)
