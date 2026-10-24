@@ -118,6 +118,7 @@ export function battleScene(): Scene {
     particles.clear();
     getFxLayer().innerHTML = '';
     bigSlot.innerHTML = '';
+    arena.classList.remove('is-big');
   };
   speed.onclick = (e) => {
     const b = (e.target as HTMLElement).closest('button') as HTMLElement | null;
@@ -264,11 +265,31 @@ export function battleScene(): Scene {
       .fromTo(b, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.16, ease: 'back.out(2.5)' })
       .to(b, { y: -10, opacity: 0, duration: 0.18, ease: 'power2.in' }, `+=${hold}`);
   }
-  function addLog(text: string): void {
+  function addLog(text: string, ev?: BattleEvent): void {
     const d = document.createElement('div');
-    d.textContent = plain(text);
+    if (ev) d.innerHTML = logHtml(ev);
+    else d.textContent = plain(text);
     logLines.prepend(d);
     while (logLines.children.length > 40) logLines.lastElementChild!.remove();
+  }
+  /** 日志行：敌方单位名字前加"敌方·"并标红（同名单位互杀时也分得清） */
+  function logHtml(ev: BattleEvent): string {
+    const text = plain(ev.text);
+    const e = ev as { unit?: UnitRef; killer?: UnitRef; source?: UnitRef; target?: UnitRef; side?: Side };
+    if (ev.type === 'synergyTier') return ev.side === 'enemy' ? `<span class="lg-en">敌方</span> ${esc(text)}` : esc(text);
+    const refs = [e.unit, e.killer ?? e.source ?? e.target].filter((r): r is UnitRef => !!r && !!r.defId && !!r.side);
+    let out = '';
+    let pos = 0;
+    for (const r of refs) {
+      const name = data.unitsById[r.defId]?.name;
+      if (!name) continue;
+      const i = text.indexOf(name, pos);
+      if (i < 0) continue;
+      out += esc(text.slice(pos, i));
+      out += r.side === 'enemy' ? `<span class="lg-en">敌方·${esc(name)}</span>` : `<span class="lg-me">${esc(name)}</span>`;
+      pos = i + name.length;
+    }
+    return out + esc(text.slice(pos));
   }
   function say(u: BU, line: string): void {
     const b = u.el.querySelector('.say-bubble') as HTMLElement;
@@ -333,8 +354,9 @@ export function battleScene(): Scene {
       bigSlot.appendChild(b);
       sfx.bigSkill();
       if (u) flashRing(u, color);
+      arena.classList.add('is-big');
       gsap
-        .timeline({ onComplete: () => b.remove() })
+        .timeline({ onComplete: () => { b.remove(); if (!bigSlot.children.length) arena.classList.remove('is-big'); } })
         .fromTo(b, { scale: 0, opacity: 1 }, { scale: 1, duration: 0.22, ease: 'back.out(2)' })
         .to(b, { y: -24, opacity: 0, duration: 0.25, ease: 'power1.in' }, '+=0.5');
       setTimeScale(curSpeed * 0.5);
@@ -362,7 +384,7 @@ export function battleScene(): Scene {
 
   // ───────────── 事件处理 ─────────────
   async function play(ev: BattleEvent): Promise<void> {
-    if (ev.type !== 'say' && ev.type !== 'attack' && ev.type !== 'damage' && ev.type !== 'equipProc') addLog(ev.text);
+    if (ev.type !== 'say' && ev.type !== 'attack' && ev.type !== 'damage' && ev.type !== 'equipProc') addLog(ev.text, ev);
     const fast = skipping;
     switch (ev.type) {
       case 'start': {

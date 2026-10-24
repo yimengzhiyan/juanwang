@@ -1388,3 +1388,21 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
 .actions .btn { min-height: 52px; }
 .side-syn { justify-content: safe center; gap: 3px; }
 .ss-chip { font-size: 11.5px; padding: 0 5px 0 2px; flex: none; }
+
+/* ═════ 2.1 小修：结局页印章 / 吸底按钮，战斗 VS，日志敌我 ═════ */
+.ach { display: inline-flex; align-items: center; gap: 4px; }
+.ach-stamp { position: static; rotate: 0deg; flex: none; font-size: 10px; line-height: 14px; padding: 0 4px; border-width: 1.5px; border-radius: 5px; }
+.over-btns2 { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 10px; }
+.over-btns2 .over-home { align-self: center; }
+.over-btns { margin-top: 0; padding-top: 10px; padding-bottom: 2px; }
+.over-btns .over-again { min-height: 60px; font-size: 26px; }
+.scene--over { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+.over-body { margin-bottom: 4px; }
+.blog-lines div.is-enemy { color: var(--c-red-dark); }
+.blog-lines div.is-enemy:first-child { color: #B42F2F; }
+.blog-lines div .lg-en { color: var(--c-red-dark); font-weight: 700; }
+.blog-lines div .lg-me { color: var(--c-blue-dark); font-weight: 700; }
+.arena.is-big .vs { visibility: hidden; }
+.big-skill { max-width: calc(100% - 16px); }
+.bs-text { min-width: 0; }
+.bs-text b { overflow: hidden; text-overflow: ellipsis; font-size: clamp(30px, 10.5vw, 46px); }

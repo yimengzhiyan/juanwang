@@ -125,13 +125,15 @@ export function overScene(): Scene {
         .join('')}</div>
       <div class="over-seed">种子 <code>${esc(s.seed)}</code></div>
     </div>
-    <div class="over-btns">
-      <button class="btn btn--go btn--xl over-again">再来一局</button>
+    <div class="over-btns2">
       <div class="over-row">
         <button class="btn btn--blue over-same">再战同一局</button>
         <button class="btn btn--gold over-share">分享</button>
       </div>
       <button class="btn btn--white btn--sm over-home">回首页</button>
+    </div>
+    <div class="over-btns">
+      <button class="btn btn--go btn--xl over-again">再来一局</button>
     </div>`;
   const bestBox = el.querySelector('.over-best-card') as HTMLElement;
   if (best && data.unitsById[best.defId]) {
@@ -200,7 +202,7 @@ export function overScene(): Scene {
       box = document.createElement('div');
       box.className = 'over-link';
       box.innerHTML = `<small>自动复制失败，长按下面的链接手动复制：</small><input readonly aria-label="分享链接">`;
-      el.querySelector('.over-btns')!.insertBefore(box, el.querySelector('.over-home'));
+      el.querySelector('.over-btns2')!.insertBefore(box, el.querySelector('.over-home'));
     }
     const input = box.querySelector('input') as HTMLInputElement;
     input.value = link;
@@ -239,8 +241,8 @@ export function overScene(): Scene {
     tl.fromTo(el.querySelector('.over-title'), { y: -200, opacity: 0 }, { y: 0, opacity: 1, duration: 0.8, ease: 'bounce.out' });
   }
   tl.fromTo(el.querySelector('.over-body'), { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35, ease: 'back.out(2)' }, 0.5);
-  gsap.fromTo(el.querySelectorAll('.ach-stamp'), { scale: 2.4, opacity: 0, rotate: -30 }, { scale: 1, opacity: 1, rotate: -12, duration: 0.18, stagger: 0.12, delay: 1.1, ease: 'power4.out' });
-  const row = el.querySelector('.over-btns') as HTMLElement;
+  gsap.fromTo(el.querySelectorAll('.ach-stamp'), { scale: 2.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.18, stagger: 0.12, delay: 1.1, ease: 'power4.out' });
+  const row = el.querySelector('.over-btns2') as HTMLElement;
   gsap.set(again, { scale: 0 });
   gsap.set(row.querySelectorAll('.over-row, .over-home'), { opacity: 0 });
   gsap.to(again, { scale: 1, duration: 0.45, delay: 2, ease: 'back.out(3)' });
