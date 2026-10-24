@@ -2,7 +2,7 @@
 import { Rng } from '../rng';
 import { clone } from '../clone';
 import type { GameData, RunState, ShopActionInput } from '../types';
-import { START_HP, applyAction, beginTurn, commit, emptyModifiers, log, makeCtx, type Ctx } from './shop';
+import { START_HP, applyAction, beginTurn, commit, emptyModifiers, inventoryOf, log, makeCtx, type Ctx } from './shop';
 import { createOpponents, prepareMatchup } from './lobby';
 import { applyPveReward } from './pve';
 
@@ -18,7 +18,7 @@ export function newRun(seed: string, data: GameData, opts: NewRunOpts = {}): Run
   const tut = !!opts.tutorial && !!data.tutorial;
   const realSeed = tut ? data.tutorial!.seed || seed : seed;
   const s: RunState = {
-    seed: realSeed, turn: 0, gold: 0, hp: START_HP, team: Array(5).fill(null), shop: [], phase: 'arena',
+    seed: realSeed, turn: 0, gold: 0, hp: START_HP, team: Array(5).fill(null), shop: [], inventory: [], phase: 'arena',
     shopLevel: 0, shopTier: 0, opponents: createOpponents(realSeed, data), modifiers: emptyModifiers(), history: [], lastEvents: [],
     stats: { maxTiers: {}, wins: 0, losses: 0, pveWins: 0, goldEquips: 0, lv3: 0, steals: 0, upgrades: 0, bestStreak: 0, streak: 0 },
     log: [], rng: new Rng(`${realSeed}:run`).state, nextUid: 1, seenHeadlines: [], seenSurprises: [],
@@ -40,6 +40,7 @@ export function shopAction(state: RunState, action: ShopActionInput, data: GameD
   const s = clone(state);
   delete s.error;
   s.lastEvents = [];
+  inventoryOf(s); // 旧存档没有 inventory → []
   const ctx = makeCtx(s, data);
   const err = runAction(ctx, action);
   if (err) return { ...state, error: err };

@@ -43,6 +43,20 @@ export function equipTotals(u: Pick<UnitInst, 'equips'>, data: GameData, mult = 
 export function equipCount(u: Pick<UnitInst, 'equips'>): number {
   return EQUIP_SLOTS.filter((s) => !!u.equips?.[s]).length;
 }
+/** 装备仓库容量 */
+export const INVENTORY_SIZE = 6;
+/** 单件装备折算算力：普通 1，金色 2 */
+export function equipInstRefund(e: Pick<EquipInst, 'gold'>): number {
+  return e.gold ? 2 : 1;
+}
+/** 装到单位上会发生什么（不修改）：new = 空槽；gold = 同名普通合成金色；replace = 换下旧装备 */
+export function attachOutcome(u: Pick<UnitInst, 'equips'>, def: EquipDef, gold = false): EquipOutcome {
+  const cur = u.equips?.[def.slot];
+  if (!cur) return 'new';
+  if (cur.defId === def.id && !cur.gold && !gold) return 'gold';
+  return 'replace';
+}
+
 /** 折算算力：每件 1，金色 2 */
 export function equipRefund(u: Pick<UnitInst, 'equips'>): number {
   let n = 0;

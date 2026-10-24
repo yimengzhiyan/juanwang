@@ -34,7 +34,7 @@ generateArchetypeTeam(archetype|profile, turn, seed, data, opts?{scale, arena}):
 botPlayTurn(state, data, {archetype}): RunState     // 替玩家按流派自动购物一回合（托管/模拟）
 runTurnOffline(state, data, {pick?}): {state, result}   // 测试用：endShop→战斗→结算→PVE 选 pick→continue
 tutorialStep(state, data?): TutorialStepId | null
-// 查询：shopMaxTier shopSlotCounts rerollCost canUpgradeShop turnIncome arenaRules canAttach equipRefund
+// 查询：shopMaxTier shopSlotCounts rerollCost canUpgradeShop turnIncome arenaRules canAttach attachOutcome equipRefund equipInstRefund INVENTORY_SIZE
 //       hpLossFor stageBonus rankByHp aliveCount pveForTurn pveTeam computeRunEnd ACHIEVEMENTS SYNERGY_NAME SYNERGY_DESCS
 ```
 
@@ -42,7 +42,7 @@ tutorialStep(state, data?): TutorialStepId | null
 ```
 phase 'arena'    → chooseArena{index}（state.arenaOptions 3 选 1）→ 回合 1
 phase 'headline' → chooseHeadline{option}（偶数回合，商店已生成但不能操作）→ 'shop'
-phase 'shop'     → buy / sell / reroll / freeze / swap / merge / equip / useConsumable / upgradeShop …
+phase 'shop'     → buy / sell / reroll / freeze / swap / merge / equip / buyEquipToInventory / unequip / equipFromInventory / sellInventory / useConsumable / upgradeShop …
                  → endShop → phase 'battle'，此时 state.matchup = {kind:'pvp'|'pve', opponentId, name, team, isHuman}
                  →（联机）POST /api/snapshot；GET /api/opponent → injectHumanOpponents(state, opponents, data)
                  → result = battleForState(state, data) → 播放 result.events
@@ -58,10 +58,14 @@ phase 'over'     → state.end = {rank, won, reason, turns, hp, archetype, arche
 |---|---|
 | `{type:'chooseArena', index}` | 仅 phase='arena' |
 | `{type:'buy', slot, to?}` | 同 1.0：to 空位放入 / 同名合并；不传 to 先合并后空位 |
-| `{type:'sell', index}` | 得 = 等级 + 装备折算（每件 1、金色 2）+ 融资 onSell |
+| `{type:'sell', index}` | 得 = 等级 + 融资 onSell；身上装备按 武器/防具/饰品 顺序**进仓库**，仓库放不下的按件折算（每件 1、金色 2） |
 | `{type:'reroll'}` | 免费顺序：头条/赛场刷新免费 → 工程师 ×4 本回合首刷 → freeRerolls → 1 算力 |
 | `{type:'freeze', slot}` / `{type:'swap', a, b}` / `{type:'merge', from, to}` | 同 1.0；merge 时装备合并（见 3.3） |
-| `{type:'equip', slot, unitIndex}` | 买商店装备并装到队伍 unitIndex 的单位上（见 3.3） |
+| `{type:'equip', slot, unitIndex}` | 买商店装备并装到队伍 unitIndex 的单位上；目标槽已有（非合金）装备 → 旧的换进仓库（仓库满报错，不扣钱）（见 3.3 第 16 条） |
+| `{type:'buyEquipToInventory', slot}` | 买商店装备直接放进仓库（仓库满报错）；不触发 eatItem，第一次从仓库装上时才触发 |
+| `{type:'unequip', unitIndex, slot}` | slot = `'weapon'\|'armor'\|'trinket'`；把该槽装备卸进仓库（免费；仓库满报错） |
+| `{type:'equipFromInventory', invIndex, unitIndex}` | 仓库第 invIndex 件装到单位对应槽：空槽装上 / 同名普通 + 普通 → 金色 / 否则替换，**旧装备放回仓库同一位置**（件数不变，不会溢出）；免费 |
+| `{type:'sellInventory', invIndex}` | 卖掉仓库里的装备：普通 +1、金色 +2 算力 |
 | `{type:'useConsumable', slot, target?}` | 买并使用消耗品；unit 型（转型）需要 target；新闻稿可传 target 指定，否则随机 |
 | `{type:'upgradeShop'}` | 4 算力；提前解锁下一阶；每局最多 2 次；会免费重抽未冻结的单位格 |
 | `{type:'chooseHeadline', option}` | 仅 phase='headline' |
@@ -73,6 +77,7 @@ phase 'over'     → state.end = {rank, won, reason, turns, hp, archetype, arche
 | 字段 | 说明 |
 |---|---|
 | `turn` `gold` `team`(长度 5) `shop` `phase` | 同 1.0；phase 增加 `'arena'` |
+| `inventory: InvEquip[]` | 装备仓库，容量 `INVENTORY_SIZE` = 6，跨回合保留；`InvEquip = {defId, gold, fresh?}`，`fresh` = 从商店买进、还没装过（第一次装上触发 eatItem）。仓库不计分、不参战。旧存档缺这个字段时 `shopAction` 自动补 `[]`（客户端读档也可 `s.inventory ??= []`） |
 | `hp` | 热度，初始 20，归零淘汰（取代 lives/trophies） |
 | `arena` / `arenaOptions` | 本局赛场 id / 开局可选的 3 个 |
 | `shopLevel` / `shopTier` | 升级商店次数（0~2）/ 升级解锁到的阶；商店最高阶 = `max(按回合, shopTier)`（`shopMaxTier(s)`） |
@@ -121,8 +126,10 @@ phase 'over'     → state.end = {rank, won, reason, turns, hp, archetype, arche
 
 ### 3.3 装备 / 消耗品（`engine/equip.ts`）
 15. 装备是永久的，**属性加成不写进 atk/hp**，而是在显示（`effectiveStats`）与开战时计算，所以卸下/换装/变金都能干净地生效。
-16. `equip{slot, unitIndex}`：目标槽为空 → 装上；同名普通版 + 普通版 → 合成金色（`stats.goldEquips++`）；已是金色的同名 → 报错"已经是金色版了"（不扣钱）；否则替换，旧装备折算 1 算力（金色 2）。装上后触发该单位的 `eatItem`（"装上装备时"技能）。
-17. 出售单位：装备每件 +1（金色 +2）。队伍内 merge：被合并方的装备移到目标空槽；同名普通 → 金色；冲突的折算算力。吞并（copyStats consume）的装备同样折算。
+16. `equip{slot, unitIndex}`：目标槽为空 → 装上；同名普通版 + 普通版 → 合成金色（`stats.goldEquips++`）；已是金色的同名 → 报错"已经是金色版了"（不扣钱）；否则替换，**旧装备换进仓库**（不再折算算力；仓库满 → 报错，不扣钱，提示先卖掉仓库装备或先卸/挪走旧装备）。装上后触发该单位的 `eatItem`（"装上装备时"技能）。`attachOutcome(unit, def, gold)` 可预判 new/gold/replace（客户端高亮用）。
+    - 仓库（容量 6）：`buyEquipToInventory` 买进仓库；`unequip` 卸进仓库；`equipFromInventory` 从仓库装上（合金/替换规则同上，换下的放回原仓库格）；`sellInventory` 卖掉（1/金色 2）。卸/装/仓库内互换都免费。
+    - eatItem 防刷：只在"从商店买来的装备第一次装上"时触发（直接 equip，或 `fresh` 的仓库装备）；卸下再装、单位间挪装备不触发。`stats.goldEquips`：合成金色时 +1；买金色槽（直接装或进仓库）时 +1；挪动已有金色装备不再计。
+17. 出售单位：装备进仓库，放不下的每件 +1（金色 +2）。队伍内 merge：被合并方的装备移到目标空槽；同名普通 → 金色；冲突的折算算力。吞并（copyStats consume）的装备同样折算。
 18. 12 件装备效果（数值以 equips.json 为准）：显卡 +3 攻 / 金 +6 且普攻无视护盾；量化 +3/-1 / 金 +6/-1 且普攻溅射目标身后 1；发布会 每次行动 30%（金 60%）多攻击 1 段；热搜 普攻改打血最少的敌人 / 金再 +2 攻；数据集 +1/+3 / 金 +2/+6；防火墙 开战 4 护盾 / 金 8 护盾且碎盾反弹 2；对齐 -1/+5，单次 ≤1 的伤害免疫 / 金 -1/+10；跳板机 阵亡后在最后排以 1 血复活一次 / 金 一半（战前上限的一半）；RLHF endShop 时永久 +1/+1 / 金 +2/+2；蒸馏 开战攻击追平左右相邻友军最高值 / 金 攻血都追平；微调 技能额外触发 1 次 / 金 2 次；融资 每回合 +1（金 +2）算力、出售 +3。
 19. 消耗品（不占槽，买了立即用）：咖啡 本回合 +3 次免费刷新；新闻稿 随机（或指定）一个未满级单位 +1 级（触发进化奖励）；转型 指定单位变成同阶随机其他单位（保留额外属性与装备）。
 
@@ -298,3 +305,16 @@ phase 'over'     → state.end = {rank, won, reason, turns, hp, archetype, arche
 ## 10. 2026-10-24 调整
 - 起始算力曲线 `baseGoldForTurn(turn)`：回合 1~2 为 7，3~4 为 8，5~6 为 9，7+ 为 10（引导局固定 10）。玩家反馈前期算力太多、选择无意义。
 - `Ability.name`（≤5 字）与 `Ability.shortDesc`（≤10 字）、`EquipDef.shortDesc/goldShortDesc`（≤8 字）：卡面直接显示，数据已全部填写。
+
+## 11. 装备仓库 · 客户端实现要点（2026-10-24）
+- 位置：仓库条放在**队伍与商店之间**，6 格横排（空格画虚线框），右侧显示 `inventory.length / INVENTORY_SIZE`；满了整条描红。
+- 拖拽：
+  - 商店装备 → 单位：`equip{slot, unitIndex}`；商店装备 → 仓库条：`buyEquipToInventory{slot}`。
+  - 单位身上的装备格 → 仓库条：`unequip{unitIndex, slot}`。
+  - 仓库格 → 单位：`equipFromInventory{invIndex, unitIndex}`（装到该装备自己的槽，不看落点在哪个格）；仓库格 → 出售区：`sellInventory{invIndex}`。
+  - 拖装备悬停到单位上时用 `attachOutcome(unit, def, gold)` 提示：new = "装上"、gold = "合成金色！"、replace = "替换（旧的进仓库）"；`canAttach` 非空时显示禁止。仓库满且结果是 replace 时预先置灰。
+- 出售单位后，装备进仓库（toast 用 log 最后一行即可）；出售区可以显示"装备将进仓库"。
+- `fresh` 的仓库装备可加个小"新"角标（第一次装上会触发"装上装备时"技能）。
+- 错误文案都在 `state.error`，直接 toast（见下方清单）。
+- 错误文案：`仓库已满（最多 6 件），先卖掉或装上一件吧`（unequip / buyEquipToInventory）、`仓库已满，换下的旧装备放不下：先卖掉仓库里的装备，或先把旧装备卸下/装到别人身上`（equip 替换）、`仓库里没有这件装备`、`这个槽没有装备`、`没有这个装备槽`、`这里没有单位`、`请选择一个单位`、`没有这件装备`、`未知装备`、`算力不够，需要 N 算力`、`已经是金色版了…`、`现在不是商店阶段`。
+- 引导局不涉及仓库（tutorial.json 不变，原 `equip` 动作照常）。

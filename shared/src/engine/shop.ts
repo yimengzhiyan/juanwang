@@ -2,12 +2,12 @@
 // 机器人直接复用 applyAction（ctx.sim = true：不出头条/突发、不写日志）。
 import { Rng } from '../rng';
 import {
-  ENEMY_TARGETS,
+  ENEMY_TARGETS, EQUIP_SLOTS, type InvEquip,
   type Ability, type ArenaRules, type BattleEvent, type EventEffect, type FreeReason, type GameData, type HeadlineDef, type Level, type Modifiers,
   type RunState, type ShopActionInput, type ShopSlot, type ShopSlotKind, type TargetFilter, type Tier, type Trigger, type UnitDef, type UnitInst,
 } from '../types';
 import { stateBonus, teamTiers, type TierMap } from './synergy';
-import { attachEquip, canAttach, equipMultFor, equipRefund, equipTotals, mergeEquips } from './equip';
+import { INVENTORY_SIZE, attachEquip, attachOutcome, canAttach, equipInstRefund, equipRefund, equipMultFor, equipTotals, mergeEquips } from './equip';
 import { DIFFICULTY } from './difficulty';
 
 // ───────────────────────── 常量 ─────────────────────────
@@ -77,6 +77,13 @@ export interface Ctx {
   /** 机器人模拟时为 true：不出头条/突发，不写日志 */
   sim?: boolean;
 }
+
+/** 仓库（旧存档缺 inventory 时补 []） */
+export function inventoryOf(s: RunState): InvEquip[] {
+  return (s.inventory ??= []);
+}
+export const INVENTORY_FULL = `仓库已满（最多 ${INVENTORY_SIZE} 件），先卖掉或装上一件吧`;
+export const INVENTORY_FULL_REPLACE = '仓库已满，换下的旧装备放不下：先卖掉仓库里的装备，或先把旧装备卸下/装到别人身上';
 
 export function makeCtx(s: RunState, data: GameData, sim = false): Ctx {
   return { s, data, rng: Rng.fromState(s.rng), sim };
@@ -885,11 +892,22 @@ function applyActionInner(ctx: Ctx, a: ShopActionInput): string | null {
       fireShop(ctx, 'sell', [u.uid], {});
       const at = indexOfUid(s, u.uid);
       if (at >= 0) s.team[at] = null;
-      const refund = equipRefund(u);
       const funding = equipTotals(u, data, equipMultFor(defOf(ctx, u), tiers)).sellGold ?? 0;
+      // 装备进仓库（按 武器/防具/饰品 顺序），放不下的按件折算
+      const inv = inventoryOf(s);
+      let refund = 0;
+      let stored = 0;
+      for (const sl of EQUIP_SLOTS) {
+        const eq = u.equips?.[sl];
+        if (!eq) continue;
+        if (inv.length < INVENTORY_SIZE) {
+          inv.push({ defId: eq.defId, gold: eq.gold });
+          stored++;
+        } else refund += equipInstRefund(eq);
+      }
       s.gold += u.level + refund + funding;
       if (s.tutorial) s.tutorial.sold = true;
-      log(ctx, `卖掉 ${unitName(data, u.defId)}，+${u.level + refund + funding} 算力${refund ? `（装备折算 ${refund}）` : ''}${funding ? `（融资 ${funding}）` : ''}`);
+      log(ctx, `卖掉 ${unitName(data, u.defId)}，+${u.level + refund + funding} 算力${stored ? `（${stored} 件装备进仓库）` : ''}${refund ? `（仓库满，装备折算 ${refund}）` : ''}${funding ? `（融资 ${funding}）` : ''}`);
       return null;
     }
     case 'reroll': {
@@ -958,14 +976,84 @@ function applyActionInner(ctx: Ctx, a: ShopActionInput): string | null {
       if (slot.price > s.gold) return `算力不够，需要 ${slot.price} 算力`;
       const bad = canAttach(u, def, !!slot.gold);
       if (bad) return bad;
+      const inv = inventoryOf(s);
+      if (attachOutcome(u, def, !!slot.gold) === 'replace' && inv.length >= INVENTORY_SIZE) return INVENTORY_FULL_REPLACE;
       s.gold -= slot.price;
       s.shop.splice(a.slot, 1);
       const r = attachEquip(u, def, !!slot.gold);
-      s.gold += r.refund;
+      if (r.old) inv.push({ defId: r.old.defId, gold: r.old.gold });
       if (r.outcome === 'gold' || slot.gold) s.stats.goldEquips++;
       if (s.tutorial) s.tutorial.usedItem = true;
-      log(ctx, `${unitName(data, u.defId)} 装上 ${def.name}${r.outcome === 'gold' || slot.gold ? '（金色！）' : ''}${r.refund ? `，旧装备折算 +${r.refund}` : ''}`);
+      log(ctx, `${unitName(data, u.defId)} 装上 ${def.name}${r.outcome === 'gold' || slot.gold ? '（金色！）' : ''}${r.old ? `，换下的 ${data.equipsById[r.old.defId]?.name ?? r.old.defId} 进仓库` : ''}`);
       fireShop(ctx, 'eatItem', [u.uid], {});
+      return null;
+    }
+    case 'buyEquipToInventory': {
+      const e = needShop();
+      if (e) return e;
+      const slot = s.shop[a.slot];
+      if (!slot || slot.kind !== 'equip') return '没有这件装备';
+      const def = data.equipsById[slot.defId];
+      if (!def) return '未知装备';
+      if (slot.price > s.gold) return `算力不够，需要 ${slot.price} 算力`;
+      const inv = inventoryOf(s);
+      if (inv.length >= INVENTORY_SIZE) return INVENTORY_FULL;
+      s.gold -= slot.price;
+      s.shop.splice(a.slot, 1);
+      inv.push({ defId: def.id, gold: !!slot.gold, fresh: true });
+      if (slot.gold) s.stats.goldEquips++;
+      log(ctx, `买下 ${def.name}${slot.gold ? '（金色）' : ''}，放进仓库`);
+      return null;
+    }
+    case 'unequip': {
+      const e = needShop();
+      if (e) return e;
+      const u = s.team[a.unitIndex];
+      if (!u) return '这里没有单位';
+      if (!(EQUIP_SLOTS as readonly string[]).includes(a.slot)) return '没有这个装备槽';
+      const cur = u.equips?.[a.slot];
+      if (!cur) return '这个槽没有装备';
+      const inv = inventoryOf(s);
+      if (inv.length >= INVENTORY_SIZE) return INVENTORY_FULL;
+      delete u.equips[a.slot];
+      inv.push({ defId: cur.defId, gold: cur.gold });
+      log(ctx, `${unitName(data, u.defId)} 卸下 ${data.equipsById[cur.defId]?.name ?? cur.defId}，放进仓库`);
+      return null;
+    }
+    case 'equipFromInventory': {
+      const e = needShop();
+      if (e) return e;
+      const inv = inventoryOf(s);
+      const item = inv[a.invIndex];
+      if (!item) return '仓库里没有这件装备';
+      const def = data.equipsById[item.defId];
+      if (!def) return '未知装备';
+      const u = s.team[a.unitIndex];
+      if (!u) return '请选择一个单位';
+      const bad = canAttach(u, def, item.gold);
+      if (bad) return bad;
+      // 换下的旧装备放回原位（仓库件数不变，不会溢出）
+      const r = attachEquip(u, def, item.gold);
+      if (r.old) inv[a.invIndex] = { defId: r.old.defId, gold: r.old.gold };
+      else inv.splice(a.invIndex, 1);
+      if (r.outcome === 'gold') s.stats.goldEquips++;
+      log(ctx, `${unitName(data, u.defId)} 从仓库装上 ${def.name}${r.outcome === 'gold' ? '（金色！）' : ''}${r.old ? `，换下的 ${data.equipsById[r.old.defId]?.name ?? r.old.defId} 进仓库` : ''}`);
+      if (item.fresh) {
+        if (s.tutorial) s.tutorial.usedItem = true;
+        fireShop(ctx, 'eatItem', [u.uid], {});
+      }
+      return null;
+    }
+    case 'sellInventory': {
+      const e = needShop();
+      if (e) return e;
+      const inv = inventoryOf(s);
+      const item = inv[a.invIndex];
+      if (!item) return '仓库里没有这件装备';
+      inv.splice(a.invIndex, 1);
+      const g = equipInstRefund(item);
+      s.gold += g;
+      log(ctx, `卖掉仓库里的 ${data.equipsById[item.defId]?.name ?? item.defId}${item.gold ? '（金色）' : ''}，+${g} 算力`);
       return null;
     }
     case 'useConsumable':

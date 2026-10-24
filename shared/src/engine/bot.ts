@@ -159,7 +159,7 @@ function simState(seed: string, team: UnitInst[], memo: BotMemo, arena?: string)
   const t = [...team.map((u) => clone(u))];
   while (t.length < TEAM_SIZE) t.push(null as unknown as UnitInst);
   return {
-    seed, turn: 0, gold: 0, hp: START_HP, team: t, shop: clone(memo.frozen), phase: 'shop', arena, shopLevel: memo.shopLevel, shopTier: memo.shopTier,
+    seed, turn: 0, gold: 0, hp: START_HP, team: t, shop: clone(memo.frozen), inventory: [], phase: 'shop', arena, shopLevel: memo.shopLevel, shopTier: memo.shopTier,
     opponents: [], modifiers: { ...emptyModifiers(), nextTurnGold: memo.bonusGold }, history: [], lastEvents: [],
     stats: { maxTiers: {}, wins: 0, losses: 0, pveWins: 0, goldEquips: 0, lv3: 0, steals: 0, upgrades: 0, bestStreak: 0, streak: 0 },
     log: [], rng: memo.rng, nextUid: memo.nextUid, seenHeadlines: [], seenSurprises: [],

@@ -7,14 +7,14 @@ export { DEFAULT_EQUIPS, DEFAULT_CONSUMABLES, DEFAULT_ARENAS, DEFAULT_OPPONENTS,
 export { newRun, shopAction, ARENA_CHOICES, type NewRunOpts } from './engine/run';
 export {
   maxTierForTurn, shopMaxTier, tierWeights, levelForXp, xpForLevel, isHeadlineTurn, currentUnitSlots, shopSlotCounts, rerollCost, canUpgradeShop,
-  canMerge, abilityAmount, abilityBuff, matchesFilter, turnIncome, arenaRules,
+  canMerge, abilityAmount, abilityBuff, matchesFilter, turnIncome, arenaRules, inventoryOf, INVENTORY_FULL, INVENTORY_FULL_REPLACE,
   TEAM_SIZE, START_HP, MAX_TURNS, BASE_GOLD, baseGoldForTurn, UNIT_PRICE, REROLL_PRICE, UPGRADE_PRICE, MAX_SHOP_LEVEL, SHOP_UNIT_SLOTS, SHOP_EQUIP_SLOTS, SHOP_CONSUMABLE_SLOTS,
 } from './engine/shop';
 export {
   computeSynergies, activeSynergies, dominantSynergy, teamTiers, tierForCount, stateBonus, synergiesFromDefs,
   SYNERGY_NAME, SYNERGY_DESCS, SYNERGY_SHOUT, FACTION_THRESHOLDS, ROLE_THRESHOLDS, type SynergyBonus, type TierMap,
 } from './engine/synergy';
-export { effectiveStats, equipTotals, equipEntries, equipCount, equipRefund, equipEffectOf, canAttach } from './engine/equip';
+export { effectiveStats, equipTotals, equipEntries, equipCount, equipRefund, equipEffectOf, canAttach, attachOutcome, equipInstRefund, INVENTORY_SIZE } from './engine/equip';
 export { simulateBattle, MAX_ACTIONS, MAX_FIELD } from './engine/battle';
 export { applyBattleResult, computeRunEnd, bestUnitOf, hpLossFor, stageBonus, buildSummary, ACHIEVEMENTS } from './engine/result';
 export {

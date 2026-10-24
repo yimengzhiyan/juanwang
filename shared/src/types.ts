@@ -179,6 +179,10 @@ export interface EquipInst {
   gold: boolean;
 }
 export type UnitEquips = Partial<Record<EquipSlot, EquipInst>>;
+/** 仓库里的装备；fresh = 从商店买进仓库、还没装过（第一次装上时触发 eatItem，之后反复卸/装不再触发） */
+export interface InvEquip extends EquipInst {
+  fresh?: boolean;
+}
 
 export type ConsumableEffect =
   /** 本回合 n 次免费刷新 */
@@ -639,6 +643,8 @@ export interface RunState {
   /** 长度恒为 5，下标 0 = 最前排 */
   team: (UnitInst | null)[];
   shop: ShopSlot[];
+  /** 装备仓库（容量 INVENTORY_SIZE = 6，跨回合保留，不计分）；旧存档缺失时引擎按 [] 处理 */
+  inventory: InvEquip[];
   phase: Phase;
   /** 赛场 id（开局三选一后确定；引导局为 undefined） */
   arena?: string;
@@ -691,6 +697,14 @@ export type ShopActionInput =
   | { type: 'merge'; from: number; to: number }
   /** 购买商店装备并装到队伍 unitIndex 的单位上 */
   | { type: 'equip'; slot: number; unitIndex: number }
+  /** 购买商店装备直接放进仓库 */
+  | { type: 'buyEquipToInventory'; slot: number }
+  /** 把队伍 unitIndex 单位 slot 槽的装备卸到仓库 */
+  | { type: 'unequip'; unitIndex: number; slot: EquipSlot }
+  /** 把仓库第 invIndex 件装到队伍 unitIndex 的单位上（对应槽已有装备 → 旧的换进仓库） */
+  | { type: 'equipFromInventory'; invIndex: number; unitIndex: number }
+  /** 卖掉仓库第 invIndex 件（普通 1、金色 2 算力） */
+  | { type: 'sellInventory'; invIndex: number }
   /** 购买并使用消耗品；unit 型需要 target（队伍下标） */
   | { type: 'useConsumable'; slot: number; target?: number }
   /** 升级商店：4 算力，提前解锁下一阶，每局最多 2 次 */

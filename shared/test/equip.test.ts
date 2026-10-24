@@ -102,12 +102,13 @@ describe('12 件装备（DESIGN 12.3）', () => {
     const r2 = fight([u('abl', { equips: eq('finetune', true) })], [u('wall')]);
     expect(of(r2, 'ability').map((e) => e.repeat)).toEqual([1, 2, 3]);
   });
-  it('融资 funding_round：每回合 +1 算力，卖掉 +3（另有装备折算 1）；金：每回合 +2', () => {
+  it('融资 funding_round：每回合 +1 算力，卖掉 +3（装备本身进仓库）；金：每回合 +2', () => {
     const s = setTeam(start('fu'), [mk('kimi', { equips: eq('funding_round') }), mk('regulator', { equips: eq('funding_round', true) })]);
     expect(turnIncome(makeCtx(s, data)).funding).toBe(3);
     const g = s.gold;
     const s2 = shopAction(s, { type: 'sell', index: 0 }, data);
-    expect(s2.gold).toBe(g + 1 + 1 + 3);
+    expect(s2.gold).toBe(g + 1 + 3);
+    expect(s2.inventory).toEqual([{ defId: 'funding_round', gold: false }]);
   });
 });
 
@@ -133,11 +134,23 @@ describe('装备动作 equip{slot, unitIndex}', () => {
     expect(s.stats.goldEquips).toBe(1);
     expect(shopAction({ ...s, gold: 10 }, { type: 'equip', slot: 0, unitIndex: 0 }, data).error).toMatch(/金色/);
   });
-  it('同槽换装：旧装备折算 1 算力（金色 2）', () => {
+  it('同槽换装：旧装备换进仓库（不再折算算力）', () => {
     let s = withShop(setTeam(start('e3'), [mk('wrapper', { equips: eq('quantize', true) })]), [{}]);
     s = shopAction(s, { type: 'equip', slot: 0, unitIndex: 0 }, data);
     expect(s.team[0]!.equips.weapon).toEqual({ defId: 'gpu_h100', gold: false });
-    expect(s.gold).toBe(10 - 3 + 2);
+    expect(s.gold).toBe(10 - 3);
+    expect(s.inventory).toEqual([{ defId: 'quantize', gold: true }]);
+  });
+  it('同槽换装但仓库已满：报错，不扣钱', () => {
+    const full = Array.from({ length: 6 }, () => ({ defId: 'dataset', gold: false }));
+    const s = { ...withShop(setTeam(start('e3b'), [mk('wrapper', { equips: eq('quantize') })]), [{}]), inventory: full };
+    const r = shopAction(s, { type: 'equip', slot: 0, unitIndex: 0 }, data);
+    expect(r.error).toMatch(/仓库已满/);
+    expect(r.gold).toBe(10);
+    expect(r.team[0]!.equips.weapon).toEqual({ defId: 'quantize', gold: false });
+    // 空槽 / 合成金色不需要仓库位
+    const s2 = { ...withShop(setTeam(start('e3c'), [mk('wrapper', { equips: eq('gpu_h100') })]), [{}]), inventory: full };
+    expect(shopAction(s2, { type: 'equip', slot: 0, unitIndex: 0 }, data).team[0]!.equips.weapon).toEqual({ defId: 'gpu_h100', gold: true });
   });
   it('错误：没有单位 / 算力不够 / 不是装备槽', () => {
     const s = withShop(setTeam(start('e4'), [mk('wrapper')]), [{ price: 30 }, { kind: 'unit', defId: 'crawler' }]);
@@ -145,11 +158,19 @@ describe('装备动作 equip{slot, unitIndex}', () => {
     expect(shopAction(s, { type: 'equip', slot: 0, unitIndex: 0 }, data).error).toMatch(/算力不够/);
     expect(shopAction(s, { type: 'equip', slot: 1, unitIndex: 0 }, data).error).toBe('没有这件装备');
   });
-  it('出售单位时装备折算：每件 1、金色 2', () => {
+  it('出售单位：装备进仓库（武器/防具/饰品顺序），仓库放不下的按件折算（每件 1、金色 2）', () => {
     const unit = mk('kimi', { equips: { ...eq('gpu_h100', true), ...eq('dataset') } });
     expect(equipRefund(unit)).toBe(3);
     const s = setTeam(start('e5'), [unit]);
-    expect(shopAction(s, { type: 'sell', index: 0 }, data).gold).toBe(s.gold + 1 + 3);
+    const r = shopAction(s, { type: 'sell', index: 0 }, data);
+    expect(r.gold).toBe(s.gold + 1);
+    expect(r.inventory).toEqual([{ defId: 'gpu_h100', gold: true }, { defId: 'dataset', gold: false }]);
+    // 仓库剩 1 格：武器进仓库，防具折算 1
+    const five = Array.from({ length: 5 }, () => ({ defId: 'rlhf', gold: false }));
+    const r2 = shopAction({ ...s, inventory: five }, { type: 'sell', index: 0 }, data);
+    expect(r2.gold).toBe(s.gold + 1 + 1);
+    expect(r2.inventory).toHaveLength(6);
+    expect(r2.inventory[5]).toEqual({ defId: 'gpu_h100', gold: true });
   });
   it('队伍内合体：装备合并（空槽移入、同名合成金色、冲突的折算）', () => {
     const a = mk('crawler', { equips: { ...eq('gpu_h100'), ...eq('dataset') } });
@@ -159,6 +180,85 @@ describe('装备动作 equip{slot, unitIndex}', () => {
     s = shopAction(s, { type: 'merge', from: 0, to: 1 }, data);
     expect(s.team[1]!.equips).toEqual({ weapon: { defId: 'quantize', gold: false }, armor: { defId: 'dataset', gold: true }, trinket: { defId: 'rlhf', gold: false } });
     expect(s.gold).toBe(g + 1);
+  });
+});
+
+describe('装备仓库', () => {
+  const full = () => Array.from({ length: 6 }, () => ({ defId: 'dataset', gold: false }));
+  it('buyEquipToInventory：买进仓库（扣钱、不触发 eatItem）；仓库满报错', () => {
+    let s = withShop(setTeam(start('i1'), [mk('prompt_eng')]), [{}, { defId: 'firewall', gold: true, price: 0 }]);
+    s = shopAction(s, { type: 'buyEquipToInventory', slot: 0 }, data);
+    expect(s.error).toBeUndefined();
+    expect(s.gold).toBe(7);
+    expect(s.inventory).toEqual([{ defId: 'gpu_h100', gold: false, fresh: true }]);
+    expect(s.team[0]!.atk).toBe(mk('prompt_eng').atk);
+    s = shopAction(s, { type: 'buyEquipToInventory', slot: 0 }, data);
+    expect(s.inventory[1]).toMatchObject({ defId: 'firewall', gold: true });
+    expect(s.stats.goldEquips).toBe(1);
+    const f = shopAction({ ...withShop(start('i1b'), [{}]), inventory: full() }, { type: 'buyEquipToInventory', slot: 0 }, data);
+    expect(f.error).toMatch(/仓库已满/);
+    expect(f.gold).toBe(10);
+  });
+  it('unequip：卸到仓库；空槽 / 没有单位 / 仓库满报错', () => {
+    const s = setTeam(start('i2'), [mk('wrapper', { equips: { ...eq('gpu_h100', true), ...eq('dataset') } })]);
+    const r = shopAction(s, { type: 'unequip', unitIndex: 0, slot: 'weapon' }, data);
+    expect(r.error).toBeUndefined();
+    expect(r.team[0]!.equips).toEqual({ armor: { defId: 'dataset', gold: false } });
+    expect(r.inventory).toEqual([{ defId: 'gpu_h100', gold: true }]);
+    expect(r.gold).toBe(s.gold);
+    expect(shopAction(r, { type: 'unequip', unitIndex: 0, slot: 'weapon' }, data).error).toBe('这个槽没有装备');
+    expect(shopAction(r, { type: 'unequip', unitIndex: 3, slot: 'weapon' }, data).error).toBe('这里没有单位');
+    expect(shopAction({ ...s, inventory: full() }, { type: 'unequip', unitIndex: 0, slot: 'weapon' }, data).error).toMatch(/仓库已满/);
+  });
+  it('equipFromInventory：空槽装上；同名普通合成金色；已有装备 → 旧的换进仓库原位', () => {
+    let s = { ...setTeam(start('i3'), [mk('wrapper', { equips: eq('gpu_h100') }), mk('kimi', { equips: eq('quantize') })]),
+      inventory: [{ defId: 'gpu_h100', gold: false }, { defId: 'dataset', gold: false }] };
+    s = shopAction(s, { type: 'equipFromInventory', invIndex: 0, unitIndex: 0 }, data);
+    expect(s.error).toBeUndefined();
+    expect(s.team[0]!.equips.weapon).toEqual({ defId: 'gpu_h100', gold: true });
+    expect(s.stats.goldEquips).toBe(1);
+    expect(s.inventory).toEqual([{ defId: 'dataset', gold: false }]);
+    s = shopAction(s, { type: 'equipFromInventory', invIndex: 0, unitIndex: 1 }, data);
+    expect(s.team[1]!.equips.armor).toEqual({ defId: 'dataset', gold: false });
+    expect(s.inventory).toEqual([]);
+    // 替换：kimi 的量化换进仓库，金色显卡（从 wrapper 卸下）装到 kimi
+    s = shopAction(s, { type: 'unequip', unitIndex: 0, slot: 'weapon' }, data);
+    s = shopAction({ ...s, inventory: [...s.inventory, ...full().slice(1)] }, { type: 'equipFromInventory', invIndex: 0, unitIndex: 1 }, data);
+    expect(s.error).toBeUndefined();
+    expect(s.team[1]!.equips.weapon).toEqual({ defId: 'gpu_h100', gold: true });
+    expect(s.inventory[0]).toEqual({ defId: 'quantize', gold: false });
+    expect(s.inventory).toHaveLength(6);
+    expect(s.stats.goldEquips).toBe(1);
+    // 错误
+    expect(shopAction(s, { type: 'equipFromInventory', invIndex: 9, unitIndex: 1 }, data).error).toBe('仓库里没有这件装备');
+    expect(shopAction(s, { type: 'equipFromInventory', invIndex: 0, unitIndex: 4 }, data).error).toBe('请选择一个单位');
+  });
+  it('equipFromInventory：商店买进仓库的装备第一次装上触发 eatItem，卸下再装不再触发', () => {
+    let s = withShop(setTeam(start('i4'), [mk('prompt_eng')]), [{}]);
+    const base = s.team[0]!.atk;
+    s = shopAction(s, { type: 'buyEquipToInventory', slot: 0 }, data);
+    s = shopAction(s, { type: 'equipFromInventory', invIndex: 0, unitIndex: 0 }, data);
+    expect(s.team[0]!.atk).toBe(base + 2);
+    expect(s.team[0]!.equips.weapon).toEqual({ defId: 'gpu_h100', gold: false });
+    s = shopAction(s, { type: 'unequip', unitIndex: 0, slot: 'weapon' }, data);
+    s = shopAction(s, { type: 'equipFromInventory', invIndex: 0, unitIndex: 0 }, data);
+    expect(s.team[0]!.atk).toBe(base + 2);
+  });
+  it('sellInventory：普通 +1、金色 +2；旧存档缺 inventory 按 [] 处理', () => {
+    let s = { ...start('i5'), inventory: [{ defId: 'gpu_h100', gold: true }, { defId: 'dataset', gold: false }] };
+    const g = s.gold;
+    s = shopAction(s, { type: 'sellInventory', invIndex: 0 }, data);
+    expect(s.gold).toBe(g + 2);
+    s = shopAction(s, { type: 'sellInventory', invIndex: 0 }, data);
+    expect(s.gold).toBe(g + 3);
+    expect(s.inventory).toEqual([]);
+    expect(shopAction(s, { type: 'sellInventory', invIndex: 0 }, data).error).toBe('仓库里没有这件装备');
+    const legacy = { ...start('i6') } as Partial<RunState>;
+    delete legacy.inventory;
+    const r = shopAction(legacy as RunState, { type: 'unequip', unitIndex: 0, slot: 'weapon' }, data);
+    expect(r.error).toBe('这里没有单位');
+    const r2 = shopAction(setTeam(legacy as RunState, [mk('wrapper', { equips: eq('dataset') })]), { type: 'unequip', unitIndex: 0, slot: 'armor' }, data);
+    expect(r2.inventory).toEqual([{ defId: 'dataset', gold: false }]);
   });
 });
 
