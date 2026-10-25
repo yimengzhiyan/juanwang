@@ -1,11 +1,11 @@
-// 流派羁绊（DESIGN 12.1 / 16）：阵营 2/3/5 三档、打法关键词 2/4 两档，档位逐级叠加（3 个时 2 个档的效果仍然生效）。
+// 流派羁绊（DESIGN 12.1 / 16）：阵营 2/3/4 三档（2.1.1，原 2/3/5）、打法关键词 2/4 两档，档位逐级叠加（3 个时 2 个档的效果仍然生效）。
 // 本文件只做统计与描述；具体效果分散在 battle.ts（战斗）和 shop.ts（商店阶段）里实现，查 tierOf()。
 import {
   FACTIONS, ROLES,
   type Faction, type GameData, type Role, type SynergyKey, type SynergyKind, type SynergyState, type UnitDef, type UnitInst,
 } from '../types';
 
-export const FACTION_THRESHOLDS = [2, 3, 5] as const;
+export const FACTION_THRESHOLDS = [2, 3, 4] as const;
 /** 打法关键词门槛（字段名沿用 ROLE_*） */
 export const ROLE_THRESHOLDS = [2, 4] as const;
 

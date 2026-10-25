@@ -34,11 +34,14 @@ const tiers = (r: ReturnType<typeof fight>, side: 'me' | 'enemy' = 'me') => of(r
 
 describe('SynergyState 输出', () => {
   it('10 条线固定顺序（阵营 4 + 关键词 6），含个数、档位、门槛、差几个到下一档', () => {
-    const st = computeSynergies([u('o1'), u('o2'), u('o3'), u('m1'), u('m2')], d);
+    const st = computeSynergies([u('o1'), u('o2'), u('m1'), u('m2'), u('c1')], d);
     expect(st.map((s) => s.key)).toEqual(['open', 'closed', 'compute', 'folk', 'multi', 'shield', 'summon', 'explode', 'growth', 'economy']);
-    expect(st[0]).toMatchObject({ kind: 'faction', name: '开源', count: 4, tier: 2, thresholds: [2, 3, 5], next: 1 });
+    expect(st[0]).toMatchObject({ kind: 'faction', name: '开源', count: 3, tier: 2, thresholds: [2, 3, 4], next: 1 });
+    const full = computeSynergies([u('o1'), u('o2'), u('o3'), u('o4')], d)[0];
+    expect(full).toMatchObject({ count: 4, tier: 3 });
+    expect(full.next).toBeUndefined();
     expect(st[4]).toMatchObject({ kind: 'role', name: '多刀', count: 2, tier: 1, thresholds: [2, 4], next: 2, descs: ROLE_META.multi.descs });
-    expect(st[1]).toMatchObject({ count: 1, tier: 0, next: 1 });
+    expect(st[1]).toMatchObject({ count: 2, tier: 1, next: 1 });
     expect(st[0].descs).toHaveLength(3);
     expect(dominantSynergy(st)?.key).toBe('open');
   });
@@ -77,8 +80,8 @@ describe('开源 open', () => {
     expect(s.team[1]).toMatchObject({ defId: 'hf', atk: 4, hp: 5 });
     expect(s.team[3]).toMatchObject({ defId: 'kimi2', atk: 4, hp: 6 });
   });
-  it('×5：开源单位每回合开始永久 +1/+1（5 人满队即可）', () => {
-    const s2 = setTeam(start('o5'), [mk('qwen_chan'), mk('hf'), mk('agi'), mk('kimi2'), mk('crawler')]);
+  it('×4：开源单位每回合开始永久 +1/+1（4 个开源即可）', () => {
+    const s2 = setTeam(start('o5'), [mk('qwen_chan'), mk('hf'), mk('agi'), mk('kimi2'), mk('wrapper')]);
     const ctx2 = makeCtx(s2, data);
     beginTurn(ctx2, 3);
     expect(ctx2.s.team[1]).toMatchObject({ defId: 'hf', atk: 4, hp: 5 });
@@ -92,16 +95,17 @@ describe('闭源 closed', () => {
     expect(of(r, 'shield')[0]).toMatchObject({ unit: { defId: 'c1' }, amount: 3 });
   });
   it('×3：闭源单位获得 1/3 血量的护盾，碎盾反弹 2', () => {
-    const r = fight([u('c1'), u('c2'), u('c3'), u('c4')], [u('hitter')], { first: 'enemy' });
+    const r = fight([u('c1'), u('c2'), u('c3'), u('o1')], [u('hitter')], { first: 'enemy' });
+    expect(tiers(r)).toEqual(['closed2']);
     const shields = of(r, 'shield').filter((e) => e.unit.defId === 'c1').map((e) => e.amount);
     expect(shields).toEqual([3, 2]);
     const broken = of(r, 'damage').find((e) => e.shieldBroken)!;
     expect(broken.unit.defId).toBe('c1');
     expect(of(r, 'damage').find((e) => e.kind === 'reflect')).toMatchObject({ amount: 2, unit: { defId: 'hitter' } });
   });
-  it('×5：反弹 = 攻击者攻击力，护盾不会被穿透（金色显卡也打不穿）', () => {
+  it('×4：反弹 = 攻击者攻击力，护盾不会被穿透（金色显卡也打不穿）', () => {
     const goldGpu = u('hitter', { equips: { weapon: { defId: 'gpu_h100', gold: true } } });
-    const r = fight([u('c1'), u('c2'), u('c3'), u('c4')], [goldGpu], { first: 'enemy', mods: { synergyBonus: { closed: 1 } } });
+    const r = fight([u('c1'), u('c2'), u('c3'), u('c4')], [goldGpu], { first: 'enemy' });
     expect(tiers(r)).toEqual(['closed3']);
     const first = of(r, 'damage')[0];
     expect(first.blocked).toBeGreaterThan(0);
@@ -116,11 +120,12 @@ describe('算力 compute', () => {
     expect(of(r, 'buff')[0]).toMatchObject({ unit: { defId: 'k2' }, atk: 2 });
   });
   it('×3：算力单位的装备效果 ×2（显卡 +3 → +6）', () => {
-    const r = fight([u('k1', { equips: gpu }), u('k2'), u('k3'), u('k4')], [u('wall')]);
+    const r = fight([u('k1', { equips: gpu }), u('k2'), u('k3')], [u('wall')]);
+    expect(of(r, 'attack')[0]).toMatchObject({ hit: 1, hits: 1 });
     expect(of(r, 'start')[0].me[0].atk).toBe(1 + 6);
   });
-  it('×5：装备最多的单位每次攻击额外攻击 1 次', () => {
-    const r = fight([u('k1', { equips: gpu }), u('k2'), u('k3'), u('k4')], [u('wall')], { mods: { synergyBonus: { compute: 1 } } });
+  it('×4：装备最多的单位每次攻击额外攻击 1 次', () => {
+    const r = fight([u('k1', { equips: gpu }), u('k2'), u('k3'), u('k4')], [u('wall')]);
     expect(of(r, 'attack')[0]).toMatchObject({ hit: 1, hits: 2 });
   });
 });
@@ -131,14 +136,15 @@ describe('民间 folk', () => {
     expect(of(r, 'summon')[0].unit).toMatchObject({ defId: 'token_shuijun', pos: 2, atk: 1, hp: 1 });
   });
   it('×3：召唤物继承召唤者 50% 属性；友军阵亡召唤水军', () => {
-    const r = fight([u('f1'), u('f2'), u('f3'), u('f4')], [u('hitter')], { first: 'enemy' });
+    const r = fight([u('f1'), u('f2'), u('f3')], [u('hitter')], { first: 'enemy' });
+    expect(tiers(r)).toEqual(['folk2']);
     // 开战水军继承最强民间（f1 2/8）的一半：1+1 / 1+4
     expect(of(r, 'summon')[0].unit).toMatchObject({ atk: 2, hp: 5 });
     const f1Dies = r.events.findIndex((e) => e.type === 'faint' && e.unit.defId === 'f1');
     expect(r.events.slice(f1Dies).find((e) => e.type === 'summon')).toBeTruthy();
   });
-  it('×5：召唤物阵亡时对敌方全体造成 1 伤害', () => {
-    const r = fight([u('f1'), u('f2'), u('f3'), u('f4')], [u('hitter'), u('poke')], { first: 'enemy', mods: { synergyBonus: { folk: 1 } } });
+  it('×4：召唤物阵亡时对敌方全体造成 1 伤害', () => {
+    const r = fight([u('f1'), u('f2'), u('f3'), u('f4')], [u('hitter'), u('poke')], { first: 'enemy' });
     const ex = of(r, 'explode')[0];
     expect(ex).toMatchObject({ amount: 1, unit: { defId: 'token_shuijun' } });
     expect(ex.targets).toHaveLength(2);

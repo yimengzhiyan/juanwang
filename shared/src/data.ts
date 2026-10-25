@@ -1044,7 +1044,7 @@ export function validateData(raw: RawGameData): GameData {
     if (list.length < 5 || list.length > 6) w.push(`units: 关键词 ${r} 有 ${list.length} 个（DESIGN 16 建议 5~6）`);
     if (list.length && list.filter((u) => u.tier <= 2).length < 2) w.push(`units: 关键词 ${r} 的 T1~T2 单位少于 2 个，前期难以成型（DESIGN 16）`);
   }
-  for (const f of FACTIONS) if (shop.length >= 20 && shop.filter((u) => u.faction === f).length < 6) w.push(`units: 阵营 ${f} 少于 6 个，6 档羁绊很难凑齐`);
+  for (const f of FACTIONS) if (shop.length >= 20 && shop.filter((u) => u.faction === f).length < 6) w.push(`units: 阵营 ${f} 少于 6 个，×4 羁绊很难凑齐`);
   if (tutorial) {
     for (const t of tutorial.turns) {
       for (const id of t.units) if (!data.unitsById[id]) p.push(`tutorial 回合 ${t.turn}: 未知单位 "${id}"`);

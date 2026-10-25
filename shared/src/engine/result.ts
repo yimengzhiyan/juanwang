@@ -23,7 +23,7 @@ export const ACHIEVEMENTS: Record<string, string> = {
   upgradeMax: '商店满升级',
   streak5: '五连胜',
   steal: '挖角成功',
-  'tier:open:3': '流派·开源 ×5', 'tier:closed:3': '流派·闭源 ×5', 'tier:compute:3': '流派·算力 ×5', 'tier:folk:3': '流派·民间 ×5',
+  'tier:open:3': '流派·开源 ×4', 'tier:closed:3': '流派·闭源 ×4', 'tier:compute:3': '流派·算力 ×4', 'tier:folk:3': '流派·民间 ×4',
   ...Object.fromEntries(ROLES.map((r) => [`tier:${r}:2`, `打法·${ROLE_META[r].name} ×4`])),
   'tier:open:2': '流派·开源 ×3', 'tier:closed:2': '流派·闭源 ×3', 'tier:compute:2': '流派·算力 ×3', 'tier:folk:2': '流派·民间 ×3',
 };

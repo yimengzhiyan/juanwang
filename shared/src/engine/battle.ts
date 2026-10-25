@@ -53,9 +53,9 @@ interface BU {
   doubled: boolean;
   /** 待执行的追击次数 */
   chain: number;
-  /** 算力 ×5：每次攻击额外 1 次 */
+  /** 算力 ×4：每次攻击额外 1 次 */
   bonusHit: boolean;
-  /** 碎盾反弹（闭源 ×3 = 2、护盾 ×4 = 3，取较大）；reflectAtk = 闭源 ×5（反弹攻击者攻击力） */
+  /** 碎盾反弹（闭源 ×3 = 2、护盾 ×4 = 3，取较大）；reflectAtk = 闭源 ×4（反弹攻击者攻击力） */
   closedReflect: number;
   reflectAtk: boolean;
   unpierceable: boolean;
@@ -192,7 +192,7 @@ class Battle {
       hp: Math.max(0, t.hp), shield: t.shield, kind, ...(broken ? { shieldBroken: true } : {}),
       text: `${srcName ? `${srcName} 对 ` : ''}${this.name(t)} 造成 ${dealt} 点伤害${blocked ? `（护盾挡下 ${blocked}${broken ? '，护盾碎了' : ''}）` : ''}${pierce && t.shield > 0 ? '（无视护盾）' : ''}`,
     });
-    // 碎盾反弹（闭源 ×3 / ×5、护盾 ×4、金色防火墙）
+    // 碎盾反弹（闭源 ×3 / ×4、护盾 ×4、金色防火墙）
     if (broken && src && src.side !== t.side && kind !== 'reflect' && this.isAlive(src)) {
       const r = Math.max(t.reflectAtk ? src.atk : t.closedReflect, t.eq.shieldReflect ?? 0);
       if (r > 0) {
@@ -291,7 +291,7 @@ class Battle {
     this.emit({ type: 'revive', unit: this.snap(u), via, source: src ? this.ref(src) : undefined, text: `${this.name(u)} 以 ${u.hp} 血复活了！` });
   }
 
-  /** 阵亡时的羁绊：自爆 ×4（自爆单位炸最前排 + 任意友军阵亡全体 1 伤害）、民间 ×5（召唤物阵亡爆炸）、民间 ×3（友军阵亡召唤水军） */
+  /** 阵亡时的羁绊：自爆 ×4（自爆单位炸最前排 + 全体余波 + 其余自爆友军成长）、民间 ×4（召唤物阵亡爆炸）、民间 ×3（友军阵亡召唤水军） */
   onDeathSynergies(u: BU): void {
     const t = this.tiers[u.side];
     if (u.consumed) return;

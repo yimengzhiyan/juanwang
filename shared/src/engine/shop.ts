@@ -40,15 +40,22 @@ export function maxTierForTurn(turn: number): Tier {
 export function shopMaxTier(s: Pick<RunState, 'turn' | 'shopTier'>): Tier {
   return Math.min(6, Math.max(maxTierForTurn(s.turn), s.shopTier ?? 0)) as Tier;
 }
-/** 商店阶级权重（DESIGN 17）：当前最高阶 3、次高阶 2、其余 1（下标 i = 阶 i+1） */
+/** 商店阶级权重（DESIGN 17 / 20）：当前最高阶 5、次高阶 2、其余 1（下标 i = 阶 i+1） */
 export function tierWeights(maxTier: number): number[] {
   if (SHOP_ROLL.legacyTierWeights) return Array.from({ length: maxTier }, (_, i) => i + 1);
-  return Array.from({ length: maxTier }, (_, i) => (i === maxTier - 1 ? 3 : i === maxTier - 2 ? 2 : 1));
+  return Array.from({ length: maxTier }, (_, i) => (i === maxTier - 1 ? SHOP_ROLL.topWeight : i === maxTier - 2 ? 2 : 1));
 }
+/** 最高阶 ≥ 这个值时，每次刷新保证至少 1 个最高阶单位（DESIGN 20） */
+export const GUARANTEE_TOP_FROM_TIER = 3;
 /** 已在队伍中的单位（同 defId）在商店里的权重倍数（DESIGN 17；仓库无关） */
 export const OWNED_UNIT_WEIGHT = 2.5;
-/** 商店抽卡参数（模拟脚本可临时改成 2.0 口径对比：{ownedWeight: 1, legacyTierWeights: true}） */
-export const SHOP_ROLL = { ownedWeight: OWNED_UNIT_WEIGHT, legacyTierWeights: false };
+/** 最高阶的权重（DESIGN 20：5） */
+export const TOP_TIER_WEIGHT = 5;
+/**
+ * 商店抽卡参数（模拟脚本对比用）：2.0 口径 {ownedWeight:1, legacyTierWeights:true, guaranteeTop:false, upgradeRerollAll:false}；
+ * 2.1 初版 {topWeight:3, guaranteeTop:false, upgradeRerollAll:false}
+ */
+export const SHOP_ROLL = { ownedWeight: OWNED_UNIT_WEIGHT, legacyTierWeights: false, topWeight: TOP_TIER_WEIGHT, guaranteeTop: true, upgradeRerollAll: true };
 /**
  * 商店刷单位的逐单位权重：阶的总权重按 tierWeights 平均分给该阶的单位，已在队伍中的 defId 再 × OWNED_UNIT_WEIGHT。
  * 返回 [{id, weight}]（客户端可据此显示"出现概率"；概率 = weight / 总和）。
@@ -257,10 +264,28 @@ export function rollShop(ctx: Ctx, initial = false, only?: ShopSlotKind): void {
         if (id) fresh.push(mkSlot(ctx, kind, id));
       }
     }
+    ensureTopTier(ctx, keep, fresh);
   }
   s.shop = [...keep, ...fresh];
   sortShop(s);
   repriceShop(ctx);
+}
+
+/**
+ * 保底（DESIGN 20）：最高阶 ≥ T3 时，刷新后商店里至少有 1 个最高阶单位（含保留下来的冻结/免费槽）；
+ * 没有的话把一个新刷出的单位格换成随机最高阶单位。
+ */
+function ensureTopTier(ctx: Ctx, keep: ShopSlot[], fresh: ShopSlot[]): void {
+  if (!SHOP_ROLL.guaranteeTop) return;
+  const top = shopMaxTier(ctx.s);
+  if (top < GUARANTEE_TOP_FROM_TIER || !(ctx.data.shopUnitsByTier[top] ?? []).length) return;
+  const tierOf = (sl: ShopSlot) => ctx.data.unitsById[sl.defId]?.tier ?? 0;
+  if ([...keep, ...fresh].some((sl) => sl.kind === 'unit' && tierOf(sl) === top)) return;
+  const idx = fresh.map((sl, i) => (sl.kind === 'unit' && !sl.free ? i : -1)).filter((i) => i >= 0);
+  if (!idx.length) return;
+  const at = ctx.rng.pick(idx);
+  const id = rollUnitDef(ctx, { tier: top });
+  if (id) fresh[at] = mkSlot(ctx, 'unit', id);
 }
 
 function tutorialTurn(ctx: Ctx) {
@@ -839,13 +864,13 @@ function pickHeadline(ctx: Ctx): HeadlineDef | undefined {
   return h;
 }
 
-/** 进入商店：startTurn 技能 + 开源 ×5（开源单位永久 +1/+1） */
+/** 进入商店：startTurn 技能 + 开源 ×4（开源单位永久 +1/+1） */
 export function openShop(ctx: Ctx): void {
   ctx.s.phase = 'shop';
   fireTeam(ctx, 'startTurn', {});
   if (tiersOf(ctx).open >= 3) {
     for (const u of teamUnits(ctx.s)) if (defOf(ctx, u)?.faction === 'open') permGrow(ctx, u, 1, 1);
-    log(ctx, '开源 ×5：开源单位永久 +1/+1');
+    log(ctx, '开源 ×4：开源单位永久 +1/+1');
   }
   repriceShop(ctx);
 }
@@ -1121,7 +1146,8 @@ function applyActionInner(ctx: Ctx, a: ShopActionInput): string | null {
       s.shopLevel++;
       s.shopTier = cur + 1;
       s.stats.upgrades++;
-      rollShop(ctx, false, 'unit');
+      // DESIGN 20：升级后立即免费重刷整个商店（冻结 / 免费槽保留），并保证有新阶单位
+      rollShop(ctx, false, SHOP_ROLL.upgradeRerollAll ? undefined : 'unit');
       log(ctx, `升级商店：提前解锁 T${s.shopTier}`);
       emitEvent(ctx, { type: 'shopLevelUp', shopLevel: s.shopLevel, tier: s.shopTier, text: `商店升级！提前解锁 T${s.shopTier}` });
       return null;

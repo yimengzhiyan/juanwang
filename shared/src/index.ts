@@ -6,7 +6,7 @@ export { validateData, indexData, parseTarget, DataError, scaleEquipEffect, addE
 export { DEFAULT_EQUIPS, DEFAULT_CONSUMABLES, DEFAULT_ARENAS, DEFAULT_OPPONENTS, DEFAULT_PVE, DEFAULT_PVE_POOL } from './defaults';
 export { newRun, shopAction, ARENA_CHOICES, type NewRunOpts } from './engine/run';
 export {
-  maxTierForTurn, shopMaxTier, tierWeights, unitRollWeights, OWNED_UNIT_WEIGHT, SHOP_ROLL, levelForXp, xpForLevel, isHeadlineTurn, currentUnitSlots, shopSlotCounts, rerollCost, canUpgradeShop,
+  maxTierForTurn, shopMaxTier, tierWeights, unitRollWeights, OWNED_UNIT_WEIGHT, SHOP_ROLL, TOP_TIER_WEIGHT, GUARANTEE_TOP_FROM_TIER, levelForXp, xpForLevel, isHeadlineTurn, currentUnitSlots, shopSlotCounts, rerollCost, canUpgradeShop,
   canMerge, permGrow, spendGold, adjacentUnits, abilityAmount, abilityBuff, matchesFilter, turnIncome, arenaRules, inventoryOf, INVENTORY_FULL, INVENTORY_FULL_REPLACE,
   TEAM_SIZE, START_HP, MAX_TURNS, BASE_GOLD, baseGoldForTurn, UNIT_PRICE, REROLL_PRICE, UPGRADE_PRICE, MAX_SHOP_LEVEL, SHOP_UNIT_SLOTS, SHOP_EQUIP_SLOTS, SHOP_CONSUMABLE_SLOTS,
 } from './engine/shop';

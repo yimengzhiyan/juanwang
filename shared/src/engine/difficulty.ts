@@ -5,7 +5,7 @@ export const DIFFICULTY = {
   earlyScale: 0.9,
   /** 之后每回合线性回升，rampTurns 回合后到 maxScale */
   rampTurns: 6,
-  maxScale: 1,
+  maxScale: 1.03,
   /** 橡皮筋：玩家热度 ≤ lowHpThreshold 时再 × lowHpScale */
   lowHpThreshold: 6,
   lowHpScale: 0.9,

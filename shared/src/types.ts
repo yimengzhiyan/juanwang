@@ -444,7 +444,7 @@ export interface SynergyState {
   name: string;
   /** 按单位个数统计（同名的不同单位各算 1，等级不计） */
   count: number;
-  /** 0 = 未激活；阵营 1~3（2/3/5 个），关键词 1~2（2/4 个） */
+  /** 0 = 未激活；阵营 1~3（2/3/4 个），关键词 1~2（2/4 个） */
   tier: number;
   /** 各档门槛：阵营 [2,3,5]，关键词 [2,4] */
   thresholds: number[];

@@ -76,9 +76,9 @@ describe('购买 / 出售 / 刷新 / 冻结 / 交换', () => {
 describe('阶级解锁 / 升级商店', () => {
   it('按回合：T1@1 T2@3 T3@5 T4@7 T5@9 T6@11，最高阶权重最高', () => {
     expect([1, 3, 5, 7, 9, 11, 20].map(maxTierForTurn)).toEqual([1, 2, 3, 4, 5, 6, 6]);
-    expect(tierWeights(1)).toEqual([3]);
-    expect(tierWeights(3)).toEqual([1, 2, 3]);
-    expect(tierWeights(6)).toEqual([1, 1, 1, 1, 2, 3]);
+    expect(tierWeights(1)).toEqual([5]);
+    expect(tierWeights(3)).toEqual([1, 2, 5]);
+    expect(tierWeights(6)).toEqual([1, 1, 1, 1, 2, 5]);
     const ctx = makeCtx({ ...start('t'), turn: 5 }, data);
     const cnt = [0, 0, 0, 0];
     for (let i = 0; i < 1200; i++) cnt[data.unitsById[rollUnitDef(ctx)!].tier]++;
@@ -89,8 +89,8 @@ describe('阶级解锁 / 升级商店', () => {
   it(`已在队伍中的单位权重 ×${OWNED_UNIT_WEIGHT}（DESIGN 17）`, () => {
     const w = unitRollWeights(data, 1, ['crawler']);
     const t1 = data.shopUnitsByTier[1];
-    expect(w.find((x) => x.id === 'crawler')!.weight).toBeCloseTo((3 / t1.length) * OWNED_UNIT_WEIGHT);
-    expect(w.find((x) => x.id === 'labeler')!.weight).toBeCloseTo(3 / t1.length);
+    expect(w.find((x) => x.id === 'crawler')!.weight).toBeCloseTo((5 / t1.length) * OWNED_UNIT_WEIGHT);
+    expect(w.find((x) => x.id === 'labeler')!.weight).toBeCloseTo(5 / t1.length);
     const base = setTeam(start('own'), [mk('crawler')]);
     const ctx = makeCtx(base, data);
     let hit = 0;
@@ -99,6 +99,30 @@ describe('阶级解锁 / 升级商店', () => {
     const p = OWNED_UNIT_WEIGHT / (t1.length - 1 + OWNED_UNIT_WEIGHT);
     expect(hit / N).toBeGreaterThan(p - 0.04);
     expect(hit / N).toBeLessThan(p + 0.04);
+  });
+  it('最高阶 ≥T3 时每次刷新（含回合开始、升级商店）保证至少 1 个最高阶单位', () => {
+    const top = (x: RunState) => x.shop.filter((sl) => sl.kind === 'unit' && data.unitsById[sl.defId].tier === shopMaxTier(x)).length;
+    for (const turn of [5, 7, 11]) {
+      let s: RunState = { ...start(`g${turn}`), turn, gold: 100 };
+      for (let i = 0; i < 40; i++) {
+        s = ok(s, { type: 'reroll' });
+        expect(top(s), `turn ${turn}`).toBeGreaterThanOrEqual(1);
+      }
+    }
+  });
+  it('upgradeShop 后立即免费重刷整个商店（单位/装备/消耗品），冻结槽保留', () => {
+    let s = ok(start('uu'), { type: 'freeze', slot: 0 });
+    const frozen = s.shop[0];
+    const before = s.shop.slice(1).map((x) => x.defId).join();
+    s = ok(s, { type: 'upgradeShop' });
+    expect(s.shop[0]).toEqual(frozen);
+    expect(s.shop.slice(1).map((x) => x.defId).join()).not.toBe(before);
+    expect(s.shop.filter((x) => x.kind === 'equip')).toHaveLength(2);
+    expect(s.shop.filter((x) => x.kind === 'consumable')).toHaveLength(1);
+    expect(s.modifiers.rerollsThisTurn).toBe(0);
+    // 升到 T3：保底出现 T3
+    s = ok({ ...s, gold: 10 }, { type: 'upgradeShop' });
+    expect(s.shop.some((x) => x.kind === 'unit' && data.unitsById[x.defId].tier === 3)).toBe(true);
   });
   it(`upgradeShop：${UPGRADE_PRICE} 算力提前解锁下一阶并重抽单位格；每局最多 ${MAX_SHOP_LEVEL} 次；阶级 = max(按回合, 升级)`, () => {
     let s = ok(start('u'), { type: 'freeze', slot: 4 });
