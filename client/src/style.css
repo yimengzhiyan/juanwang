@@ -1571,3 +1571,4 @@ input { font-family: inherit; user-select: text; -webkit-user-select: text; }
 .sum-grow img { width: 20px; height: 20px; }
 .sum-grow b { color: var(--c-gold-dark); font-family: var(--font-num); font-size: 17px; -webkit-text-stroke: 0.5px var(--outline); }
 .sum-grow small { margin-left: auto; font-size: 11px; color: var(--text-sub); }
+.up-btn .up-note { font-size: 10px; font-weight: 700; line-height: 1.1; opacity: 0.95; }

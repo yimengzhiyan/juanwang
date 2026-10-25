@@ -145,9 +145,11 @@ export function gameScene(): Scene {
     const left = MAX_SHOP_LEVEL - s.shopLevel;
     if (t >= 6 || left <= 0) {
       upBtn.innerHTML = `<b>T${t}</b><span>${t >= 6 ? '最高阶' : '升级已用完'}</span>`;
+      upBtn.title = '';
       upBtn.disabled = true;
     } else {
-      upBtn.innerHTML = `<b>升级 T${t}→T${t + 1}</b><span><img src="${ui('gold')}" alt="">${UPGRADE_PRICE} · 剩 ${left} 次</span>`;
+      upBtn.innerHTML = `<b>升级 T${t}→T${t + 1}</b><span><img src="${ui('gold')}" alt="">${UPGRADE_PRICE} · 剩 ${left} 次</span><small class="up-note">并刷新商店</small>`;
+      upBtn.title = `花 ${UPGRADE_PRICE} 算力解锁 T${t + 1} 单位，并免费刷新商店`;
       upBtn.disabled = !canUpgradeShop(s);
     }
     // 刷新价格

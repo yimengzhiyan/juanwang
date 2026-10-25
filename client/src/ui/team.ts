@@ -70,7 +70,7 @@ export function runSynergies(s: RunState, data: GameData): SynergyState[] {
   return computeSynergies(s.team, data, stateBonus(s, data));
 }
 
-/** 羁绊条（DESIGN 16）：两行，上 = 阵营（4，档位 2/3/5），下 = 打法（6，档位 2/4）。行内激活的在前；0 个的只显示图标 */
+/** 羁绊条（DESIGN 16）：两行，上 = 阵营（4），下 = 打法（6）；门槛/档位全部来自 SynergyState.thresholds。行内激活的在前；0 个的只显示图标 */
 export function renderSynergy(el: HTMLElement, states: SynergyState[], onTap?: (st: SynergyState) => void): void {
   el.classList.add('is-2row');
   const rows: [string, string, SynergyState[]][] = [

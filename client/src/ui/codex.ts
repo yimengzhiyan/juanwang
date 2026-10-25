@@ -1,4 +1,4 @@
-// 图鉴：4 阵营页签（顶部 2/3/5 档效果 + 该阵营全部单位大卡）/ 打法（6 个子页签，顶部 2/4 档效果来自 ROLE_META）/ 装备 / 赛场。对局中打开时标出当前羁绊人数。
+// 图鉴：4 阵营页签（顶部各档效果（门槛取引擎 FACTION_THRESHOLDS） + 该阵营全部单位大卡）/ 打法（6 个子页签，顶部 2/4 档效果来自 ROLE_META）/ 装备 / 赛场。对局中打开时标出当前羁绊人数。
 import {
   EQUIP_SLOTS, FACTIONS, FACTION_THRESHOLDS, ROLES, ROLE_META, SYNERGY_DESCS, computeSynergies, stateBonus,
   type GameData, type Role, type RunState, type SynergyKey, type UnitDef,
